@@ -124,7 +124,7 @@ JOIN_CONTINUATIONS_PL='
     # Reads the bodies of @$pending from $$i; returns 0 when a body is not closed.
     my ($s, $i, $pending, $out) = @_;
     my $n = length $s;
-    for my $h (@$pending) {
+    for my $h (grep { !$_->[3] } @$pending) {
       my ($delim, $quoted, $dash) = @$h;
       my $closed = 0;
       while ($$i < $n) {
@@ -154,15 +154,24 @@ JOIN_CONTINUATIONS_PL='
     my @stack = (q{N});   # N code, S single quote, A $quote, D double quote, B backtick, P $( … ),
                           # X ${ … }, $(( … )), $[ … ] or (( … )), closed by $close[-1]
     my @depth;            # parentheses open inside each P frame
-    my (@close, @xdepth); # closing bracket and brackets open inside each X frame
-    my @pending;          # here-docs whose bodies start at the next code newline
+    my (@close, @xdepth, @xdollar); # closing bracket, brackets open inside, `$((` flag of each X frame
+    my @pending;          # here-docs whose bodies start at the next code newline: [delim, quoted, dash, fake, stack size]
+    # A here-doc opened inside $( … ) or a backquote that closes on the same line has no body for
+    # the lines after it (`: $( (:) <<W )`): those lines are commands (rc.8 red team, F6).
+    my $closed_frame = sub { $_->[3] = 1 for grep { $_->[4] > @stack } @pending; };
+    my $push_x = sub { my ($close, $dollar) = @_; push @stack, q{X}; push @xdepth, 0; push @close, $close; push @xdollar, $dollar; };
     my $word_start = 1;
     my $n = length $s;
     pos($s) = 0;
     while (pos($s) < $n) {
       my $top = $stack[-1];
       if ($top eq q{S}) {
-        $s =~ /\G[^\x27]*\x27?/gc; $out .= $&; pop @stack if substr($&, -1) eq "\x27"; next;
+        $s =~ /\G[^\x27]*\x27?/gc;
+        my $m = $&;
+        # A single-quoted text that ends in a lone backslash (bash -c, eval, a here-string) is
+        # run by a shell that drops that backslash, as at the end of the call (rc.8 red team, F6).
+        if (substr($m, -1) eq "\x27") { pop @stack; $m =~ s/(?<!\\)((?:\\\\)*)\\\x27\z/$1\x27/; }
+        $out .= $m; next;
       }
       if ($top eq q{A}) {
         $s =~ /\G(?:[^\x27\\]|\\.)*(?:\\\z)?(\x27?)/gcs; $out .= $&; pop @stack if length $1; next;
@@ -174,10 +183,13 @@ JOIN_CONTINUATIONS_PL='
         if ($s =~ /\G"/gc) { $out .= q{"}; pop @stack; next; }
         if ($s =~ /\G`/gc) { $out .= "`"; push @stack, q{B}; $word_start = 1; next; }
         if ($s =~ /\G\$\(/gc) { $out .= q{$(}; push @stack, q{P}; push @depth, 0; $word_start = 1; next; }
+        # `"${x:-"<<EOF"}"`: the word of ${…} has quotes of its own (rc.8 red team, F6).
+        if ($s =~ /\G\$\{/gc) { $out .= "\$\{"; $push_x->("}", 0); $word_start = 0; next; }
         $s =~ /\G./gcs; $out .= $&; next;
       }
       if ($s =~ /\G\n/gc) {
         $out .= "\n"; $word_start = 1;
+        @pending = grep { !$_->[3] } @pending;
         if (@pending) {
           my $i = pos($s);
           return undef unless body_lines($s, \$i, \@pending, \$out);
@@ -190,24 +202,32 @@ JOIN_CONTINUATIONS_PL='
       if ($quotes && $s =~ /\G\$\x27/gc) { $out .= "\$\x27"; push @stack, q{A}; $word_start = 0; next; }
       if ($quotes && $s =~ /\G"/gc) { $out .= q{"}; push @stack, q{D}; $word_start = 0; next; }
       # `<<` inside an expansion is a shift or plain text, not a here-doc (rc.6 red team, F4).
+      # So is `<<` inside `for((`, `if((` and an array subscript `x[1<<W]=5`, `x=([1<<W]=5)` (rc.8, F6).
       my $xo;
       if ($s =~ /\G(?:\$\(\(|\$\{|\$\[)/gc) { $xo = $&; }
-      elsif (substr($s, pos($s), 2) eq "((" && ($out eq q{} || substr($out, -1) =~ /[\s;&|(]/)) { $xo = "(("; pos($s) += 2; }
+      elsif (substr($s, pos($s), 2) eq "((") {
+        my $back = length($out) > 16 ? substr($out, -16) : $out;
+        if ($back =~ /(?:^|[\s;&|(!{])(?:(?:if|elif|while|until|for|then|do|else|time|coproc)[ \t]*)?\z/) { $xo = "(("; pos($s) += 2; }
+      }
+      elsif (substr($s, pos($s), 1) eq "[") {
+        my $back = length($out) > 64 ? substr($out, -64) : $out;
+        if ($back =~ /(?:(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*|[A-Za-z0-9_]\+?=\()\z/) { $xo = "["; pos($s) += 1; }
+      }
       if (defined $xo) {
-        $out .= $xo; push @stack, q{X}; push @xdepth, 0;
-        push @close, substr($xo, -1) eq "{" ? "}" : substr($xo, -1) eq "[" ? "]" : ")";
+        $out .= $xo;
+        $push_x->(substr($xo, -1) eq "{" ? "}" : substr($xo, -1) eq "[" ? "]" : ")", $xo eq "\$((" ? 1 : 0);
         $word_start = $xo =~ /\(\z/ ? 1 : 0; next;
       }
       if ($s =~ /\G\$\(/gc) { $out .= q{$(}; push @stack, q{P}; push @depth, 0; $word_start = 1; next; }
       if ($s =~ /\G`/gc) {
         $out .= "`";
-        if ($top eq q{B}) { pop @stack; $word_start = 0; } else { push @stack, q{B}; $word_start = 1; }
+        if ($top eq q{B}) { pop @stack; $closed_frame->(); $word_start = 0; } else { push @stack, q{B}; $word_start = 1; }
         next;
       }
       if ($top eq q{P} && $s =~ /\G([()])/gc) {
         $out .= $1;
         if ($1 eq "(") { $depth[-1]++; $word_start = 1; next; }
-        if ($depth[-1]) { $depth[-1]--; } else { pop @stack; pop @depth; }
+        if ($depth[-1]) { $depth[-1]--; } else { pop @stack; pop @depth; $closed_frame->(); }
         $word_start = 0; next;
       }
       if ($top eq q{X} && $s =~ /\G[(){}\[\]]/gc) {
@@ -217,10 +237,14 @@ JOIN_CONTINUATIONS_PL='
         if ($c eq $open) { $xdepth[-1]++; }
         elsif ($c eq $close[-1]) {
           if ($xdepth[-1]) { $xdepth[-1]--; }
+          elsif ($xdollar[-1] && substr($s, pos($s), 1) ne ")") {
+            # `$((1)<<W)` has no `))`: bash reads `$( (1)<<W )`, a command substitution (rc.8, F6).
+            pop @xdepth; pop @close; pop @xdollar; $stack[-1] = q{P}; push @depth, 0;
+          }
           else {
             # `))` closes an arithmetic frame; a single `)` ends it as well.
             $out .= ")" if $c eq ")" && $s =~ /\G\)/gc;
-            pop @stack; pop @xdepth; pop @close;
+            pop @stack; pop @xdepth; pop @close; pop @xdollar; $closed_frame->();
           }
         }
         $word_start = $c eq "(" ? 1 : 0; next;
@@ -238,25 +262,25 @@ JOIN_CONTINUATIONS_PL='
           if ($s =~ /\G[^\s;&|()<>\\\x27"]+/gc) { $out .= $&; $delim .= $&; next; }
           last;
         }
-        push @pending, [ $delim, $quoted, $dash ];
+        push @pending, [ $delim, $quoted, $dash, 0, scalar @stack ];
         $word_start = 0; next;
       }
       if ($top eq q{X} && $s =~ /\G[^\\\n#\x27"`\$()<{}\[\]]+/gc) {
         $out .= $&; $word_start = $& =~ /[\s;&|()<>]$/ ? 1 : 0; next;
       }
-      if ($top ne q{X} && $s =~ /\G[^\\\n#\x27"`\$()<]+/gc) {
+      if ($top ne q{X} && $s =~ /\G[^\\\n#\x27"`\$()<\[]+/gc) {
         $out .= $&; $word_start = $& =~ /[\s;&|()<>]$/ ? 1 : 0; next;
       }
       $s =~ /\G./gcs; $out .= $&; $word_start = $& =~ /[\s;&|()<>]/ ? 1 : 0;
     }
-    return undef if @pending;
+    return undef if grep { !$_->[3] } @pending;
     # A single quote left open: bash stops with a syntax error there, but the passes below may
     # still read the text differently, so the call is joined again with quotes ignored.
     return ($out, scalar grep { $_ eq q{S} || $_ eq q{A} } @stack);
   }
   sub drop_final_backslash { my $t = shift; $t =~ s/(?<!\\)((?:\\\\)*)\\\z/$1/; return $t; }
   # Most calls have no continuation at all: nothing to join.
-  if (index($text, "\\\n") < 0) { print drop_final_backslash($text); exit 0; }
+  if (index($text, "\\\n") < 0 && index($text, "\\\x27") < 0) { print drop_final_backslash($text); exit 0; }
   sub join_any { my $q = shift; my @r = join_text($text, 1, $q); @r = join_text($text, 0, $q) unless defined $r[0]; return @r; }
   my ($joined, $open) = join_any(1);
   ($joined) = join_any(0) if $open;
@@ -292,28 +316,37 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   # exit 0, bypassing every check below it). Stdin has no such limit.
   my $text = do { local $/; <STDIN> };
   my @lines = split(/\n/, $text, -1);
-  my (@out, @pending);
-  # Set when a `<<` inside ${…}, $((…)), $[…] or ((…)) was not taken for a here-doc (rc.6 red team, F4).
+  # Set when a `<<` was not taken for a here-doc: inside ${…}, $((…)), $[…], ((…)) or an array
+  # subscript (rc.6 red team, F4), in a comment, or in $(…) or a backquote closed on its line (rc.8, F6).
   my $shift_in_expansion = 0;
+  # 1 while the text is read as rc.6 read it (every `<<` a here-doc, no comments): used only to fail
+  # closed when that reading leaves a body open (rc.8 red team, F5).
+  my $legacy = 0;
   # Скан состояния кавычек — чистая функция (состояние, текст): заголовок с
   # переносами сканируется инкрементально, каждый новый сегмент один раз,
   # состояние переносится между итерациями. Прежняя continued_header заново
   # проходила всю уже склеенную строку на каждом переносе — квадратичное
   # время на длинных `\`-цепочках (issue #1148).
+  # Returns the quote open at the end of $line ("a" for $\x27…\x27) and whether the line ends in a
+  # comment: a backslash there is part of the comment, not a continuation (rc.8 red team, F5).
   sub scan_quote_state {
     my ($line, $quote) = @_;
     for (my $i = 0; $i < length($line); $i++) {
       my $char = substr($line, $i, 1);
       if (defined $quote) {
         if ($quote ne chr(39) && $char eq "\\" && $i + 1 < length($line)) { $i++; next; }
-        undef $quote if $char eq $quote;
+        undef $quote if $char eq ($quote eq "a" ? chr(39) : $quote);
       } elsif ($char eq "\\" && $i + 1 < length($line)) {
         $i++;
+      } elsif (!$legacy && $char eq "#" && ($i == 0 || substr($line, $i - 1, 1) =~ /[\s;&|()<>`]/)) {
+        return (undef, 1);
+      } elsif (!$legacy && $char eq chr(39) && $i && substr($line, $i - 1, 1) eq "\$") {
+        $quote = "a";
       } elsif ($char eq chr(39) || $char eq q{"}) {
         $quote = $char;
       }
     }
-    return $quote;
+    return ($quote, 0);
   }
 
   sub is_data_command {
@@ -442,7 +475,8 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   sub line_heredocs {
     my ($line, $initial_quote, $initial_depth, $prior_group_source, $compound_frames, $expansions) = @_;
     my (@specs, $start, $group_depth, $closed_prior_group, $last_heredoc_end);
-    my $swallow_close = 0;
+    my $swallow_at = -1;
+    my $in_bq = 0;
     my $quote = $initial_quote;
     $start = 0;
     $group_depth = $initial_depth;
@@ -452,27 +486,64 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       my $char = substr($line, $i, 1);
       if (defined $quote) {
         if ($quote ne chr(39) && $char eq "\\" && $i + 1 < length($line)) { $i++; next; }
-        undef $quote if $char eq $quote;
+        if (!$legacy && $quote eq q{"} && $char eq "\$" && substr($line, $i + 1, 1) eq "{") {
+          # `"${x:-"<<EOF"}"`: the word of ${…} has quotes of its own (rc.8 red team, F6).
+          push @$expansions, { close => "}", skip => 0, depth => 0, requote => q{"} };
+          undef $quote; $i++; next;
+        }
+        undef $quote if $char eq ($quote eq "a" ? chr(39) : $quote);
         next;
       }
       if ($char eq "\\" && $i + 1 < length($line)) { $i++; next; }
+      unless ($legacy) {
+        if ($char eq "`") { $in_bq = !$in_bq; next; }
+        # A comment: a `<<` or a quote in it means nothing; in backquotes it ends at the backquote.
+        # Inside ${…} and the like `#` starts no comment. A `<<` after it sends the text to the
+        # rc.6 check below (fail closed).
+        if ($char eq "#" && ($i == 0 || substr($line, $i - 1, 1) =~ /[\s;&|()<>`]/)
+            && !grep { !$_->{comsub} } @$expansions) {
+          $shift_in_expansion = 1 if index($line, "<<", $i) >= 0;
+          last unless $in_bq;
+          my $e = index($line, "`", $i);
+          last if $e < 0;
+          $i = $e - 1; next;
+        }
+        if ($char eq chr(39) && $i && substr($line, $i - 1, 1) eq "\$") { $quote = "a"; next; }
+      }
       if ($char eq chr(39) || $char eq q{"}) { $quote = $char; next; }
-      # Open expansions ${…}, $((…)), $[…] and ((…)), kept across lines in @$expansions: a `<<`
-      # inside one is not a here-doc. Only tracked here; the group logic below is unchanged.
-      if ($char =~ /[\$(){}\[\]]/) {
+      # Open expansions ${…}, $((…)), $[…], ((…)) (also after for/if/while…), an array subscript
+      # x[…] or x=([…]=…), and command substitutions $(…), kept across lines in @$expansions: a `<<`
+      # inside one is not a here-doc, nor is one in a $(…) closed on its own line. Only tracked here;
+      # the group logic below is unchanged.
+      if (!$legacy && $char =~ /[\$(){}\[\]]/) {
         my $top = @$expansions ? $expansions->[-1] : undef;
         my $two = substr($line, $i, 2);
-        my $prev = $i ? substr($line, $i - 1, 1) : q{};
-        if ($char eq "\$" && substr($line, $i + 1, 2) eq "((") { push @$expansions, { close => ")", skip => 2, depth => 0 }; }
+        if ($char eq "\$" && substr($line, $i + 1, 2) eq "((") { push @$expansions, { close => ")", skip => 2, depth => 0, arith => 1, dollar => 1 }; }
+        elsif ($two eq "\$(") { push @$expansions, { close => ")", skip => 1, depth => 0, comsub => 1 }; }
         elsif ($two eq "\$\{" || $two eq "\$[") { push @$expansions, { close => substr($two, 1) eq "{" ? "}" : "]", skip => 1, depth => 0 }; }
-        elsif ($two eq "((" && $prev =~ /^[\s;&|(]?$/ && !($top && $top->{skip})) { push @$expansions, { close => ")", skip => 2, depth => 0 }; }
+        elsif ($two eq "((" && !($top && $top->{skip})
+               && substr($line, $i > 16 ? $i - 16 : 0, $i > 16 ? 16 : $i) =~ /(?:^|[\s;&|(!{])(?:(?:if|elif|while|until|for|then|do|else|time|coproc)[ \t]*)?$/) {
+          push @$expansions, { close => ")", skip => 2, depth => 0, arith => 1 };
+        }
+        elsif ($char eq "[" && !($top && $top->{close} eq "]")
+               && substr($line, $i > 64 ? $i - 64 : 0, $i > 64 ? 64 : $i) =~ /(?:(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*|[A-Za-z0-9_]\+?=\()$/) {
+          push @$expansions, { close => "]", skip => 1, depth => 0 };
+        }
         if ($top = @$expansions ? $expansions->[-1] : undef) {
           my $open = { ")" => "(", "}" => "{", "]" => "[" }->{$top->{close}};
           if ($char eq $open) { if ($top->{skip}) { $top->{skip}--; } else { $top->{depth}++; } }
           elsif ($char eq $top->{close}) {
-            if ($swallow_close) { $swallow_close = 0; }
+            if ($swallow_at == $i) { }
             elsif ($top->{depth}) { $top->{depth}--; }
-            else { pop @$expansions; $swallow_close = $char eq ")" && substr($line, $i + 1, 1) eq ")"; }
+            elsif ($top->{dollar} && $top->{arith} && substr($line, $i + 1, 1) ne ")") {
+              # `$((1)<<W)` has no `))`: bash reads `$( (1)<<W )`, a command substitution.
+              $top->{arith} = 0; $top->{comsub} = 1;
+            }
+            else {
+              pop @$expansions; $top->{closed} = 1;
+              $swallow_at = $i + 1 if $top->{arith} && substr($line, $i + 1, 1) eq ")";
+              if ($top->{requote}) { $quote = $top->{requote}; next; }
+            }
           }
         }
       }
@@ -503,7 +574,11 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       }
       next unless substr($line, $i, 2) eq "<<";
       next if substr($line, $i, 3) eq "<<<";
-      if (@$expansions) { $shift_in_expansion = 1; next; }
+      my $in_comsub;
+      if (@$expansions) {
+        if (grep { !$_->{comsub} } @$expansions) { $shift_in_expansion = 1; next; }
+        $in_comsub = $expansions->[-1];
+      }
       my $tail = substr($line, $i);
       next unless $tail =~ /^<<(-?)\s*(?!<)(?:([\x27"])([A-Za-z_][A-Za-z0-9_]*)\2|([A-Za-z_][A-Za-z0-9_]*))/;
       my $match_length = length($&);
@@ -536,7 +611,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       for my $stage (@right_stages[1 .. $#right_stages]) {
         $keep ||= heredoc_recipient($stage);
       }
-      push @specs, { indent => $indent, delim => $delim, keep => $keep };
+      push @specs, { indent => $indent, delim => $delim, keep => $keep, in => $in_comsub, bq => $in_bq };
       $last_heredoc_end = $i + $match_length;
       $i += $match_length - 1;
     }
@@ -552,9 +627,15 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       $frame->{source} .= substr($line, $frame->{line_start}) . "\n";
       $frame->{line_start} = 0;
     }
+    # A here-doc in $(…) or a backquote closed on this line has no body on the next lines.
+    my $opened = @specs;
+    @specs = grep { !(($_->{in} && $_->{in}{closed}) || ($_->{bq} && !$in_bq)) } @specs;
+    $shift_in_expansion = 1 if @specs < $opened;
     return (\@specs, $quote, $group_depth);
   }
 
+  sub reduce {
+  my (@out, @pending);
   my ($header_quote, $header_group_depth, $group_source, @compound_frames) = (undef, 0, q{});
   my @expansions;
   # Set when some here-doc body has no non-blank line (issue #1568): `cat > f <<EOF` + `EOF`
@@ -568,7 +649,9 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       $probe =~ s/^\t+// if $body->{indent};
       if ($probe eq $body->{delim}) { $empty_body = 1 unless $body->{text}; shift @pending; push @out, q{}; next; }
       $body->{text} = 1 if $line =~ /\S/;
-      push @out, $line if $body->{keep};
+      # An interpreter drops a lone backslash ending its script line (`bash <<\x27EOF\x27`, rc.8 F6).
+      (my $kept = $line) =~ s/(?<!\\)((?:\\\\)*)\\$/$1/;
+      push @out, $kept if $body->{keep};
       next;
     }
     # Сегменты накапливаются списком и склеиваются один раз; состояние
@@ -580,8 +663,8 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
     while ($line_no + 1 < @lines) {
       my ($slashes) = $joined =~ /(\\+)$/;
       last unless defined $slashes && length($slashes) % 2;
-      $seg_quote = scan_quote_state($joined, $seg_quote);
-      last if defined $seg_quote && $seg_quote ne q{"};
+      ($seg_quote, my $comment) = scan_quote_state($joined, $seg_quote);
+      last if $comment || (defined $seg_quote && $seg_quote ne q{"});
       push @segments, substr($joined, 0, -1);
       $joined = $lines[++$line_no];
     }
@@ -593,10 +676,25 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
     $group_source = $after_depth ? $group_source . $line . "\n" : q{};
     $header_group_depth = $after_depth;
   }
+  return (scalar @pending, $empty_body, \@out);
+  }
+  my ($left, $empty_body, $out) = reduce();
+  # Where this reading can differ from rc.6 (comments, $\x27…\x27, `<<`, ${…}), the text is also read as
+  # rc.6 read it, and both readings are scanned: a body rc.6 left open sends the whole text to the
+  # checks, and lines rc.6 joined or kept differently are added. This reading is never the looser
+  # one (rc.8 red team, F5: a comment line ending in a backslash, `${x:- #}`, `@(#a|b)`).
+  if (!$left && $text =~ /[#`]|\$\x27|<<|\$\{/) {
+    $legacy = 1;
+    my ($left6, $empty6, $out6) = reduce();
+    $legacy = 0;
+    if ($left6) { $left = 1; }
+    elsif (join("\n", @$out6) ne join("\n", @$out)) { push @$out, @$out6; $empty_body ||= $empty6; }
+  }
   # An unterminated body means this was not a heredoc at all (an arithmetic
   # shift, a quoted "<<" in prose): stripping there would hide real commands,
   # so the whole reduction is discarded rather than trusted.
-  if (@pending) { print "UNTERMINATED"; exit 0; }
+  if ($left) { print "UNTERMINATED"; exit 0; }
+  my @out = @$out;
   $empty_body ||= $shift_in_expansion;
   print "OK", ($empty_body ? "E" : "-"), join("\n", @out);
 ')
@@ -777,9 +875,11 @@ SEGMENTER_PL='
       } elsif ($char eq q{"} || $char eq chr(39)) {
         $quote = $char;
         $segment .= $char;
-      } elsif ($char eq q{#} && $escaped_at != length($segment) && ($segment eq q{} || $segment =~ /[ \t]$/)) {
+      } elsif ($char eq q{#} && $escaped_at != length($segment) && ($segment =~ /[ \t]$/
+               || ($segment eq q{} && ($i == 0 || substr($text, $i - 1, 1) ne chr(123))))) {
         # A comment runs to the end of the line; an apostrophe in it must not open a quote
-        # that swallows the next lines (and a command hidden behind them).
+        # that swallows the next lines (and a command hidden behind them). `{#` starts no
+        # comment: `${#x} ; rm -rf x` runs the rm (rc.8 red team, F6).
         my $end = index($text, "\n", $i);
         $i = ($end < 0 ? $n : $end) - 1;
       } elsif ($char eq q{$} && $next eq chr(123)) {
@@ -1083,13 +1183,33 @@ SEGMENTER_PL='
     return @scripts;
   }
 
+  # A literal here-string read by a shell as its script: `bash <<< "git push --force"` (rc.8, F6).
+  # A word with `$` or a backquote is not known here and is left as before.
+  sub herestring_scripts {
+    my @scripts;
+    for my $item (@_) {
+      next if index($item->[0], "<<<") < 0;
+      my @tokens = words($item->[0]);
+      my ($sink) = command_indices(@tokens);
+      next unless defined $sink && command_base($tokens[$sink]) =~ /^(?:ba|z|k|da|a)?sh$/;
+      my (@args, $script);
+      for (my $k = $sink + 1; $k < @tokens; $k++) {
+        if ($tokens[$k] =~ /^0?<<<(.*)$/s) { $script = length $1 ? $1 : $tokens[++$k]; next; }
+        push @args, $tokens[$k];
+      }
+      next unless defined $script && $script !~ /[\$`]/ && shell_reads_stdin(@args);
+      push @scripts, $script;
+    }
+    return @scripts;
+  }
+
   sub inspected_segments {
     my ($text, $depth) = @_;
     $depth //= 0;
     my @lexed = lex_segments($text);
     my @out = map { $_->[0] } @lexed;
     if ($depth < 3) {
-      push @out, inspected_segments($_, $depth + 1) for piped_scripts(@lexed);
+      push @out, inspected_segments($_, $depth + 1) for piped_scripts(@lexed), herestring_scripts(@lexed);
     }
     return @out;
   }

@@ -524,9 +524,11 @@ def main():
             code, err = run(hook, command)
             check(code != 0 or named in doc, f"{command!r} -> {code}: a pass-through the guide names as {named}")
         # Known limits remain observable until an executable detector replaces them (#1002).
-        for command, named in (("bash <<< 'rm -rf /important'", "`bash <<<`"),
-                               ("sh -s <<< 'rm -rf /important'", "`sh -s <<<`"),
-                               ('echo "$(rm -rf /important)"', "`$(...)`"),
+        # A literal here-string read by a shell is checked since the rc.8 red team (F6).
+        for command in ("bash <<< 'rm -rf /important'", "sh -s <<< 'rm -rf /important'"):
+            code, err = run(hook, command)
+            check(code == 2, f"{command!r} -> {code}: a literal here-string fed to a shell is checked")
+        for command, named in (('echo "$(rm -rf /important)"', "`$(...)`"),
                                ('echo "`rm -rf /important`"', "обратных кавычках"),
                                ('cat <<EOF\n$(rm -rf /important)\nEOF', "`cat <<EOF`"),
                                ('cat <<EOF > >(bash)\nrm -rf /important\nEOF', "> >(bash)")):
