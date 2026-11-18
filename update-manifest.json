@@ -81,7 +81,7 @@
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "c77f5b1bf715f5d7e92d3a1e2b7d18598586ea622bb37683144ca6de38944a70"
+      "sha256": "104cc36c01578a04fc384ce1b4b9a18cdf70a928edcfc6887838d2ebc38243a6"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -321,7 +321,7 @@
     },
     {
       "path": ".claude/lib/dry-run-dir.sh",
-      "sha256": "364d003bc3a4f9a53d02e67296b1075de2d34c306a5c018c30861c77508f139b"
+      "sha256": "f2764508a694e7ddf286dbc6ccc7f9386b77e9556dddf05a0f4570956232091d"
     },
     {
       "path": ".claude/lib/find-python3.sh",
@@ -1685,7 +1685,7 @@
     },
     {
       "path": "memory/dry-run-contract.md",
-      "sha256": "245de67b45b55f6bcb8e9dd219065f17206422f94cf784a9e65bcc8cf9a1b725"
+      "sha256": "60f467d27a33d8e8bd62a3277932f66be0a73a19f799d41a168ced278ecf69cb"
     },
     {
       "path": "memory/feedback_community_communication_style.md",
@@ -2525,11 +2525,11 @@
     },
     {
       "path": "scripts/dry-run-begin.sh",
-      "sha256": "9d348a474de3c43b7fabbe835e199ec3b09da28eda3302beb54b988c80270ac6"
+      "sha256": "2318ca7dd4adb1e77c8ea82ed83391541bc1c18db7c666b0825f0c8121119906"
     },
     {
       "path": "scripts/dry-run-complete.sh",
-      "sha256": "1e0e62bdb28be6aaa19f3b082881eac2d217babdba56f4723bfcc46cb73294e7"
+      "sha256": "e644b4cb84b3f8e380e554001f879ddacd25d0eacd086ad51087a749aadbafc7"
     },
     {
       "path": "scripts/exocortex-publish.sh",
