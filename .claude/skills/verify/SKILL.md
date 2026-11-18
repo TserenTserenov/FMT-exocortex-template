@@ -108,7 +108,7 @@ bash .claude/scripts/load-extensions.sh verify before
 - **Verdict**: `DPFPackageAdequacyStatus` — `admissibleForDeclaredDPFUse` / `seedOnly` / `repairBeforeDPFUse` (авто) + эскалационные `holdForPFADDecision` / `holdForCoreAmendmentDecision` / `refreshNeeded` — по координатам D1-D11, порядковая шкала 0-5 (WP-474 Ф8.1/Ф8.3, пир-сессия 2026-09-05-27)
 
 **Для `wp`:**
-- Прочитать WP context file (`{{GOVERNANCE_REPO}}/inbox/WP-{N}-*.md`)
+- Прочитать WP context file (`${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/WP-{N}-*.md`)
 - Прочитать артефакт РП
 - Передать sub-agent'у: артефакт + критерии done + чеклист wp
 - Модель sub-agent'а: по verification_class

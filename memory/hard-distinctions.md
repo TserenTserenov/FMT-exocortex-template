@@ -123,9 +123,9 @@ description: "Операционный файл памяти IWE"
 
 | # | Тип | Где | Владелец |
 |---|-----|-----|----------|
-| 1 | Universal protocol (ОРЗ) | FMT/scripts/ → {{WORKSPACE_DIR}}/scripts/ | Платформа |
+| 1 | Universal protocol (ОРЗ) | FMT/scripts/ → ${IWE_WORKSPACE:-$HOME/IWE}/scripts/ | Платформа |
 | 1b | Role-specific protocol | FMT/roles/<role>/scripts/ | Платформа + роль |
-| 2 | Author protocol | {{WORKSPACE_DIR}}/scripts/ (не в FMT) | Автор |
+| 2 | Author protocol | ${IWE_WORKSPACE:-$HOME/IWE}/scripts/ (не в FMT) | Автор |
 | 3 | Service | `<service>/scripts/` | Сервис |
 | 4 | Repo operations | `<repo>/.ops/` или `<repo>/scripts/` | Репо |
 | 5 | Agent hook | `.claude/hooks/` или `.claude/skills/<skill>/` | Агентная инфра |
@@ -185,16 +185,16 @@ description: "Операционный файл памяти IWE"
 
 **Антипаттерны:**
 
-1. **Лог в governance-репо.** «Запишу лог выполнения скрипта в `{{GOVERNANCE_REPO}}/inbox/`, чтобы потом разобрать» — нарушение OwnerIntegrity. Факт исполнения принадлежит исполнителю, не репо решений. Лог засоряет историю git случайными сообщениями.
+1. **Лог в governance-репо.** «Запишу лог выполнения скрипта в `${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/`, чтобы потом разобрать» — нарушение OwnerIntegrity. Факт исполнения принадлежит исполнителю, не репо решений. Лог засоряет историю git случайными сообщениями.
 2. **Инцидент в `<service>/logs/`.** «Сбой мелкий, запишу прямо рядом с логами» — теряется. Инциденты должны аггрегироваться в governance, чтобы попадать в недельный обзор и стать паттерном (P10, P11).
 3. **State file как append-only.** `sync-manifest.yaml` накапливает версии вместо перезаписи — превращается в лог, теряет смысл «текущего состояния». Для истории используется `git log` над самим state-файлом.
 
 **Пример правильной маршрутизации:**
 
 ```
-{{WORKSPACE_DIR}}/scripts/week-draft-append.sh                     # скрипт
-{{WORKSPACE_DIR}}/scripts/logs/week-draft-append.log               # лог (рядом)
-{{WORKSPACE_DIR}}/scripts/state/last-append.yaml                   # state file (рядом)
+${IWE_WORKSPACE:-$HOME/IWE}/scripts/week-draft-append.sh                     # скрипт
+${IWE_WORKSPACE:-$HOME/IWE}/scripts/logs/week-draft-append.log               # лог (рядом)
+${IWE_WORKSPACE:-$HOME/IWE}/scripts/state/last-append.yaml                   # state file (рядом)
   2026-04-17-week-draft-append-failed.md               # инцидент (если упадёт)
 ```
 
@@ -236,7 +236,7 @@ description: "Операционный файл памяти IWE"
 | Код агента (instrument) | Данные агента (governance) | Решения человека (governance) |
 |---|---|---|
 | Промпты, скрипты, agent-card, trajectory cache | Черновики, отчёты, находки, extraction-reports | Утверждённые планы, подтверждённые captures |
-| DS-autonomous-agents | **DS-agent-workspace** | {{GOVERNANCE_REPO}} (пример реализации) |
+| DS-autonomous-agents | **DS-agent-workspace** | ${IWE_GOVERNANCE_REPO:-DS-strategy} (пример реализации) |
 | Меняется редко (версии кода) | Создаётся ежедневно (ночные циклы) | Создаётся при утверждении |
 | Автор: разработчик | Автор: агент | Автор: человек |
 

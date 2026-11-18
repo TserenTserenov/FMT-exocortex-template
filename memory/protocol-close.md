@@ -344,7 +344,7 @@ RUN-карточки тогда не является ❌.
 1. **Бэкап + грязные репо** — `backup-icloud.sh` + `check-dirty-repos.sh` (платформа) [[gate]]
 2. **Memory Validate** — `memory-bleed.sh` (HOT-лимит, orphans, superseded_by) [[gate]]
 3. **ТО памяти (T, SC.024.3)** — проверка здоровья статической нагрузки: [[narrative]]
-   - `wc -l {{WORKSPACE_DIR}}/.claude/rules/distinctions.md` → **> 80 строк = drift-флаг** (по правилу DP.KR.001 §6: 1-3 строки на различение). Предложить аудит в WP-7.
+   - `wc -l ${IWE_WORKSPACE:-$HOME/IWE}/.claude/rules/distinctions.md` → **> 80 строк = drift-флаг** (по правилу DP.KR.001 §6: 1-3 строки на различение). Предложить аудит в WP-7.
    - `wc -l` по MEMORY.md текущего проекта в `~/.claude/projects/<слаг-проекта>/memory/` (слаг = путь рабочей директории, `/` → `-`) → **> 200 строк = флаг** (превышен лимит).
    - Feedback/lessons файлы в `memory/` с `mtime > 14 дней` без обращения → предложить понизить `horizon: warm`.
    - Флаги — информативно. Пользователь решает действие.
