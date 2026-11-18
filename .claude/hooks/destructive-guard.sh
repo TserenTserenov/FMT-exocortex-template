@@ -497,8 +497,12 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       if ($char eq "\\" && $i + 1 < length($line)) { $i++; next; }
       unless ($legacy) {
         if ($char eq "`") { $in_bq = !$in_bq; next; }
-        if ($char eq "#" && ($i == 0 || substr($line, $i - 1, 1) =~ /[\s;&|()<>`]/)) {
-          # A comment: a `<<` or a quote in it means nothing; in backquotes it ends at the backquote.
+        # A comment: a `<<` or a quote in it means nothing; in backquotes it ends at the backquote.
+        # Inside ${…} and the like `#` starts no comment. A `<<` after it sends the text to the
+        # rc.6 check below (fail closed).
+        if ($char eq "#" && ($i == 0 || substr($line, $i - 1, 1) =~ /[\s;&|()<>`]/)
+            && !grep { !$_->{comsub} } @$expansions) {
+          $shift_in_expansion = 1 if index($line, "<<", $i) >= 0;
           last unless $in_bq;
           my $e = index($line, "`", $i);
           last if $e < 0;
@@ -660,8 +664,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       my ($slashes) = $joined =~ /(\\+)$/;
       last unless defined $slashes && length($slashes) % 2;
       ($seg_quote, my $comment) = scan_quote_state($joined, $seg_quote);
-      last if $comment;
-      last if defined $seg_quote && $seg_quote ne q{"};
+      last if $comment || (defined $seg_quote && $seg_quote ne q{"});
       push @segments, substr($joined, 0, -1);
       $joined = $lines[++$line_no];
     }
@@ -676,9 +679,17 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   return (scalar @pending, $empty_body, \@out);
   }
   my ($left, $empty_body, $out) = reduce();
-  # A `<<` not taken for a here-doc: when the rc.6 reading of the same text leaves a body open,
-  # the whole text is scanned, as rc.6 did, so this reading is never the looser one (rc.8, F5).
-  if (!$left && $shift_in_expansion) { $legacy = 1; ($left) = reduce(); }
+  # Where this reading can differ from rc.6 (comments, $\x27…\x27, `<<`, ${…}), the text is also read as
+  # rc.6 read it, and both readings are scanned: a body rc.6 left open sends the whole text to the
+  # checks, and lines rc.6 joined or kept differently are added. This reading is never the looser
+  # one (rc.8 red team, F5: a comment line ending in a backslash, `${x:- #}`, `@(#a|b)`).
+  if (!$left && $text =~ /[#`]|\$\x27|<<|\$\{/) {
+    $legacy = 1;
+    my ($left6, $empty6, $out6) = reduce();
+    $legacy = 0;
+    if ($left6) { $left = 1; }
+    elsif (join("\n", @$out6) ne join("\n", @$out)) { push @$out, @$out6; $empty_body ||= $empty6; }
+  }
   # An unterminated body means this was not a heredoc at all (an arithmetic
   # shift, a quoted "<<" in prose): stripping there would hide real commands,
   # so the whole reduction is discarded rather than trusted.
