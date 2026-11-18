@@ -215,6 +215,8 @@ jobs:
         run: bash setup/test-check-changelog-entry.sh
       - name: Run WP-529 Ф276 build-runtime author-sourced files tests
         run: bash setup/test-build-runtime-author-sourced.sh
+      - name: Run 0.42 rc.9 Н4 delivered exec-bit consistency test
+        run: bash scripts/tests/test-delivered-exec-bit-matches-update.sh
 
   # #1030/#1005: exercise lock publication and both timeout process trees
   # under Git for Windows Bash with native Windows Python. POSIX signal probes

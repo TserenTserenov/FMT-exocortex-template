@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "5cf983a30d1a1e25ea5c2284b46ba6cf10ed1b8d05bc8c885cc0ba15230ef3a2"
+      "sha256": "e6349dfc616e458675cdc83bf5562258b89f6afb4431a758a9e31c27b372b854"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -237,7 +237,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-git-branch-remote.sh",
-      "sha256": "c24c07fd8fceba090d5b0234d212d5cec1fa4c5345019096a17963449ca1f510"
+      "sha256": "e9d4d63fcae18c2884b77d5f7c6a6cbc228042cc603da673636a3edcc6f074a4"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-indirect-input.sh",
@@ -941,7 +941,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "bbee1e7dce690269b9bf41dcbbcf97a320e003ac6ce504bc216c258eac399f72"
+      "sha256": "a63ea56e2e49886a9a6925e1bef0be64fa61d0f051eb5460fe7b90e85030b417"
     },
     {
       "path": ".gitignore",
@@ -3485,7 +3485,7 @@
     },
     {
       "path": "setup/build-runtime.sh",
-      "sha256": "33c7872d3421f192ad7a18d6e288e019a14dfa03e49521d6cfffa1eb443ac47a"
+      "sha256": "1b8e977709c329c628b95e81cf884bb8d24704655cdce0412207e2372e8f2e01"
     },
     {
       "path": "setup/install-dsh-skills.sh",
@@ -3582,6 +3582,7 @@
     "scripts/tests/session-guard-isolate-t1-t20-smoke.sh",
     "scripts/tests/session-guard-second-open-warning-smoke.sh",
     "scripts/tests/test-captures-write-lock-840.sh",
+    "scripts/tests/test-delivered-exec-bit-matches-update.sh",
     "scripts/tests/test-issue-1411-secret-scan-fp.sh",
     "scripts/tests/test-issue-1411-update-rollback-unrelated-history.sh",
     "scripts/tests/test-issue-1569-extensionless-author-scan.sh",
@@ -3901,6 +3902,7 @@
     "setup/test-apply-op.sh",
     "setup/test-attestation-build-statement.sh",
     "setup/test-attestation-canonical-digest.sh",
+    "setup/test-build-runtime-author-sourced.sh",
     "setup/test-build-runtime-preserves-live-state.sh",
     "setup/test-check-changelog-entry.sh",
     "setup/test-day-open-delivery-closure.sh",
