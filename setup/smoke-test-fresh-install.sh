@@ -730,7 +730,17 @@ PY
     else
         fail "e2e full mode: fresh catalog state schema is incomplete"
     fi
-    E2E_ROUTE_OUT=$(IWE_EXECUTOR_CATALOG="$E2E_GOV10/scripts/executor-catalog.yaml" \
+    # 0.42 red team F5: route-task.sh finds its workspace root from the folder
+    # it sits in (a parent named FMT-exocortex-template) or from the caller's
+    # IWE_WORKSPACE/IWE_ROOT/IWE_TEMPLATE. Without naming the installation
+    # explicitly this check passed only in a checkout under that folder name or
+    # on a machine with a live IWE in the environment — and then validated
+    # against that live IWE. Name the installation under test and the template
+    # root its catalog paths are relative to.
+    E2E_ROUTE_OUT=$(env -u IWE_WORKSPACE -u IWE_ROOT \
+        IWE_DIR="$E2E_WS10" IWE_TEMPLATE="$TEMPLATE_DIR" \
+        IWE_GOVERNANCE_REPO="$SMOKE_GOVERNANCE_REPO" \
+        IWE_EXECUTOR_CATALOG="$E2E_GOV10/scripts/executor-catalog.yaml" \
         bash "$TEMPLATE_DIR/scripts/route-task.sh" --validate 2>&1) || E2E_ROUTE_RC=$?
     E2E_ROUTE_RC="${E2E_ROUTE_RC:-0}"
     if [ "$E2E_ROUTE_RC" -eq 0 ]; then

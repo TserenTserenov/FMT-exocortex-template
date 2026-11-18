@@ -140,6 +140,29 @@ fi
 
 RUNTIME_DIR="$WORKSPACE_DIR/.iwe-runtime"
 
+# === Author installation: files whose source is the root (WP-529 F276 item 8) ===
+# In the author's installation the root is the source of .claude/sync-manifest.yaml
+# and of every path in .github/author-sourced-paths.txt; the template only carries
+# a delivered copy. On 17.11.2026 a rebuild copied the template's
+# .claude/sync-manifest.yaml over the root's (on two of the author's machines) and stopped the
+# root's own update. Such a file is left as it is and shown by --diff.
+# The author installation is recognised by the same rule as update.sh
+# is_author_mode(): params.yaml in the workspace declares author_mode: true.
+AUTHOR_SOURCED_LIST="$TEMPLATE_DIR/.github/author-sourced-paths.txt"
+is_author_mode() {
+    [ -f "$WORKSPACE_DIR/params.yaml" ] || return 1
+    grep -qE '^author_mode:[[:space:]]*true' "$WORKSPACE_DIR/params.yaml"
+}
+is_author_sourced() {
+    [ "$1" = ".claude/sync-manifest.yaml" ] && return 0
+    [ -f "$AUTHOR_SOURCED_LIST" ] || return 1
+    grep -qxF -- "$1" "$AUTHOR_SOURCED_LIST"
+}
+# author_keeps REL — the workspace copy exists and the author's root owns it.
+author_keeps() {
+    [ -f "$WORKSPACE_DIR/$1" ] && is_author_mode && is_author_sourced "$1"
+}
+
 if ! $QUIET; then
     echo "=== build-runtime ==="
     echo "  Template: $TEMPLATE_DIR"
@@ -336,6 +359,14 @@ done
 
 # === Diff mode ===
 if $DIFF_MODE; then
+    # Author-sourced workspace files are never written by a rebuild, so their
+    # difference from the template is shown here and is not counted as drift.
+    for f in "${COPIED_FILES[@]}"; do
+        if author_keeps "$f" && ! cmp -s "$WORKSPACE_DIR/$f" "$BUILD_DIR/workspace/$f"; then
+            echo "[diff] AUTHOR-KEPT: $f — источник в корне (author_mode), пересборка его не перезаписывает; отличие от шаблона:"
+            diff -u "$WORKSPACE_DIR/$f" "$BUILD_DIR/workspace/$f" 2>/dev/null | head -20 | sed 's/^/  /'
+        fi
+    done
     if [ ! -d "$RUNTIME_DIR" ]; then
         echo "[diff] $RUNTIME_DIR не существует — будет создан с нуля."
         echo "  Substituted: ${#SUBSTITUTED_FILES[@]} файлов"
@@ -477,6 +508,10 @@ for f in "${COPIED_FILES[@]}"; do
         : # skip — protected file already exists, seed-on-first-install only (issue #327)
     elif [ -f "$dst" ] && cmp -s "$src" "$dst"; then
         : # skip — identical
+    elif author_keeps "$f"; then
+        # Not gated on $QUIET: update.sh calls this script with --quiet, and the
+        # 17.11 overwrite went unnoticed exactly because nothing was printed.
+        echo "  ⚠ $f — author_mode: источник в корне, копия шаблона не записана. Сверь: bash $0 --workspace \"$WORKSPACE_DIR\" --diff"
     else
         # issue #348: seeding a protected user file used to be silent, so a workspace
         # that had lost its params.yaml (layout migration, interrupted setup) got the
