@@ -1729,7 +1729,7 @@
     },
     {
       "path": "memory/protocol-close.md",
-      "sha256": "1580e3f2e2c578b02aeef1a199d14e3a4b84a4ebcc691ab41a3255c825325aa9"
+      "sha256": "e65fdcef07a57422b8aea68dc063025a5e6a27b96280688765c39f5c7d63d0ba"
     },
     {
       "path": "memory/protocol-dt-integration.md",
@@ -3587,6 +3587,7 @@
     "scripts/tests/test-issue-1569-extensionless-author-scan.sh",
     "scripts/tests/test-issue-1572-isolate-root-records.sh",
     "scripts/tests/test-issue-1575-update-row-c-locale.sh",
+    "scripts/tests/test-issue-1581-close-note-commit.sh",
     "scripts/tests/test-iwe-audit-fpf-copy.sh",
     "scripts/tests/test-peer-session-finalize-index-lock.sh",
     "scripts/tests/test-setup-extractor-feeders-linux-env.sh",
