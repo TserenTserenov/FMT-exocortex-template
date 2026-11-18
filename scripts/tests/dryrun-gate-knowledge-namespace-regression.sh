@@ -52,7 +52,7 @@ expect_allow() { # <desc> <tool_name>
 }
 mkstate() { # <gate_id> <pid> <pgid> <sid> <token>
     local tsha
-    tsha=$(printf '%s' "$5" | shasum -a 256 | awk '{print $1}')
+    tsha=$(printf '%s' "$5" | dry_run_sha256)
     jq -nc --arg gid "$1" --argjson pid "$2" --argjson pgid "$3" --arg sid "$4" --arg tsha "$tsha" \
       '{version:2,gate_id:$gid,owner_session_id:$sid,owner_pid:$pid,owner_pgid:$pgid,owner_pid_start:"unknown-start",owner_token_sha256:$tsha,state:"active",created_at:"2026-10-11T00:00:00Z",initiator:"test"}' \
       > "$IWE_DRY_RUN_DIR/gate-$1.state"
@@ -62,8 +62,12 @@ mksentinel() { # <gate_id>
       > "$IWE_DRY_RUN_SENTINEL"
 }
 
+# Portable sha256 / pgid (issue #1586: Git Bash has no shasum, its ps no -o).
+# shellcheck source=../../.claude/lib/dry-run-dir.sh
+. "$ROOT/.claude/lib/dry-run-dir.sh"
+
 sleep 300 & SLEEP_PID=$!
-SLEEP_PGID=$(ps -o pgid= -p "$SLEEP_PID" | tr -d ' ')
+SLEEP_PGID=$(dry_run_proc_pgid "$SLEEP_PID")
 mkstate "g-219" "$SLEEP_PID" "$SLEEP_PGID" "sid-219" "tok-219"
 mksentinel "g-219"
 

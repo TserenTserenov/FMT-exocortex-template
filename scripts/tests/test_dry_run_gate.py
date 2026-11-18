@@ -1688,3 +1688,99 @@ def test_review3_bypass_blocked(isolated_gate, command):
 def test_review3_quoted_data_passes(isolated_gate, command):
     r = isolated_gate(command)
     assert r.returncode == 0, f"{command!r} blocked: {r.stderr}"
+
+
+# --- #1468: write forms that passed under an active rehearsal ------------------
+# The scanner only adds blocks (before/after comparison over every string in
+# this file: no case got looser). Still open (0.43, allow-list design): a
+# command word from a variable (`G=git; $G push`; `"$PY3" -c ...` is a
+# day-close step), git write subcommands outside the list (stash, clean, ...).
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "git -c core.fsmonitor='git push' status",
+        "git -c core.pager='touch /tmp/cg-pwn' log",
+        "git -c diff.external=/tmp/x diff",
+        "git -c alias.st='!git push' st",
+        "git -c diff.x.textconv='touch /tmp/p' diff",
+        "git -c core.sshCommand='touch /tmp/p' fetch",
+        "git -ccore.pager=x log",
+        "git --config-env=core.pager=EVIL log",
+        "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.pager GIT_CONFIG_VALUE_0='touch /tmp/p' git log",
+        "export GIT_CONFIG_COUNT=1; git log",
+        "GIT_EXTERNAL_DIFF=/tmp/x git diff",
+        "GIT_PAGER='touch /tmp/p' git log",
+        "find . -name x -exec rm {} \\;",
+        "find . -exec touch /tmp/p +",
+        "find . -ok rm {} \\;",
+        "find . -execdir rm {} +",
+        "find . -name '*.tmp' -delete",
+        "find . -fprint /tmp/out",
+        "awk 'BEGIN{system(\"touch /tmp/p\")}'",
+        "awk 'BEGIN{print 1 > \"/tmp/p\"}'",
+        "awk 'BEGIN{\"date\" | getline x}'",
+        "awk 'BEGIN{print \"x\" | \"sh\"}'",
+        "awk -f prog.awk file",
+        "gawk -i inplace '{print}' file",
+        "sed '1e touch /tmp/p' file",
+        "sed 's/a/b/e' file",
+        "sed -n 'w /tmp/out' file",
+        "sed 's/a/b/w /tmp/out' file",
+        "sed -f script.sed file",
+        "python3 -c 'import os; os.system(\"touch /tmp/p\")'",
+        "python3 -c 'open(\"/tmp/p\",\"w\").write(\"x\")'",
+        "python -c '__import__(\"os\").remove(\"x\")'",
+        "[[ 1 -eq 'a[$(touch /tmp/p)]' ]]",
+        "x='a[$(touch /tmp/p)]'; echo $((x))",
+        "x='a[$(touch /tmp/p)]'; (( x ))",
+        "x='a[$(touch /tmp/p)]'; let y=x",
+        "x='a[$(touch /tmp/p)]'; echo ${s:x}",
+        "X='a' git push",
+        "X='a' rm -rf /tmp/zz-cg",
+        "X=\"a b\" git commit -m x",
+        "X='a'b git push",
+        "\"git\" push",
+        "'rm' -f x",
+    ],
+)
+def test_issue_1468_write_forms_blocked(isolated_gate, command):
+    r = isolated_gate(command)
+    assert r.returncode == 2, f"{command!r} passed the gate: {r.stderr}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "git status --short",
+        "git log --oneline -3",
+        "git -C repo log -1",
+        "echo \"see: git commit\"",
+        "find . -name '*.md' -type f",
+        "awk '{print $2}' f",
+        "grep x f | awk -F'|' '{print $1}'",
+        "awk '$1 > 5' f",
+        "sed -n '1,5p' f",
+        "sed 's/a/b/g' f",
+        "sed -n '/where/p' f",
+        "sed -E 's#x#y#' f",
+        "STRATEGY_DAY_NAME=$(python3 -c \"import yaml; print(1)\")",
+        "x=$(( 1 << 3 ))",
+        "N=$(( $(date +%s) - 3600 ))",
+        "[[ -f x ]] && echo y",
+        "[[ $(wc -l < f) -gt 3 ]] && echo big",
+        "echo ${HOME:-x} ${#arr[@]} ${s:0:5}",
+        "AUTHOR_MODE=$(grep -E '^author_mode:' \"${IWE_WORKSPACE:-$HOME/IWE}/params.yaml\" 2>/dev/null | awk '{print $2}')",
+        "PY3=x; S=$([ -n \"$PY3\" ] && \"$PY3\" -c \"import yaml\" || echo monday)",
+        "date +%u",
+        "echo 'git push'",
+        "command -v rm",
+        "command -V git",
+        "grep -n \"system(\" notes.md",
+        "git log -c -1",
+    ],
+)
+def test_issue_1468_reads_still_pass(isolated_gate, command):
+    r = isolated_gate(command)
+    assert r.returncode == 0, f"{command!r} blocked: {r.stderr}"
