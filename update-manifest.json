@@ -2505,7 +2505,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "bf6bd2153240c4cdaf378751a48070ef4c4b010cbab400f15f00285181cdc6ce"
+      "sha256": "732ef302c946d25c6fe29994cf989b0c2e9f14574e67b1ae839e71319b2104eb"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -3385,7 +3385,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "bf6bd2153240c4cdaf378751a48070ef4c4b010cbab400f15f00285181cdc6ce"
+      "sha256": "732ef302c946d25c6fe29994cf989b0c2e9f14574e67b1ae839e71319b2104eb"
     },
     {
       "path": "seed/strategy/scripts/day-open-sync-banner-patch.py",
@@ -3586,6 +3586,7 @@
     "scripts/tests/test-issue-1411-update-rollback-unrelated-history.sh",
     "scripts/tests/test-issue-1569-extensionless-author-scan.sh",
     "scripts/tests/test-issue-1572-isolate-root-records.sh",
+    "scripts/tests/test-issue-1575-update-row-c-locale.sh",
     "scripts/tests/test-iwe-audit-fpf-copy.sh",
     "scripts/tests/test-peer-session-finalize-index-lock.sh",
     "scripts/tests/test-setup-extractor-feeders-linux-env.sh",
