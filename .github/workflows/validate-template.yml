@@ -213,6 +213,8 @@ jobs:
         run: bash setup/test-strategist-isolated-scenarios.sh
       - name: Run WP-529 changelog gate tests
         run: bash setup/test-check-changelog-entry.sh
+      - name: Run WP-529 Ф276 build-runtime author-sourced files tests
+        run: bash setup/test-build-runtime-author-sourced.sh
 
   # #1030/#1005: exercise lock publication and both timeout process trees
   # under Git for Windows Bash with native Windows Python. POSIX signal probes
