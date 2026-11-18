@@ -5206,10 +5206,33 @@ update_needs_exec_bit() {
 }
 
 # The unchanged-program +x repair (WP-529 F275) relies on chmod taking effect. On Git Bash
-# (MSYS/MinGW) chmod is a no-op and `-x` follows the shebang, so a shebang-less *.sh would be
-# re-delivered on every run and the update would never report «Всё актуально» (rc.6 red team F2).
+# (MSYS/MinGW) and Cygwin chmod is a no-op and `-x` follows the shebang, so a shebang-less *.sh
+# would be re-delivered on every run and the update would never report «Всё актуально» (rc.6 red
+# team F2, rc.8 F7).
 UPDATE_EXEC_REPAIR=true
-case "$(uname -s 2>/dev/null)" in MINGW* | MSYS*) UPDATE_EXEC_REPAIR=false ;; esac
+case "$(uname -s 2>/dev/null)" in MINGW* | MSYS* | CYGWIN*) UPDATE_EXEC_REPAIR=false ;; esac
+# update_exec_bit_takes_effect DIR — whether a file in DIR given the mode the plan sets for a
+# program (666 and `chmod +x`, masked by umask) is executable. It is not under umask 177, 111 or
+# 133 (no x bit is left) or on a noexec mount (`-x` is false whatever the mode); the repair would
+# then queue the same programs on every run (rc.8 red team F7). In --check nothing is written:
+# only the umask is checked.
+update_exec_bit_takes_effect() {
+    local _um _mode _probe _ok=1
+    _um=$(umask)
+    _mode=$(( (8#666 & ~8#$_um) | (8#111 & ~8#$_um) ))
+    [ $(( _mode & 8#100 )) -ne 0 ] || return 1
+    $CHECK_ONLY && return 0
+    _probe=$(mktemp "$1/.iwe-exec-probe.XXXXXX" 2>/dev/null) || return 1
+    chmod "$(printf '%03o' "$_mode")" "$_probe" 2>/dev/null && [ -x "$_probe" ] && _ok=0
+    rm -f "$_probe"
+    return "$_ok"
+}
+UPDATE_EXEC_REPAIR_OFF_HERE=false
+if $UPDATE_EXEC_REPAIR && ! update_exec_bit_takes_effect "$SCRIPT_DIR"; then
+    UPDATE_EXEC_REPAIR=false
+    UPDATE_EXEC_REPAIR_OFF_HERE=true
+fi
+EXEC_REPAIR_SKIPPED=()
 
 while IFS='|' read -r fpath fdesc expected_hash; do
     [ -z "$fpath" ] && continue
@@ -5245,6 +5268,9 @@ while IFS='|' read -r fpath fdesc expected_hash; do
         # WP-529 F275: an unchanged program without +x is still fetched, so Step 2 re-delivers it
         # with the same content and the plan sets +x (rc.3-rc.5 upgrade runs: NOEXEC 27).
         if ! $UPDATE_EXEC_REPAIR || [ -x "$SCRIPT_DIR/$fpath" ] || ! update_needs_exec_bit "$fpath" "$SCRIPT_DIR/$fpath"; then
+            if $UPDATE_EXEC_REPAIR_OFF_HERE && [ ! -x "$SCRIPT_DIR/$fpath" ] && update_needs_exec_bit "$fpath" "$SCRIPT_DIR/$fpath"; then
+                EXEC_REPAIR_SKIPPED+=("$fpath")
+            fi
             UNCHANGED=$((UNCHANGED + 1))
             continue
         fi
@@ -5253,6 +5279,9 @@ while IFS='|' read -r fpath fdesc expected_hash; do
     DOWNLOAD_DESCS+=("$fdesc")
     DOWNLOAD_HASHES+=("$expected_hash")
 done < "$MANIFEST_PARSED"
+if [ ${#EXEC_REPAIR_SKIPPED[@]} -gt 0 ]; then
+    echo "⚠ Право на запуск здесь не ставится (umask $(umask) или том смонтирован с noexec): ${#EXEC_REPAIR_SKIPPED[@]} программ остаются без +x и не перевыкладываются при каждом запуске. Поставьте право вручную (chmod +x) или смените umask/том: ${EXEC_REPAIR_SKIPPED[*]}" >&2
+fi
 
 # curl_supports_parallel_batch — one-time capability probe (peer-session
 # 2026-08-21-09, consensus with Codex): --parallel/--parallel-max shipped

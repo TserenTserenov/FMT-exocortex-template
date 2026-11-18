@@ -969,7 +969,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "b8d048187512396a1debb940cfc546cdf047ac7dc3d3da2573ba8df4b46cc41c"
+      "sha256": "0c4ec0203ec13078ba179e97347480bc82905abdfda303ae8f6d30d50d028556"
     },
     {
       "path": "CLAUDE.md",
@@ -3525,7 +3525,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "abbfa5b4c7ac6a208153437b712b25200defc4a5af3559624566d46ce9275ea8"
+      "sha256": "3f5d46901110d0b2cce5696a2f18e9591d40e2271df8e8346edf72e1d5f5981e"
     }
   ],
   "excluded_paths": [
@@ -3605,6 +3605,7 @@
     "scripts/tests/test-wp529-f270-rollback-cleanup.sh",
     "scripts/tests/test-wp529-f270-settings-merge-report.sh",
     "scripts/tests/test-wp529-f270-step0-no-downgrade.sh",
+    "scripts/tests/test-wp529-f275-exec-repair-probe.sh",
     "scripts/tests/test_1229_sync_bundle.sh",
     "scripts/tests/test_1230_publish.sh",
     "scripts/tests/test_1231_artifactor.sh",
