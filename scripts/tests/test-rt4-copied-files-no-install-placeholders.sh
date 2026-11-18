@@ -8,8 +8,11 @@
 # ${IWE_WORKSPACE:-$HOME/IWE} and ${IWE_GOVERNANCE_REPO:-DS-strategy}.
 #
 # The scope is taken from setup.sh itself (the [4b] subdir list), so a new copied
-# subdirectory is covered without editing this test. The one exemption is the
-# author-mode skill, which documents the {{KEY}} syntax used when promoting files.
+# subdirectory is covered without editing this test. Two exemptions, both documents
+# about the marker itself rather than commands: the author-mode skill (it documents the
+# {{KEY}} syntax used when promoting files) and memory/navigation.md, which keeps an
+# explained {{GOVERNANCE_REPO}} marker on purpose (#1057, checked by
+# setup/smoke-test-fresh-install.sh "installed navigation keeps the explained marker").
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -25,7 +28,7 @@ for d in $subdirs; do
 done
 
 hits=$(grep -rnE '\{\{(WORKSPACE_DIR|GOVERNANCE_REPO)\}\}' "${targets[@]}" 2>/dev/null \
-  | grep -v "^$ROOT/.claude/skills/author-mode/SKILL.md:" || true)
+  | grep -v -e "^$ROOT/.claude/skills/author-mode/SKILL.md:" -e "^$ROOT/memory/navigation.md:" || true)
 if [ -n "$hits" ]; then
   echo "$hits" | sed "s|^$ROOT/||" | head -30 >&2
   fail "files copied as-is at install still carry {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}} ($(printf '%s\n' "$hits" | wc -l | tr -d ' ') lines)"

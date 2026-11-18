@@ -14,7 +14,7 @@ description: "Операционный файл памяти IWE"
 ---
 # Навигация по репозиториям (Слой 3)
 
-> `${IWE_GOVERNANCE_REPO:-DS-strategy}` в путях ниже — имя репозитория управления из `.exocortex.env` (`GOVERNANCE_REPO`); подставьте значение своей установки.
+> `{{GOVERNANCE_REPO}}` в путях ниже — имя репозитория управления из `.exocortex.env` (`GOVERNANCE_REPO`); подставьте значение своей установки.
 
 ## Ключевые файлы
 
@@ -42,7 +42,7 @@ description: "Операционный файл памяти IWE"
 <!-- | Мой бот (READ-ONLY) | `your-org/your-bot/` | -->
 <!-- | Монорепо ИИ-систем | `your-org/ai-systems/` | -->
 | Шаблонизатор | `FMT-exocortex-template/setup.sh` |
-| Личная онтология | `${IWE_GOVERNANCE_REPO:-DS-strategy}/ontology.md` |
+| Личная онтология | `{{GOVERNANCE_REPO}}/ontology.md` |
 | Программа обучения | `DS-principles-curriculum/` |
 | Сессии агентов (если заведён) | `MC-sessions/` |
 | Личные данные: персона, дело жизни, мастерство (если заведён) | `PD-persona/` |
@@ -78,9 +78,9 @@ description: "Операционный файл памяти IWE"
 
 | Файл | Путь |
 |------|------|
-| Стратегия | `${IWE_GOVERNANCE_REPO:-DS-strategy}/docs/Strategy.md` |
-| Реестр всех РП (WP-1…WP-85+) | `${IWE_GOVERNANCE_REPO:-DS-strategy}/docs/WP-REGISTRY.md` |
-| WeekPlan | `${IWE_GOVERNANCE_REPO:-DS-strategy}/current/` |
+| Стратегия | `{{GOVERNANCE_REPO}}/docs/Strategy.md` |
+| Реестр всех РП (WP-1…WP-85+) | `{{GOVERNANCE_REPO}}/docs/WP-REGISTRY.md` |
+| WeekPlan | `{{GOVERNANCE_REPO}}/current/` |
 
 ## GitHub-организации (НЕ путать!)
 
@@ -92,5 +92,5 @@ description: "Операционный файл памяти IWE"
 
 ## WP Context Files
 
-> Все context files: `${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/WP-{N}/WP-{N}.md` (всегда папка — WP-434)
-> Архив: `${IWE_GOVERNANCE_REPO:-DS-strategy}/archive/wp-contexts/`
+> Все context files: `{{GOVERNANCE_REPO}}/inbox/WP-{N}/WP-{N}.md` (всегда папка — WP-434)
+> Архив: `{{GOVERNANCE_REPO}}/archive/wp-contexts/`

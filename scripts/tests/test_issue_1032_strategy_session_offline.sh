@@ -37,6 +37,8 @@ text = Path(sys.argv[1]).read_text()
 section = text.split("### Шаг 0. Рабочая копия", 1)[1]
 block = re.search(r"```bash\n(.*?)```", section, re.S).group(1)
 block = block.replace("{{WORKSPACE_DIR}}", sys.argv[2]).replace("{{GOVERNANCE_REPO}}", "DS-strategy")
+# RT-4: the skill now spells these as the environment form
+block = block.replace("${IWE_WORKSPACE:-$HOME/IWE}", sys.argv[2]).replace("${IWE_GOVERNANCE_REPO:-DS-strategy}", "DS-strategy")
 Path(sys.argv[3]).write_text(block)
 PY
 

@@ -1725,7 +1725,7 @@
     },
     {
       "path": "memory/navigation.md",
-      "sha256": "c7b08440b9e8d0cc107dffdeb1eff7ce9d29d177276daac342124e5d71d6e383"
+      "sha256": "a07ba9c2796b9d8b8203ed3c1c61120c6dbbe27ae1f5666a16d7b95edb710803"
     },
     {
       "path": "memory/protocol-close.md",
@@ -3125,7 +3125,7 @@
     },
     {
       "path": "scripts/tests/test_issue_1032_strategy_session_offline.sh",
-      "sha256": "80338b4704b0d42eb8653bd36f4942574f75288db787c44616e6ebda3610abdd"
+      "sha256": "5b3ae59fe2aa95ac5c0617c0a5084e292ef22f260146bcaffe618466b9444e8e"
     },
     {
       "path": "scripts/tests/test_issue_1032_windows_fail_closed.sh",
