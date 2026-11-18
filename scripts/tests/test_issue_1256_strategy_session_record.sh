@@ -47,6 +47,9 @@ class SessionRecordTest(unittest.TestCase):
     def run_block(self, block, *, env=None, tail="", cwd=None):
         replacements = {
             "{{WORKSPACE_DIR}}": str(self.ws),
+            # RT-4: the shipped blocks now use the environment form for the same values
+            "${IWE_WORKSPACE:-$HOME/IWE}": str(self.ws),
+            "${IWE_GOVERNANCE_REPO:-DS-strategy}": "GOV",
             "{{IWE_TEMPLATE}}": str(self.template),
             "{{GOVERNANCE_REPO}}": "GOV",
             "<записанный путь>": str(self.gov),

@@ -1292,7 +1292,9 @@ INCEOF
     local upd_output upd_emoji upd_status
     upd_output=$(run_bounded "${ISSUE_SWEEP_TIMEOUT:-10}" bash -c \
       "cd '$IWE/FMT-exocortex-template' && bash update.sh --check --fast 2>&1")
-    upd_status=$(printf '%s\n' "$upd_output" | grep -E '^[✓⚠]' | head -1)
+    # issue #1575: alternation, not a bracket expression -- under cron/launchd
+    # (C locale) [✓⚠] is a set of bytes and also matches the "ℹ" info line.
+    upd_status=$(printf '%s\n' "$upd_output" | grep -E '^(✓|⚠)' | head -1)
     case "$upd_status" in
         ✓*) upd_emoji="🟢" ;;
         ⚠*) upd_emoji="🟡" ;;

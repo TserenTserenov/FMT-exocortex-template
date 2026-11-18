@@ -17,7 +17,7 @@ check() { if [ "$2" = ok ]; then echo "PASS: $1"; else echo "FAIL: $1"; FAILURES
 has() { grep -qF -- "$1" "$SKILL"; }
 
 # --- text checks
-grep -nE '\{\{WORKSPACE_DIR\}\}/\{\{GOVERNANCE_REPO\}\}/(docs|current|inbox|Lifework|archive)' "$SKILL" >/dev/null \
+grep -nE '(\{\{WORKSPACE_DIR\}\}|\$\{IWE_WORKSPACE:-\$HOME/IWE\})/(\{\{GOVERNANCE_REPO\}\}|\$\{IWE_GOVERNANCE_REPO:-DS-strategy\})/(docs|current|inbox|Lifework|archive)' "$SKILL" >/dev/null \
   && check "no canonical literal in paths" bad || check "no canonical literal in paths" ok
 has 'resolve_active_worktree' && has 'GOV_WT=' && check "resolver defines GOV_WT" ok || check "resolver defines GOV_WT" bad
 has 'open --isolate' && check "isolation command" ok || check "isolation command" bad
@@ -25,7 +25,7 @@ has 'ds-publish.sh' && check "ds-publish" ok || check "ds-publish" bad
 has 'GUARD_MODE=absent' && has 'mode=legacy' && check "explicit no-session-guard branch" ok || check "explicit no-session-guard branch" bad
 has ': "${GOV_WT:?}"' && has 'cd -- "$GOV_WT" || exit 1' && check "GOV_WT re-check in write blocks" ok || check "GOV_WT re-check in write blocks" bad
 has '--git-common-dir' && check "common-dir membership check" ok || check "common-dir membership check" bad
-has 'PUB="$GOV_WT/scripts/ds-publish.sh"' && has 'bash "$PUB" "$GOV_WT" normal' && has 'source "{{WORKSPACE_DIR}}/scripts/lib/common.sh"' && check "quoted paths" ok || check "quoted paths" bad
+has 'PUB="$GOV_WT/scripts/ds-publish.sh"' && has 'bash "$PUB" "$GOV_WT" normal' && has 'source "${IWE_WORKSPACE:-$HOME/IWE}/scripts/lib/common.sh"' && check "quoted paths" ok || check "quoted paths" bad
 # extensions come after the working-copy step
 o1=$(grep -n '^### Шаг 0\. Рабочая копия' "$SKILL" | head -1 | cut -d: -f1)
 o2=$(grep -n 'load-extensions.sh strategy-session before' "$SKILL" | head -1 | cut -d: -f1)
@@ -52,7 +52,7 @@ ROOT="$TMP/ws"; mkdir -p "$ROOT/scripts" "$TMP/other"
 git init -q "$ROOT/GOV" && git -C "$ROOT/GOV" -c user.email=a@b -c user.name=t commit -q --allow-empty -m i
 git -C "$ROOT/GOV" worktree add -q -b wt "$TMP/wt" 2>/dev/null
 git init -q "$TMP/other" && git -C "$TMP/other" -c user.email=a@b -c user.name=t commit -q --allow-empty -m i
-sed "s#{{WORKSPACE_DIR}}#$ROOT#g; s#{{GOVERNANCE_REPO}}#GOV#g" "$TMP/block.sh" > "$TMP/run.sh"
+sed "s#{{WORKSPACE_DIR}}#$ROOT#g; s#{{GOVERNANCE_REPO}}#GOV#g; s#\\\${IWE_WORKSPACE:-\\\$HOME/IWE}#$ROOT#g; s#\\\${IWE_GOVERNANCE_REPO:-DS-strategy}#GOV#g" "$TMP/block.sh" > "$TMP/run.sh"
 run() { (cd "$1" && IWE_SCRIPTS="$ROOT/none" bash "$TMP/run.sh" 2>&1); }
 wtreal=$(cd "$TMP/wt" && pwd -P)
 # no guard: legacy, canon and worktree both OK, unrelated repo falls back to canon
@@ -119,7 +119,8 @@ MARKERS = [("step0", "GUARD_MODE=required"), ("retry", "<блок шага 0 б�
            ("open", "open --isolate --wp"), ("write", "<команды записи>"),
            ("publish", "ds-publish.sh"), ("search", "grep -rl")]
 step0 = next((body for _, body in fences if MARKERS[0][1] in body), "")
-SUBST = [("{{WORKSPACE_DIR}}", ws), ("{{GOVERNANCE_REPO}}", "DS-strategy"), ("<CANON_C>", canon),
+SUBST = [("{{WORKSPACE_DIR}}", ws), ("{{GOVERNANCE_REPO}}", "DS-strategy"),
+         ("${IWE_WORKSPACE:-$HOME/IWE}", ws), ("${IWE_GOVERNANCE_REPO:-DS-strategy}", "DS-strategy"), ("<CANON_C>", canon),
          ("<GUARD>", guard), ("<WP-N>", "WP-1"), ("<worktree_path>", wt),
          ("<команды записи>", "printf '%s\\n' '- [ ] цель недели' >> docs/Strategy.md")]
 PATH_PLACEHOLDERS = ("<записанный абсолютный путь>", "<записанный путь>")
