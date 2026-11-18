@@ -1445,7 +1445,10 @@ fi
 # (`--del`, `--forc`, `--mo`). Creating a branch and every listing form stay allowed.
 # rc.5 red team (RT5-3): `git branch --unset-upstream`/`-u` rewrites the tracking config and
 # `git remote update --prune` deletes remote-tracking branches; both passed the same way.
-GIT_BRANCH_WRITE=$(git_segment branch | grep -E -- ' branch( .*)? (-[a-zA-Z]*[dDfmMCu][a-zA-Z]*|--(d[a-z]*|forc|force|mo|mov|move|unset-upstream|set-upstream-to|set-upstream))( |=|$)' || true)
+# 0.42 red team F6: the prefix rule above applies to these too — `--unset`, `--u` and
+# `--set-upstream-t` are accepted by git as --unset-upstream / --set-upstream-to.
+# (`--se`, `--set`, `--set-u` are ambiguous with the retired --set-upstream and git refuses them.)
+GIT_BRANCH_WRITE=$(git_segment branch | grep -E -- ' branch( .*)? (-[a-zA-Z]*[dDfmMCu][a-zA-Z]*|--(d[a-z]*|forc|force|mo|mov|move|u[a-z-]*|set-upstream[a-z-]*))( |=|$)' || true)
 GIT_REMOTE_WRITE=$(git_segment remote | grep -E -- ' remote( -v| --verbose)* ((add|rename|remove|rm|set-head|set-branches|set-url|prune)( |$)|update( .*)? (--prune|-p)( |$))' || true)
 if [ -n "$GIT_BRANCH_WRITE$GIT_REMOTE_WRITE" ]; then
   block "git branch -d/-D/-f/-m/-M/-C/-u, --unset-upstream и git remote add/rename/remove/set-url/set-head/set-branches/prune, git remote update --prune запрещены — разрешены без запроса только для просмотра, а эти формы удаляют ветку или меняют адрес хранилища. Просмотр (git branch, git branch -a -vv, git remote -v, git remote get-url) работает; удаление ветки и смену адреса делает пилот сам. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."

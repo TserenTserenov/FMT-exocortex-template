@@ -87,6 +87,16 @@ expect "cat /dev/null > TMPDIR" pass 'cat /dev/null > "$TMPDIR/empty.txt"'
 expect "cat with 2>/dev/null" pass 'cat README.md 2>/dev/null | head -5'
 expect "head -n 20" pass 'head -n 20 README.md'
 
+# === 0.42 red team F6: git accepts any unambiguous prefix of a long option ===
+expect "branch --unset (prefix)" block 'git branch --unset'
+expect "branch --u (prefix)" block 'git branch --u'
+expect "branch --unset-up main" block 'git branch --unset-up main'
+expect "branch --set-upstream-t=" block 'git branch --set-upstream-t=origin/main'
+expect "branch --set-upstream-t value" block 'git branch --set-upstream-t origin/main main'
+expect "branch --set-upstream-" block 'git branch --set-upstream-=origin/main'
+expect "branch --sort still passes" pass 'git branch --sort=-committerdate'
+expect "branch --show-current still passes" pass 'git branch --show-current'
+
 # === listing and harmless forms pass ===
 expect "branch list" pass 'git branch'
 expect "branch -a -vv" pass 'git branch -a -vv'

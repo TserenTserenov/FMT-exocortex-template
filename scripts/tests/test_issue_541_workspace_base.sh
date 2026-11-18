@@ -186,10 +186,13 @@ for stub in launchctl osascript claude crontab systemctl open caffeinate; do
 done
 # macOS mktemp -d without a template ignores $TMPDIR and writes into the user's real temp
 # directory; give it one. Any other call goes to the real mktemp untouched.
-cat > "$SHIM_DIR/mktemp" <<'SHIM'
+# The real mktemp is resolved here, not assumed at /usr/bin: NixOS keeps it in the system
+# profile, and the hardcoded path failed every update run of this test there (0.42 rc.9 red team, Н5).
+REAL_MKTEMP=$(command -v mktemp) || { echo "FAIL: mktemp not found in PATH" >&2; exit 1; }
+cat > "$SHIM_DIR/mktemp" <<SHIM
 #!/bin/bash
-if [ "$#" -eq 1 ] && [ "$1" = "-d" ]; then exec /usr/bin/mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXX"; fi
-exec /usr/bin/mktemp "$@"
+if [ "\$#" -eq 1 ] && [ "\$1" = "-d" ]; then exec "$REAL_MKTEMP" -d "\${TMPDIR:-/tmp}/tmp.XXXXXXXX"; fi
+exec "$REAL_MKTEMP" "\$@"
 SHIM
 chmod +x "$SHIM_DIR"/*
 # A git that does not work, as on a macOS whose Command Line Tools went missing after an update.
