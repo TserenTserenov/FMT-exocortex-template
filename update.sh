@@ -5188,6 +5188,23 @@ is_fork_owned_path() {
     return 1
 }
 
+# Defined before the manifest loop: Step 2 calls it for unchanged programs that lack +x
+# (WP-529 F275); a call above the definition fails as 'command not found' = false.
+# Pattern of "executable" paths of the apply loops: files arrive via raw
+# `curl -o` without permissions, so +x is set at delivery (on a temporary
+# file before rename). issue #308: .githooks/* is not cosmetic (git silently skips a
+# non-executable hook); wp-list.py/check-claude-md-links.py — 755 in git upstream.
+# WP-529 Ф270 (F1 of the rc.3 red team): 54 programs that are 755 in git matched no pattern and
+# arrived non-executable on upgrade (scripts/iwe-notify among them: notify.sh looks it up with
+# `[ -x ]`, so every Telegram notification stopped). A delivered file that starts with `#!` is
+# a program meant to be run directly, so it gets +x too; SRC is the downloaded payload.
+update_needs_exec_bit() {
+    case "$1" in
+        *.sh | .githooks/* | .claude/bin/* | scripts/wp-list.py | scripts/check-claude-md-links.py) return 0 ;;
+    esac
+    [ -n "${2:-}" ] && [ -f "$2" ] && [ "$(head -c 2 "$2")" = "#!" ]
+}
+
 while IFS='|' read -r fpath fdesc expected_hash; do
     [ -z "$fpath" ] && continue
     # issue #402 (defect 3): native Windows Python prints \r\n even inside a
@@ -5219,8 +5236,12 @@ while IFS='|' read -r fpath fdesc expected_hash; do
     # half of the speedup alongside parallel download, since a typical update
     # leaves most files unchanged.
     if [ -n "$expected_hash" ] && [ -f "$SCRIPT_DIR/$fpath" ] && [ "$(hash_file "$SCRIPT_DIR/$fpath")" = "$expected_hash" ]; then
-        UNCHANGED=$((UNCHANGED + 1))
-        continue
+        # WP-529 F275: an unchanged program without +x is still fetched, so Step 2 re-delivers it
+        # with the same content and the plan sets +x (rc.3-rc.5 upgrade runs: NOEXEC 27).
+        if [ -x "$SCRIPT_DIR/$fpath" ] || ! update_needs_exec_bit "$fpath" "$SCRIPT_DIR/$fpath"; then
+            UNCHANGED=$((UNCHANGED + 1))
+            continue
+        fi
     fi
     DOWNLOAD_QUEUE+=("$fpath")
     DOWNLOAD_DESCS+=("$fdesc")
@@ -6087,21 +6108,6 @@ update_mode_plus_x() {
     local _um
     _um=$(umask)
     printf '%03o\n' "$(( 8#$1 | ( 8#111 & ~8#$_um ) ))"
-}
-
-# Pattern of "executable" paths of the apply loops: files arrive via raw
-# `curl -o` without permissions, so +x is set at delivery (on a temporary
-# file before rename). issue #308: .githooks/* is not cosmetic (git silently skips a
-# non-executable hook); wp-list.py/check-claude-md-links.py — 755 in git upstream.
-# WP-529 Ф270 (F1 of the rc.3 red team): 54 programs that are 755 in git matched no pattern and
-# arrived non-executable on upgrade (scripts/iwe-notify among them: notify.sh looks it up with
-# `[ -x ]`, so every Telegram notification stopped). A delivered file that starts with `#!` is
-# a program meant to be run directly, so it gets +x too; SRC is the downloaded payload.
-update_needs_exec_bit() {
-    case "$1" in
-        *.sh | .githooks/* | .claude/bin/* | scripts/wp-list.py | scripts/check-claude-md-links.py) return 0 ;;
-    esac
-    [ -n "${2:-}" ] && [ -f "$2" ] && [ "$(head -c 2 "$2")" = "#!" ]
 }
 
 # update_dest_mode REL — current permissions of the target in the clone: cp into an existing file

@@ -45,6 +45,18 @@ done < "$TMP/exec-paths"
 [ "$TOTAL" -gt 100 ] || { echo "FATAL: only $TOTAL executable manifest paths found" >&2; exit 2; }
 grep -qx 'scripts/iwe-notify' "$TMP/exec-paths" || { echo "  FAIL: scripts/iwe-notify is not in the checked set"; FAILS=$((FAILS + 1)); }
 
+# WP-529 F275: update.sh runs top to bottom, so a call above the definition is 'command not
+# found' (= false) and the unchanged-program +x repair silently never fires (rc.4/rc.5: NOEXEC 27).
+DEF_LINE=$(grep -n '^update_needs_exec_bit() {' "$UPDATE_SH" | head -1 | cut -d: -f1)
+FIRST_CALL=$(grep -n 'update_needs_exec_bit "' "$UPDATE_SH" | head -1 | cut -d: -f1)
+if [ -z "$FIRST_CALL" ] || [ "$DEF_LINE" -ge "$FIRST_CALL" ]; then
+  echo "  FAIL: update_needs_exec_bit is defined at line $DEF_LINE, first called at line ${FIRST_CALL:-none}"
+  FAILS=$((FAILS + 1))
+fi
+# The pre-download filter must not skip an unchanged program that lacks +x.
+grep -q 'if \[ -x "\$SCRIPT_DIR/\$fpath" \] || ! update_needs_exec_bit "\$fpath" "\$SCRIPT_DIR/\$fpath"; then' "$UPDATE_SH" \
+  || { echo "  FAIL: the download filter skips unchanged programs without checking +x"; FAILS=$((FAILS + 1)); }
+
 # A plain document stays non-executable.
 update_needs_exec_bit "README.md" "$ROOT/README.md" && { echo "  FAIL: README.md would get +x"; FAILS=$((FAILS + 1)); }
 # No payload path: the path patterns alone decide, as before.
