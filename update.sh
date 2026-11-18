@@ -5205,6 +5205,12 @@ update_needs_exec_bit() {
     [ -n "${2:-}" ] && [ -f "$2" ] && [ "$(head -c 2 "$2")" = "#!" ]
 }
 
+# The unchanged-program +x repair (WP-529 F275) relies on chmod taking effect. On Git Bash
+# (MSYS/MinGW) chmod is a no-op and `-x` follows the shebang, so a shebang-less *.sh would be
+# re-delivered on every run and the update would never report «Всё актуально» (rc.6 red team F2).
+UPDATE_EXEC_REPAIR=true
+case "$(uname -s 2>/dev/null)" in MINGW* | MSYS*) UPDATE_EXEC_REPAIR=false ;; esac
+
 while IFS='|' read -r fpath fdesc expected_hash; do
     [ -z "$fpath" ] && continue
     # issue #402 (defect 3): native Windows Python prints \r\n even inside a
@@ -5238,7 +5244,7 @@ while IFS='|' read -r fpath fdesc expected_hash; do
     if [ -n "$expected_hash" ] && [ -f "$SCRIPT_DIR/$fpath" ] && [ "$(hash_file "$SCRIPT_DIR/$fpath")" = "$expected_hash" ]; then
         # WP-529 F275: an unchanged program without +x is still fetched, so Step 2 re-delivers it
         # with the same content and the plan sets +x (rc.3-rc.5 upgrade runs: NOEXEC 27).
-        if [ -x "$SCRIPT_DIR/$fpath" ] || ! update_needs_exec_bit "$fpath" "$SCRIPT_DIR/$fpath"; then
+        if ! $UPDATE_EXEC_REPAIR || [ -x "$SCRIPT_DIR/$fpath" ] || ! update_needs_exec_bit "$fpath" "$SCRIPT_DIR/$fpath"; then
             UNCHANGED=$((UNCHANGED + 1))
             continue
         fi
@@ -5500,7 +5506,7 @@ for _dq_i in "${!DOWNLOAD_QUEUE[@]}"; do
             case "$fpath" in
                 memory/*.md|memory/*.yaml|memory/*.yml) record_memory_old_hash "$fpath" "$LOCAL_HASH" ;;
             esac
-        elif update_needs_exec_bit "$fpath" "$REMOTE_FILE" && [ ! -x "$SCRIPT_DIR/$fpath" ]; then
+        elif $UPDATE_EXEC_REPAIR && update_needs_exec_bit "$fpath" "$REMOTE_FILE" && [ ! -x "$SCRIPT_DIR/$fpath" ]; then
             # WP-529 F275 (rc.3 upgrade-from-release, NOEXEC 27): a program whose content did not
             # change but which lacks +x (a git mode flip, or an older install that delivered it
             # without +x) is re-delivered with the same content, so the plan sets +x on it.
