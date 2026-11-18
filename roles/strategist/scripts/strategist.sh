@@ -1393,10 +1393,15 @@ day_open_observe() {
         log "Day Open: сверка плана с origin не удалась (сеть?) — сигнал «нет плана» не шлю, отложил (код $DAY_OPEN_DEFERRED_RC)"
         exit "$DAY_OPEN_DEFERRED_RC"
     fi
-    if git -C "$WORKSPACE" cat-file -e "refs/remotes/origin/$GIT_DEFAULT_BRANCH:$plan_path" 2>/dev/null; then
-        log "SKIP: DayPlan $DATE уже опубликован на origin (владелец — серверный day-open); этот хост наблюдатель, пайплайн не запускаю"
-        exit 0
-    fi
+    # Day Close moves the plan to archive/day-plans/; an evening run that only
+    # looked in current/ reported a published plan as missing (18.11, WP-484 F313).
+    local archived_path="archive/day-plans/DayPlan $DATE.md" found_path
+    for found_path in "$plan_path" "$archived_path"; do
+        if git -C "$WORKSPACE" cat-file -e "refs/remotes/origin/$GIT_DEFAULT_BRANCH:$found_path" 2>/dev/null; then
+            log "SKIP: DayPlan $DATE уже опубликован на origin ($found_path; владелец — серверный day-open); этот хост наблюдатель, пайплайн не запускаю"
+            exit 0
+        fi
+    done
     local now today
     now=$(date +%H:%M)
     today=$(date +%Y-%m-%d)
