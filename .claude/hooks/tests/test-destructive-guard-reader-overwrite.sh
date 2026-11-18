@@ -241,5 +241,13 @@ expect "40 brace groups into /tmp ask (unresolvable)" ask "ls > /tmp/x$B40"
 expect "40 brace groups after tee ask (unresolvable)" ask "echo a | tee x$B40"
 expect "bad bracket class asks, not a raw perl error" ask 'cat README.md > a[[:alpha:]]/b'
 
+# === WP-529 F275, rc.6 red team F4: `<<` inside an expansion is not a here-doc ===
+expect "shift inside \$((…)) does not hide the next line" ask 'ls $((1<<ls))
+grep zzzqqq README.md > params.yaml
+ls'
+expect "<< inside \${…} gives cat no here-doc input" ask 'cat ${x:-<<ls} > params.yaml
+x
+ls'
+
 echo "reader-overwrite: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

@@ -98,7 +98,10 @@ fi
 # never actually fail here (the identical content just parsed successfully
 # one line up), but "should never fail" is exactly the assumption Д22 exists
 # to not make.
-CMD=$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_input.command') || block "jq отказал при извлечении команды после успешной валидации — блокирую."
+# `jq -j` and the `x` sentinel keep trailing newlines: `$(…)` would strip them, and with them the
+# newline of a final backslash-newline, which then hid the last word (rc.6 red team, F3).
+CMD=$(printf '%s' "$HOOK_INPUT" | jq -j '.tool_input.command' && printf x) || block "jq отказал при извлечении команды после успешной валидации — блокирую."
+CMD=${CMD%x}
 CWD=$(printf '%s' "$HOOK_INPUT" | jq -r '.cwd // .tool_input.cwd // empty' 2>/dev/null || true)
 
 # Line continuations are removed first, the way bash does before it reads the words (rc.2 red team,
@@ -110,7 +113,10 @@ CWD=$(printf '%s' "$HOOK_INPUT" | jq -r '.cwd // .tool_input.cwd // empty' 2>/de
 # quoted body a continuation is joined too unless the next line closes the body: a body fed to an
 # interpreter is joined by that interpreter, and a data body is dropped below anyway. A here-doc
 # whose body never closes was not one (an arithmetic `<<`): the text is then joined everywhere
-# outside quotes and comments. Every pass below reads only the joined text.
+# outside quotes and comments. A backslash that ends the whole text escapes nothing: bash, zsh and
+# sh drop it and run the command, so it is dropped here too (rc.6 red team, F3: `git push --force\`
+# hid `--force` from every rule anchored on a space or the end). Every pass below reads only the
+# joined text.
 JOIN_CONTINUATIONS_PL='
   use strict; use warnings;
   my $text = do { local $/; <STDIN> };
@@ -145,8 +151,10 @@ JOIN_CONTINUATIONS_PL='
   sub join_text {
     my ($s, $heredocs, $quotes) = @_;
     my $out = q{};
-    my @stack = (q{N});   # N code, S single quote, A $quote, D double quote, B backtick, P $( … )
+    my @stack = (q{N});   # N code, S single quote, A $quote, D double quote, B backtick, P $( … ),
+                          # X ${ … }, $(( … )), $[ … ] or (( … )), closed by $close[-1]
     my @depth;            # parentheses open inside each P frame
+    my (@close, @xdepth); # closing bracket and brackets open inside each X frame
     my @pending;          # here-docs whose bodies start at the next code newline
     my $word_start = 1;
     my $n = length $s;
@@ -181,6 +189,15 @@ JOIN_CONTINUATIONS_PL='
       if ($quotes && $s =~ /\G\x27/gc) { $out .= "\x27"; push @stack, q{S}; $word_start = 0; next; }
       if ($quotes && $s =~ /\G\$\x27/gc) { $out .= "\$\x27"; push @stack, q{A}; $word_start = 0; next; }
       if ($quotes && $s =~ /\G"/gc) { $out .= q{"}; push @stack, q{D}; $word_start = 0; next; }
+      # `<<` inside an expansion is a shift or plain text, not a here-doc (rc.6 red team, F4).
+      my $xo;
+      if ($s =~ /\G(?:\$\(\(|\$\{|\$\[)/gc) { $xo = $&; }
+      elsif (substr($s, pos($s), 2) eq "((" && ($out eq q{} || substr($out, -1) =~ /[\s;&|(]/)) { $xo = "(("; pos($s) += 2; }
+      if (defined $xo) {
+        $out .= $xo; push @stack, q{X}; push @xdepth, 0;
+        push @close, substr($xo, -1) eq "{" ? "}" : substr($xo, -1) eq "[" ? "]" : ")";
+        $word_start = $xo =~ /\(\z/ ? 1 : 0; next;
+      }
       if ($s =~ /\G\$\(/gc) { $out .= q{$(}; push @stack, q{P}; push @depth, 0; $word_start = 1; next; }
       if ($s =~ /\G`/gc) {
         $out .= "`";
@@ -193,7 +210,22 @@ JOIN_CONTINUATIONS_PL='
         if ($depth[-1]) { $depth[-1]--; } else { pop @stack; pop @depth; }
         $word_start = 0; next;
       }
-      if ($heredocs && $s =~ /\G<<(?!<)(-?)[ \t]*/gc) {
+      if ($top eq q{X} && $s =~ /\G[(){}\[\]]/gc) {
+        my $c = $&;
+        $out .= $c;
+        my $open = { ")" => "(", "}" => "{", "]" => "[" }->{$close[-1]};
+        if ($c eq $open) { $xdepth[-1]++; }
+        elsif ($c eq $close[-1]) {
+          if ($xdepth[-1]) { $xdepth[-1]--; }
+          else {
+            # `))` closes an arithmetic frame; a single `)` ends it as well.
+            $out .= ")" if $c eq ")" && $s =~ /\G\)/gc;
+            pop @stack; pop @xdepth; pop @close;
+          }
+        }
+        $word_start = $c eq "(" ? 1 : 0; next;
+      }
+      if ($heredocs && !@close && $s =~ /\G<<(?!<)(-?)[ \t]*/gc) {
         my $dash = $1 eq q{-};
         $out .= $&;
         # The delimiter word: quotes and backslashes make it quoted; a continuation inside is joined.
@@ -209,7 +241,10 @@ JOIN_CONTINUATIONS_PL='
         push @pending, [ $delim, $quoted, $dash ];
         $word_start = 0; next;
       }
-      if ($s =~ /\G[^\\\n#\x27"`\$()<]+/gc) {
+      if ($top eq q{X} && $s =~ /\G[^\\\n#\x27"`\$()<{}\[\]]+/gc) {
+        $out .= $&; $word_start = $& =~ /[\s;&|()<>]$/ ? 1 : 0; next;
+      }
+      if ($top ne q{X} && $s =~ /\G[^\\\n#\x27"`\$()<]+/gc) {
         $out .= $&; $word_start = $& =~ /[\s;&|()<>]$/ ? 1 : 0; next;
       }
       $s =~ /\G./gcs; $out .= $&; $word_start = $& =~ /[\s;&|()<>]/ ? 1 : 0;
@@ -219,12 +254,13 @@ JOIN_CONTINUATIONS_PL='
     # still read the text differently, so the call is joined again with quotes ignored.
     return ($out, scalar grep { $_ eq q{S} || $_ eq q{A} } @stack);
   }
+  sub drop_final_backslash { my $t = shift; $t =~ s/(?<!\\)((?:\\\\)*)\\\z/$1/; return $t; }
   # Most calls have no continuation at all: nothing to join.
-  if (index($text, "\\\n") < 0) { print $text; exit 0; }
+  if (index($text, "\\\n") < 0) { print drop_final_backslash($text); exit 0; }
   sub join_any { my $q = shift; my @r = join_text($text, 1, $q); @r = join_text($text, 0, $q) unless defined $r[0]; return @r; }
   my ($joined, $open) = join_any(1);
   ($joined) = join_any(0) if $open;
-  print $joined;
+  print drop_final_backslash($joined);
 '
 CMD=$(printf '%s' "$CMD" | perl -e "$JOIN_CONTINUATIONS_PL") || fail_check "perl, склейка переносов строк"
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -257,6 +293,8 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   my $text = do { local $/; <STDIN> };
   my @lines = split(/\n/, $text, -1);
   my (@out, @pending);
+  # Set when a `<<` inside ${…}, $((…)), $[…] or ((…)) was not taken for a here-doc (rc.6 red team, F4).
+  my $shift_in_expansion = 0;
   # Скан состояния кавычек — чистая функция (состояние, текст): заголовок с
   # переносами сканируется инкрементально, каждый новый сегмент один раз,
   # состояние переносится между итерациями. Прежняя continued_header заново
@@ -402,8 +440,9 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   }
 
   sub line_heredocs {
-    my ($line, $initial_quote, $initial_depth, $prior_group_source, $compound_frames) = @_;
+    my ($line, $initial_quote, $initial_depth, $prior_group_source, $compound_frames, $expansions) = @_;
     my (@specs, $start, $group_depth, $closed_prior_group, $last_heredoc_end);
+    my $swallow_close = 0;
     my $quote = $initial_quote;
     $start = 0;
     $group_depth = $initial_depth;
@@ -418,6 +457,25 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       }
       if ($char eq "\\" && $i + 1 < length($line)) { $i++; next; }
       if ($char eq chr(39) || $char eq q{"}) { $quote = $char; next; }
+      # Open expansions ${…}, $((…)), $[…] and ((…)), kept across lines in @$expansions: a `<<`
+      # inside one is not a here-doc. Only tracked here; the group logic below is unchanged.
+      if ($char =~ /[\$(){}\[\]]/) {
+        my $top = @$expansions ? $expansions->[-1] : undef;
+        my $two = substr($line, $i, 2);
+        my $prev = $i ? substr($line, $i - 1, 1) : q{};
+        if ($char eq "\$" && substr($line, $i + 1, 2) eq "((") { push @$expansions, { close => ")", skip => 2, depth => 0 }; }
+        elsif ($two eq "\$\{" || $two eq "\$[") { push @$expansions, { close => substr($two, 1) eq "{" ? "}" : "]", skip => 1, depth => 0 }; }
+        elsif ($two eq "((" && $prev =~ /^[\s;&|(]?$/ && !($top && $top->{skip})) { push @$expansions, { close => ")", skip => 2, depth => 0 }; }
+        if ($top = @$expansions ? $expansions->[-1] : undef) {
+          my $open = { ")" => "(", "}" => "{", "]" => "[" }->{$top->{close}};
+          if ($char eq $open) { if ($top->{skip}) { $top->{skip}--; } else { $top->{depth}++; } }
+          elsif ($char eq $top->{close}) {
+            if ($swallow_close) { $swallow_close = 0; }
+            elsif ($top->{depth}) { $top->{depth}--; }
+            else { pop @$expansions; $swallow_close = $char eq ")" && substr($line, $i + 1, 1) eq ")"; }
+          }
+        }
+      }
       if ($char eq "(" || $char eq "{") { $group_depth++; next; }
       if ($char eq ")" || $char eq "}") {
         $group_depth-- if $group_depth;
@@ -445,6 +503,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       }
       next unless substr($line, $i, 2) eq "<<";
       next if substr($line, $i, 3) eq "<<<";
+      if (@$expansions) { $shift_in_expansion = 1; next; }
       my $tail = substr($line, $i);
       next unless $tail =~ /^<<(-?)\s*(?!<)(?:([\x27"])([A-Za-z_][A-Za-z0-9_]*)\2|([A-Za-z_][A-Za-z0-9_]*))/;
       my $match_length = length($&);
@@ -497,6 +556,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   }
 
   my ($header_quote, $header_group_depth, $group_source, @compound_frames) = (undef, 0, q{});
+  my @expansions;
   # Set when some here-doc body has no non-blank line (issue #1568): `cat > f <<EOF` + `EOF`
   # empties f, so the reader-overwrite rule below must not exempt here-docs in this call.
   my $empty_body = 0;
@@ -527,7 +587,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
     }
     $line = @segments ? join(q{}, @segments, $joined) : $joined;
     push @out, $line;
-    my ($specs, $after_quote, $after_depth) = line_heredocs($line, $header_quote, $header_group_depth, $group_source, \@compound_frames);
+    my ($specs, $after_quote, $after_depth) = line_heredocs($line, $header_quote, $header_group_depth, $group_source, \@compound_frames, \@expansions);
     push @pending, @$specs;
     $header_quote = $after_quote;
     $group_source = $after_depth ? $group_source . $line . "\n" : q{};
@@ -537,6 +597,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   # shift, a quoted "<<" in prose): stripping there would hide real commands,
   # so the whole reduction is discarded rather than trusted.
   if (@pending) { print "UNTERMINATED"; exit 0; }
+  $empty_body ||= $shift_in_expansion;
   print "OK", ($empty_body ? "E" : "-"), join("\n", @out);
 ')
 # HEREDOC_EMPTY=E: a here-doc body is empty or could not be delimited; either way the
