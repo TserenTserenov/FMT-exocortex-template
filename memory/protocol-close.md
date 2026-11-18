@@ -114,6 +114,8 @@ python3 scripts/process-runner.py relocate-card <run_id> \
 
 **Обязательно вместе с заявкой (WP-484, пир-сессия 2026-09-11-08 с Kimi+Codex, `bug-2026-09-11-quick-close-confirmed-clean-repos-blind-to-cherry-pick-delivery.md`):** (1) поле `session` во входе — `{"commits":[],"confirmed_clean_repos":[...],"session":{"agent":"claude-code","wp":"WP-NNN","slug":"<slug сессии>"}}`, иначе хендлер не найдёт семафор и проверит ВСЮ ветку (в общем чекауте с чужими неопубликованными коммитами это отказ всегда); (2) после КАЖДОГО коммита по ходу сессии — `bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" note-commit <sha> --repo <repo> --wp WP-NNN --slug <slug>` — единственное доказательство принадлежности коммита сессии; доставка через cherry-pick (другой SHA на origin) распознаётся по patch-id только для объявленных коммитов. Без `note-commit`, но с найденным семафором хендлер работает в режиме `session_scope_inferred`: пропускает, только если ни один неопубликованный коммит ветки не трогает файлы сессии, иначе отказывает как «неоднозначный» — не как «ваш коммит».
 
+**Команды `note-commit` нет в установке** (`session-guard.sh note-commit` отвечает `Unknown command: note-commit` — в шаблон она не поставляется, как и раннер закрытия, которому она нужна) → пункт (2) пропустить: без раннера заявка `confirmed_clean_repos` не подаётся и доказывать принадлежность коммита некому; коммиты сессии проверяются вручную по `git status --short` и `git log @{u}..HEAD` каждого репо, Close не блокируется (issue #1581).
+
 **1c. Строка о доставке в шаблон (РП-529 Ф248, 31.10, решение пилота) · [[narrative]].** Если сессия правила файл с `delivery: managed` (frontmatter), в итоге закрытия назвать его одной строкой: «изменён managed-файл X — в шаблон попадёт на закрытии недели через список расхождений». Ничего не записывать и не вызывать `template-sync.sh`; строка — напоминание пилоту, не вход решения о доставке.
 
 ### 2. Короткий свод + рефлексия (шаги `reflection-gate` → `session-reflection-render` → `session-reflection-append` при `reflection_due: true`, WP-484 Ф56 05.08 — три reflex-шага вместо одного ai-шага) [[gate]]
@@ -342,7 +344,7 @@ RUN-карточки тогда не является ❌.
 1. **Бэкап + грязные репо** — `backup-icloud.sh` + `check-dirty-repos.sh` (платформа) [[gate]]
 2. **Memory Validate** — `memory-bleed.sh` (HOT-лимит, orphans, superseded_by) [[gate]]
 3. **ТО памяти (T, SC.024.3)** — проверка здоровья статической нагрузки: [[narrative]]
-   - `wc -l {{WORKSPACE_DIR}}/.claude/rules/distinctions.md` → **> 80 строк = drift-флаг** (по правилу DP.KR.001 §6: 1-3 строки на различение). Предложить аудит в WP-7.
+   - `wc -l ${IWE_WORKSPACE:-$HOME/IWE}/.claude/rules/distinctions.md` → **> 80 строк = drift-флаг** (по правилу DP.KR.001 §6: 1-3 строки на различение). Предложить аудит в WP-7.
    - `wc -l` по MEMORY.md текущего проекта в `~/.claude/projects/<слаг-проекта>/memory/` (слаг = путь рабочей директории, `/` → `-`) → **> 200 строк = флаг** (превышен лимит).
    - Feedback/lessons файлы в `memory/` с `mtime > 14 дней` без обращения → предложить понизить `horizon: warm`.
    - Флаги — информативно. Пользователь решает действие.

@@ -1978,9 +1978,23 @@ if [ "$CMD" = "open" ]; then
     [ -f "$ISOLATE_EXISTING_SEM" ] && ISOLATE_SEM_EXISTS=1 || ISOLATE_SEM_EXISTS=0
 
     # Dirty policy: first open on frozen path = advisory; re-entry = allowlist only
+    # issue #1572: update.sh/setup.sh keep their own records in the workspace root
+    # (.claude.md.base, .claude.md.delivered, .memory-deployed.tsv). They must stay
+    # there (the next update reads them) and the platform does not own the root's
+    # .gitignore, so an untracked copy of exactly these files in the workspace root
+    # is not "uncommitted work" and must not block --isolate.
+    ISOLATE_ON_WORKSPACE_ROOT=0
+    if [ "$(realpath "$ISOLATE_BASE_DIR" 2>/dev/null || echo "$ISOLATE_BASE_DIR")" = "$(realpath "$IWE_ROOT" 2>/dev/null || echo "$IWE_ROOT")" ]; then
+      ISOLATE_ON_WORKSPACE_ROOT=1
+    fi
     ISOLATE_DIRTY_ENTRIES=()
     while IFS= read -r -d '' isolate_status_entry; do
       [ -n "$isolate_status_entry" ] || continue
+      if [ "$ISOLATE_ON_WORKSPACE_ROOT" = "1" ]; then
+        case "$isolate_status_entry" in
+          '?? .claude.md.base'|'?? .claude.md.delivered'|'?? .memory-deployed.tsv') continue ;;
+        esac
+      fi
       ISOLATE_DIRTY_ENTRIES+=("$isolate_status_entry")
     done < <(git -C "$ISOLATE_BASE_DIR" status --porcelain -z --untracked-files=all 2>/dev/null)
     if [ "${#ISOLATE_DIRTY_ENTRIES[@]}" -gt 0 ]; then

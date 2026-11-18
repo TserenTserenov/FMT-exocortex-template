@@ -663,6 +663,38 @@ sys.exit(1)
     [ "$CHECK9_FAIL" -eq 0 ] && echo "PASS"
 fi
 
+# issue #1574: the release shipped setup/optional/setup-cloud-scheduler.sh, which
+# the user's own pre-commit (scripts/validate-fmt-scripts.sh --files <staged>)
+# rejects, so committing the delivered files needed --no-verify. Same class as
+# #403/#617/#759/#1135/#1278: the delivery was never run through its own check.
+# Run it here over every delivered *.sh/*.py, with the default governance repo
+# name a user install has (the author's own IWE_GOVERNANCE_REPO is not used).
+echo -n "[10/10] Delivered scripts pass validate-fmt-scripts... "
+FMT_VALIDATOR="$TEMPLATE_DIR/scripts/validate-fmt-scripts.sh"
+if [ ! -f "$FMT_VALIDATOR" ] || [ ! -f "$TEMPLATE_DIR/update-manifest.json" ]; then
+    echo "SKIP (no validate-fmt-scripts.sh or update-manifest.json)"
+else
+    DELIVERED_SCRIPTS=()
+    while IFS= read -r delivered_rel; do
+        [ -f "$TEMPLATE_DIR/$delivered_rel" ] && DELIVERED_SCRIPTS+=("$delivered_rel")
+    done < <(python3 -c '
+import json, sys
+for entry in json.load(open(sys.argv[1])).get("files", []):
+    path = entry.get("path", "")
+    if path.endswith((".sh", ".py")):
+        print(path)
+' "$TEMPLATE_DIR/update-manifest.json")
+    if [ ${#DELIVERED_SCRIPTS[@]} -eq 0 ]; then
+        echo "SKIP (no delivered scripts in update-manifest.json)"
+    elif FMT_VALIDATOR_OUT=$(cd "$TEMPLATE_DIR" && env -u IWE_GOVERNANCE_REPO bash "$FMT_VALIDATOR" --files "${DELIVERED_SCRIPTS[@]}" 2>&1); then
+        echo "PASS"
+    else
+        echo "FAIL"
+        printf '%s\n' "$FMT_VALIDATOR_OUT" | grep -E '❌|⚠|^[[:space:]]+[0-9]+:' | head -20 | sed 's/^/  /'
+        FAIL=1
+    fi
+fi
+
 echo ""
 if [ "$FAIL" -eq 0 ]; then
     echo "=== ALL CHECKS PASSED ==="
