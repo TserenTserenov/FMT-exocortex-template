@@ -201,6 +201,21 @@ check "1: попытка не записывалась" "0" "$(log_count 'RECORD
 check "1: сообщений нет" "0" "$(messages)"
 check "1: SKIP с причиной в журнале" "1" "$(log_count 'наблюдатель, пайплайн не запускаю')"
 
+# ---------------------------------------------------------------- 1b
+echo "== 1b: план уже перенесён закрытием дня в архив — тоже опубликован, тревоги нет"
+new_case
+publish_dayplan
+mkdir -p "$WS/DS-strategy/archive/day-plans"
+git -C "$WS/DS-strategy" -c core.hooksPath=/dev/null \
+    mv "current/DayPlan $TODAY.md" "archive/day-plans/DayPlan $TODAY.md"
+git -C "$WS/DS-strategy" -c user.name=fixture -c user.email=fixture@example.invalid \
+    -c core.hooksPath=/dev/null commit -q -m "fixture: day-close archives DayPlan $TODAY"
+git -C "$WS/DS-strategy" push -q origin main 2>/dev/null
+rc=$(run_strategist morning DAY_OPEN_OBSERVER_AFTER=00:00)
+check "1b: код выхода" "0" "$rc"
+check "1b: сообщений нет" "0" "$(messages)"
+check "1b: SKIP называет архив" "1" "$(log_count 'archive/day-plans/DayPlan')"
+
 # ---------------------------------------------------------------- 2
 echo "== 2: плана нет, окно владельца не прошло — defer (7), без сигнала"
 new_case
