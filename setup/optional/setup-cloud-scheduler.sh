@@ -39,7 +39,7 @@ WORKSPACE="${WORKSPACE_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
 STRATEGY_DIR=$(find "$WORKSPACE" -maxdepth 1 -type d -name "DS-*strategy*" | head -1)
 
 if [ -z "$STRATEGY_DIR" ]; then
-    echo "❌ Не найден DS-strategy репо в $WORKSPACE"
+    echo "❌ Не найден репозиторий стратегии (каталог DS-*strategy*) в $WORKSPACE"
     exit 1
 fi
 

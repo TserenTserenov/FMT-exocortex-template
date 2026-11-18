@@ -3501,7 +3501,7 @@
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
-      "sha256": "db944ef8f5b86f79e132c0c612fca3e11330a836fb9010a791f551251080174c"
+      "sha256": "56d0b414d2b1bd2922cbd8265f71d5de0611ac9555bd31441c4adbe535de493e"
     },
     {
       "path": "setup/optional/setup-local-gateway.sh",
@@ -3509,7 +3509,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "e8ad334bc7e2018dcf6d59e840d9072bb8613fc9fea07e1989dcc68fcff63f56"
+      "sha256": "5e133c3150b942132f2511cef7868988f8d33888453d46f2c5046779a4d6e951"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
