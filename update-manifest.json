@@ -969,7 +969,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "ace575be4b806efb4877e74aeccf24baa98e6be194439a05579f318e9c0af13f"
+      "sha256": "df39dc9df98e497cc32a21d21a4290928ff620e5b7ebc774d8514d6ef5b4cdde"
     },
     {
       "path": "CLAUDE.md",
@@ -2929,7 +2929,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "b7e0cae6a66ddf5c77d55431164470b6703f52aafd6f1b1be237fa2222099403"
+      "sha256": "92c8a5c753c4bbb5459aa7abd460cf50f50f8c87ef6cd9a887f450bc8517a0df"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3705,6 +3705,7 @@
     "scripts/tests/test_issue_1550.sh",
     "scripts/tests/test_issue_1555.sh",
     "scripts/tests/test_issue_1558.sh",
+    "scripts/tests/test_issue_1577_1578_isolate_root.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",

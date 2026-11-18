@@ -451,9 +451,13 @@ frozen_checkout_match() {
 }
 
 resolve_isolate_push_script() {
+  # issue #1578: the template ships isolate-push.sh next to this script
+  # (FMT-exocortex-template/scripts/), which neither of the first two
+  # locations covers on a stock install, so close left every isolated copy behind.
   local candidates=(
     "$IWE_ROOT/$GOV_REPO/scripts/isolate-push.sh"
     "$IWE_ROOT/scripts/isolate-push.sh"
+    "$(dirname "$SESSION_GUARD_SELF")/isolate-push.sh"
   )
   local c
   for c in "${candidates[@]}"; do
@@ -2078,7 +2082,12 @@ if [ "$CMD" = "open" ]; then
   # scaffold. Redirect it into the isolated worktree so the allowlist
   # registration below (which keys off this same variable) and the actual
   # append target agree.
-  if [ "${ISOLATE_FLAG:-0}" = "1" ] && [ -n "${ISOLATED_WORKTREE_PATH:-}" ]; then
+  # issue #1577: only when the isolated worktree IS the governance repo. An
+  # isolate of another repo (the IWE root started from ~/IWE) has no inbox/:
+  # the line landed in an untracked file of that copy, never reached the
+  # governance log, and later blocked `git worktree remove`.
+  if [ "${ISOLATE_FLAG:-0}" = "1" ] && [ -n "${ISOLATED_WORKTREE_PATH:-}" ] \
+     && same_git_repo "$ISOLATE_BASE_DIR" "$IWE_ROOT/$GOV_REPO"; then
     OPEN_LOG="$ISOLATED_WORKTREE_PATH/inbox/open-sessions.log"
     mkdir -p "$(dirname "$OPEN_LOG")"
   fi
@@ -2640,13 +2649,18 @@ print(json.dumps({"wp": sys.argv[1], "slug": sys.argv[2], "agent": sys.argv[3], 
   if [ -n "$ISOLATE_WT" ] && [ -d "$ISOLATE_WT" ]; then
     if PUSH_BIN=$(resolve_isolate_push_script); then
       echo "session-guard: close: isolate-push через $PUSH_BIN" >&2
-      if ! bash "$PUSH_BIN" "$ISOLATE_WT" main; then
+      # The same target open isolated from: origin's default branch, `main`
+      # only when origin/HEAD is unknown. A hard-coded `main` never delivered
+      # a repo whose default branch is named otherwise.
+      ISOLATE_TARGET_BRANCH="$(git -C "$ISOLATE_WT" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#^refs/remotes/origin/##' || true)"
+      ISOLATE_TARGET_BRANCH="${ISOLATE_TARGET_BRANCH:-main}"
+      if ! IWE_GOVERNANCE_REPO="$GOV_REPO" bash "$PUSH_BIN" "$ISOLATE_WT" "$ISOLATE_TARGET_BRANCH"; then
         echo "⚠️  isolate-push не завершился успешно — worktree оставлен: $ISOLATE_WT" >&2
       else
         git -C "$(git -C "$ISOLATE_WT" rev-parse --git-common-dir 2>/dev/null | sed "s|/.git$||;s|/$||" || true)" worktree remove --force "$ISOLATE_WT" 2>/dev/null           || git worktree remove --force "$ISOLATE_WT" 2>/dev/null           || echo "⚠️  не удалось удалить isolate worktree $ISOLATE_WT" >&2
       fi
     else
-      echo "⚠️  isolate-push.sh не найден ($GOV_REPO/scripts или $IWE_ROOT/scripts) — worktree оставлен: $ISOLATE_WT" >&2
+      echo "⚠️  isolate-push.sh не найден ($GOV_REPO/scripts, $IWE_ROOT/scripts или $(dirname "$SESSION_GUARD_SELF")) — worktree оставлен: $ISOLATE_WT" >&2
     fi
   fi
 
