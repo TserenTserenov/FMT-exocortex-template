@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "03a356daf8f613a889b9632b3baa1bfad84cb6acfc50d1a55fe0d9d48ca6d373"
+      "sha256": "16893e3f95e1ac3b1ace196415e4fce7e7d9c580900ce81bff14e1476a5e7207"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",

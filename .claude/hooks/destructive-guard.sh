@@ -1188,6 +1188,7 @@ SEGMENTER_PL='
   sub herestring_scripts {
     my @scripts;
     for my $item (@_) {
+      next if index($item->[0], "<<<") < 0;
       my @tokens = words($item->[0]);
       my ($sink) = command_indices(@tokens);
       next unless defined $sink && command_base($tokens[$sink]) =~ /^(?:ba|z|k|da|a)?sh$/;
