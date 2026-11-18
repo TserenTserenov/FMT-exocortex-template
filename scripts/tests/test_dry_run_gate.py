@@ -962,11 +962,15 @@ def win(tmp_path):
     env = {k: v for k, v in os.environ.items() if not k.startswith(("IWE_DRY_RUN", "FAKE_"))}
     env.update(
         PATH=f"{stub_bin}:{os.environ['PATH']}",
+        CLAUDECODE="1",  # a Claude Code host (#1124: begin refuses elsewhere)
         FAKE_UNAME="MINGW64_NT-10.0-19045",
         LOCALAPPDATA=str(local),
         SYSTEMROOT=str(sysroot),
         FAKE_SDDL_FILE=str(sddl_file),
         FAKE_LOG=str(log),
+        # Private paths; the production resolution ignores them (no test-mode
+        # marker), so the teardown below also checks the real flag.
+        IWE_DRY_RUN_SENTINEL=str(tmp_path / "private-flag"),
     )
 
     class Win:
@@ -981,13 +985,13 @@ def win(tmp_path):
         def acl(self, sddl):
             sddl_file.write_text(f"iwe-dry-run\r\n{sddl}\r\n", encoding="utf-8")
 
-        def run(self, *args, stdin=""):
+        def run(self, *args, stdin="", shim=""):
             return subprocess.run(
-                ["bash", "-c", UNAME_SHIM, "_", *map(str, args)],
+                ["bash", "-c", shim + UNAME_SHIM, "_", *map(str, args)],
                 input=stdin, capture_output=True, text=True, timeout=30, env=self.env,
             )
 
-        def lib(self, mode="existing", prefix=""):
+        def lib(self, mode="existing", prefix="", shim=""):
             """Resolve + check through the shared library; returns (rc, dir, err), rc None = not resolved."""
             script = (
                 f'{prefix}. "{DRY_RUN_LIB}"; dry_run_resolve_paths || {{ printf "RES:1\\nERR:%s\\n" "$DRY_RUN_ERR"; exit 0; }}; '
@@ -995,12 +999,21 @@ def win(tmp_path):
             )
             f = tmp_path / "lib-call.sh"
             f.write_text(script, encoding="utf-8")
-            out = dict(line.split(":", 1) for line in self.run(f).stdout.splitlines() if ":" in line)
+            out = dict(line.split(":", 1) for line in self.run(f, shim=shim).stdout.splitlines() if ":" in line)
             if "RES" in out:
                 return None, None, out.get("ERR", "")
             return int(out["RC"]), out["DIR"], out["ERR"]
 
-    return Win()
+    real_flag = Path("/tmp/iwe-dry-run.flag")
+    flag_before = real_flag.exists()
+    yield Win()
+    # A Git Bash test resolves the production sentinel path; none of them may
+    # create it (a leaked flag fail-closes every agent on the host).
+    if not flag_before and real_flag.exists():
+        leaked = real_flag.read_text(encoding="utf-8", errors="replace")
+        if '"initiator":"pytest"' in leaked:
+            real_flag.unlink()
+        pytest.fail(f"test created the real rehearsal flag /tmp/iwe-dry-run.flag: {leaked}")
 
 
 def test_win_creates_dir_with_private_acl(win):
@@ -1175,6 +1188,100 @@ def test_win_rehearsal_in_secured_test_dir(win, tmp_path):
     done = win.run(COMPLETE, out["gate_id"], "rehearsal-finished", "s", out["owner_token"])
     assert done.returncode == 0, done.stderr
     assert not (dry_dir / "flag").exists()
+
+
+# --- #1586: Git Bash tools — mkdir -m fails, no shasum, cygwin ps without -o ---
+#
+# Exported functions win over the PATH the scripts pin. mkdir -m creates the
+# directory and then fails on the chmod; shasum is missing; ps rejects -o and
+# prints the cygwin default table (with the optional status letter column).
+GIT_BASH_TOOLS = r"""
+mkdir() {
+    if [ "${1:-}" = -m ]; then
+        shift 2; command mkdir "$@" || return
+        echo "mkdir: cannot change permissions of '$1': Permission denied" >&2; return 1
+    fi
+    command mkdir "$@"
+}
+shasum() { echo "bash: shasum: command not found" >&2; return 127; }
+ps() {
+    case " $* " in *" -o"*|*" -eo"*) echo "ps: unknown option -- o" >&2; return 1 ;; esac
+    local sel=(-A)
+    [ "${1:-}" = -p ] && sel=(-p "$2")
+    printf '      PID    PPID    PGID     WINPID   TTY         UID    STIME COMMAND\n'
+    command ps -o pid=,ppid=,pgid=,uid=,lstart= "${sel[@]}" | awk '{ printf "%s%8s%8s%8s%11s%6s%12s%9s %s\n", (NR % 2 ? "I" : " "), $1, $2, $3, $1 + 40000, "pty0", $4, $8, "/usr/bin/bash" }'
+}
+export -f mkdir shasum ps
+"""
+
+
+def test_gitbash_creates_dir_although_mkdir_m_fails(win):
+    """#1586 gap 1: on Git Bash the directory is created without -m; the ACL is the access control."""
+    rc, d, err = win.lib("create", shim=GIT_BASH_TOOLS)
+    assert rc == 0, err
+    assert win.dir.is_dir()
+    assert "/inheritance:r" in win.log.read_text(encoding="utf-8")
+
+
+def _gitbash_test_dir(win, tmp_path):
+    dry_dir = tmp_path / "td"
+    dry_dir.mkdir()
+    (dry_dir / ".iwe-dry-run-test-mode").write_text("1", encoding="utf-8")
+    win.env.update(IWE_DRY_RUN_DIR=str(dry_dir), IWE_DRY_RUN_SENTINEL=str(dry_dir / "flag"))
+    return dry_dir
+
+
+def test_gitbash_rehearsal_without_shasum_and_ps_o(win, tmp_path):
+    """#1586 gaps 2-3: begin → gate blocks a write → complete, with sha256sum and the cygwin ps table."""
+    dry_dir = _gitbash_test_dir(win, tmp_path)
+    begin = win.run(BEGIN, "pytest", "s", shim=GIT_BASH_TOOLS)
+    assert begin.returncode == 0, begin.stderr
+    out = dict(line.split("=", 1) for line in begin.stdout.splitlines())
+    state = json.loads((dry_dir / f"gate-{out['gate_id']}.state").read_text(encoding="utf-8"))
+    assert state["owner_pgid"] > 0 and state["owner_pid_start"].startswith("cygwin:")
+    assert len(state["owner_token_sha256"]) == 64
+    write = json.dumps({"tool_name": "Bash", "tool_input": {"command": "git commit -m x"}})
+    assert win.run(HOOK, stdin=write, shim=GIT_BASH_TOOLS).returncode == 2
+    done = win.run(COMPLETE, out["gate_id"], "rehearsal-finished", "s", out["owner_token"], shim=GIT_BASH_TOOLS)
+    assert done.returncode == 0, done.stderr
+    assert not (dry_dir / "flag").exists()
+
+
+def test_gitbash_orphan_sweep_reads_cygwin_ps(win, tmp_path):
+    """#1586 gap 3 in the gate: a rehearsal whose owner tree is gone is proven orphaned from the cygwin ps table."""
+    dry_dir = _gitbash_test_dir(win, tmp_path)
+    # The owner is a shell in its own session that exits right after begin
+    # (`; exit` keeps bash from exec-ing begin in its own place).
+    begin = subprocess.run(
+        ["bash", "-c", GIT_BASH_TOOLS + UNAME_SHIM.replace('exec bash "$@"', 'bash "$@"; exit $?'), "_", str(BEGIN), "pytest", "s"],
+        capture_output=True, text=True, timeout=30, env=win.env, start_new_session=True,
+    )
+    assert begin.returncode == 0, begin.stderr
+    out = dict(line.split("=", 1) for line in begin.stdout.splitlines())
+    (dry_dir / "flag").unlink()
+    gate = win.run(HOOK, stdin=json.dumps({"tool_name": "Read", "tool_input": {}}), shim=GIT_BASH_TOOLS)
+    assert gate.returncode == 0, gate.stderr
+    state = json.loads((dry_dir / f"gate-{out['gate_id']}.state").read_text(encoding="utf-8"))
+    assert state["state"] == "completed" and state["completion_reason"] == "orphan-sweep"
+
+
+@pytest.mark.skipif(not _production_sentinel_clear(), reason="a live rehearsal on this host owns /tmp/iwe-dry-run.flag")
+def test_begin_refuses_outside_claude_code(win):
+    """#1124: without Claude Code nothing runs dry-run-gate.sh, so begin refuses before any side effect."""
+    # The production dir has an open ACL, so even a begin without the refusal
+    # (pre-fix code) stops at the ACL check, before the real sentinel.
+    win.dir.mkdir()
+    win.acl(f"D:AI(A;OICI;FA;;;{USER_SID})(A;OICIID;FA;;;BU)")
+    win.env.pop("CLAUDECODE")
+    r = win.run(BEGIN, "pytest", "s")
+    assert r.returncode == 1 and "issue #1124" in r.stderr and "IWE_DRY_RUN_HOOKED_RUNTIME=1" in r.stderr
+    assert not win.log.exists()  # refused before any directory check
+    # A runtime that states it runs the hook gets past the refusal and stops
+    # at the open ACL.
+    win.env["IWE_DRY_RUN_HOOKED_RUNTIME"] = "1"
+    r = win.run(BEGIN, "pytest", "s")
+    assert r.returncode == 1 and f"каталог репетиции {win.dir}:" in r.stderr
+    assert not Path("/tmp/iwe-dry-run.flag").exists()
 
 
 @pytest.mark.parametrize("uname", ["Linux", "CYGWIN_NT-10.0-19045"])

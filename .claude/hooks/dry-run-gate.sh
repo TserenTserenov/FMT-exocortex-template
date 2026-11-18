@@ -232,13 +232,13 @@ orphan_proven() { # <pid> <pid_start> <pgid>
     case "$pid" in ''|*[!0-9]*|0) return 2 ;; esac
     case "$pgid" in ''|*[!0-9]*|0) return 2 ;; esac
     if kill -0 "$pid" 2>/dev/null; then
-        cur_start=$(ps -o lstart= -p "$pid" 2>/dev/null) || return 2
+        cur_start=$(dry_run_proc_start "$pid") || return 2
         [ -n "$cur_start" ] || return 2
         # Alive and start matches — the owner is alive, no orphanhood.
         [ "$cur_start" = "$pid_start" ] && return 1
         # Alive but a different start — pid reuse: the original owner is dead.
     fi
-    snapshot=$(ps -eo pid=,pgid= 2>/dev/null) || return 2
+    snapshot=$(dry_run_pid_pgid_snapshot) || return 2
     [ -n "$snapshot" ] || return 2
     if printf '%s\n' "$snapshot" | awk -v pg="$pgid" '$1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ && $2 == pg {f=1} END{exit f?0:1}'; then
         return 1  # the rehearsal tree is still alive — not an orphan
@@ -337,10 +337,7 @@ fi
 # not only by the TTL below. A sentinel of the old format (no gate_id) follows the
 # previous TTL+whitelist path unchanged.
 # lstat invariants of the sentinel (Codex r1): a regular file of the same owner.
-case "$(uname)" in
-    Darwin) S_UID=$(stat -f %u "$SENTINEL" 2>/dev/null || true) ;;
-    *)      S_UID=$(stat -c %u "$SENTINEL" 2>/dev/null || true) ;;
-esac
+S_UID=$(dry_run_stat uid "$SENTINEL" || true)
 [ -n "$S_UID" ] && [ "$S_UID" = "$(id -u)" ] || fail_closed "sentinel $SENTINEL owned by uid ${S_UID:-unknown}, expected $(id -u)"
 SENTINEL_GID=$(jq -r '.gate_id // empty' "$SENTINEL" 2>/dev/null || true)
 if [ -n "$SENTINEL_GID" ]; then
@@ -390,10 +387,7 @@ if [ -n "$SENTINEL_GID" ]; then
     esac
 fi
 
-case "$(uname)" in
-    Darwin) MTIME=$(stat -f %m "$SENTINEL" 2>/dev/null) ;;
-    *)      MTIME=$(stat -c %Y "$SENTINEL" 2>/dev/null) ;;
-esac
+MTIME=$(dry_run_stat mtime "$SENTINEL")
 
 if [ -z "$MTIME" ]; then
     # File vanished between test and stat (race with parallel cleanup) — allow.
