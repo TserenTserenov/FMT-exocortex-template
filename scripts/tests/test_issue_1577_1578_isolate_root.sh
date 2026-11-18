@@ -8,7 +8,10 @@
 #        governance repo's log.
 # #1578: close looked for isolate-push.sh only in $GOV_REPO/scripts and
 #        $IWE_ROOT/scripts, printed "isolate-push.sh не найден" and left the
-#        isolated copy behind with its commits unpushed.
+#        isolated copy behind with its commits unpushed. close also always
+#        pushed to `main`, while open isolates from origin's default branch:
+#        a root whose default branch is not `main` was never delivered.
+# Run once with a `main` root and once with a `trunk` root.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -23,101 +26,118 @@ trap 'cd /; rm -rf "$SANDBOX"' EXIT
 
 git_id() { git -C "$1" config user.email test@example.com; git -C "$1" config user.name test; }
 
-# IWE root: its own repo with an origin; the governance repo and the runtime
-# directory are nested inside and ignored, as in a real installation.
-IWE_ROOT="$SANDBOX/iwe-root"
-git init -q --bare --initial-branch=main "$SANDBOX/root-origin.git"
-git init -q --initial-branch=main "$IWE_ROOT"
-git_id "$IWE_ROOT"
-printf 'DS-strategy/\n.iwe-runtime/\n' > "$IWE_ROOT/.gitignore"
-echo "root" > "$IWE_ROOT/README.md"
-git -C "$IWE_ROOT" add .gitignore README.md
-git -C "$IWE_ROOT" commit -qm "seed root"
-git -C "$IWE_ROOT" remote add origin "$SANDBOX/root-origin.git"
-git -C "$IWE_ROOT" push -qu origin main 2>/dev/null
+run_case() { # <root default branch>
+  local branch="$1" case_dir iwe gov sid out wt orz close_rc close_out
+  echo "case: IWE root on '$branch'"
+  case_dir="$SANDBOX/$branch"
+  mkdir -p "$case_dir"
 
-GOV="$IWE_ROOT/DS-strategy"
-git init -q --bare --initial-branch=main "$SANDBOX/gov-origin.git"
-git init -q --initial-branch=main "$GOV"
-git_id "$GOV"
-mkdir -p "$GOV/inbox/WP-485"
-echo "card" > "$GOV/inbox/WP-485/WP-485.md"
-git -C "$GOV" add inbox
-git -C "$GOV" commit -qm "seed gov"
-git -C "$GOV" remote add origin "$SANDBOX/gov-origin.git"
-git -C "$GOV" push -qu origin main 2>/dev/null
+  # IWE root: its own repo with an origin; the governance repo and the
+  # runtime directory are nested inside and ignored, as in a real install.
+  iwe="$case_dir/iwe-root"
+  git init -q --bare --initial-branch="$branch" "$case_dir/root-origin.git"
+  git init -q --initial-branch="$branch" "$iwe"
+  git_id "$iwe"
+  printf 'DS-strategy/\n.iwe-runtime/\n' > "$iwe/.gitignore"
+  echo "root" > "$iwe/README.md"
+  git -C "$iwe" add .gitignore README.md
+  git -C "$iwe" commit -qm "seed root"
+  git -C "$iwe" remote add origin "$case_dir/root-origin.git"
+  git -C "$iwe" push -qu origin "$branch" 2>/dev/null
+  git -C "$iwe" remote set-head origin -a >/dev/null 2>&1
 
-mkdir -p "$IWE_ROOT/.iwe-runtime/sessions"
-export IWE_ROOT IWE_GOVERNANCE_REPO=DS-strategy IWE_FROZEN_CANONICAL_PATH=""
+  gov="$iwe/DS-strategy"
+  git init -q --bare --initial-branch=main "$case_dir/gov-origin.git"
+  git init -q --initial-branch=main "$gov"
+  git_id "$gov"
+  mkdir -p "$gov/inbox/WP-485"
+  echo "card" > "$gov/inbox/WP-485/WP-485.md"
+  git -C "$gov" add inbox
+  git -C "$gov" commit -qm "seed gov"
+  git -C "$gov" remote add origin "$case_dir/gov-origin.git"
+  git -C "$gov" push -qu origin main 2>/dev/null
+
+  mkdir -p "$iwe/.iwe-runtime/sessions"
+  sid="t1577-$branch-$$"
+
+  [ ! -e "$iwe/scripts/isolate-push.sh" ] && [ ! -e "$gov/scripts/isolate-push.sh" ] \
+    || { echo "fixture error: isolate-push.sh must exist only next to session-guard.sh"; exit 1; }
+
+  out=$(cd "$iwe" && IWE_ROOT="$iwe" IWE_SESSION_ID="$sid" bash "$SG" open --wp WP-485 \
+    --agent "$AGENT" --task "isolate root" --slug "$sid" --isolate 2>&1)
+  wt=$(printf '%s\n' "$out" | grep -o '{.*}' | tail -1 \
+    | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["worktree_path"])' 2>/dev/null)
+  if [ -z "$wt" ] || [ ! -d "$wt" ]; then
+    fail "open --isolate from the root returned no worktree: $(printf '%s\n' "$out" | tail -3 | tr '\n' ' ')"
+    return
+  fi
+
+  # --- #1577 ---
+  if [ ! -e "$wt/inbox/open-sessions.log" ]; then
+    pass "#1577 the root copy got no inbox/open-sessions.log"
+  else
+    fail "#1577 open-log line written into the root copy: $wt/inbox/open-sessions.log"
+  fi
+  if grep -q "| WP-485 | $AGENT | isolate root" "$gov/inbox/open-sessions.log" 2>/dev/null; then
+    pass "#1577 the open-log line is in the governance repo's log"
+  else
+    fail "#1577 governance log has no line for this open"
+  fi
+
+  # --- #1578 ---
+  echo "work" > "$wt/work.txt"
+  git -C "$wt" add work.txt
+  git -C "$wt" commit -qm "session work"
+
+  # The ORZ scaffold stays in the governance repo for a root isolate; close
+  # wants it staged, and a completed Quick Close card for this slug.
+  orz=$(find "$gov/sessions" -name "*-$sid.md" -type f 2>/dev/null | head -1)
+  if [ -z "$orz" ]; then
+    fail "ORZ scaffold not found under $gov/sessions"
+    return
+  fi
+  printf '\n## Итог\n\nСделано.\n' >> "$orz"
+  git -C "$gov" add -- "${orz#"$gov"/}"
+  mkdir -p "$gov/inbox/agent/tasks"
+  printf -- '---\nprocess_id: quick-close\nstatus: completed\n---\n' > "$gov/inbox/agent/tasks/RUN-quick-close-$sid.md"
+
+  # Without IWE_GOVERNANCE_REPO in the environment (the shipped default name):
+  # isolate-push.sh refuses to run without it, so close must pass its own value.
+  close_rc=0
+  close_out=$(cd "$iwe" && env -u IWE_GOVERNANCE_REPO IWE_ROOT="$iwe" IWE_SESSION_ID="$sid" \
+    bash "$SG" close --wp WP-485 --agent "$AGENT" --slug "$sid" 2>&1) || close_rc=$?
+  if printf '%s\n' "$close_out" | grep -q "isolate-push.sh не найден"; then
+    fail "#1578 close did not find isolate-push.sh next to session-guard.sh"
+  else
+    pass "#1578 close found isolate-push.sh"
+  fi
+  if git -C "$case_dir/root-origin.git" cat-file -e "refs/heads/$branch:work.txt" 2>/dev/null; then
+    pass "#1578 the session's commit reached origin/$branch"
+  else
+    fail "#1578 origin/$branch has no work.txt: $(printf '%s\n' "$close_out" | grep -i 'isolate' | tail -2 | tr '\n' ' ')"
+  fi
+  if git -C "$case_dir/root-origin.git" rev-parse -q --verify refs/heads/main >/dev/null && [ "$branch" != main ]; then
+    fail "#1578 close created a stray 'main' on a '$branch' origin"
+  fi
+  if [ ! -d "$wt" ] && ! git -C "$iwe" worktree list --porcelain | grep -qxF "worktree $wt"; then
+    pass "#1578 the isolated copy is removed after close"
+  else
+    fail "#1578 the isolated copy is left behind: $wt"
+  fi
+  if [ "$close_rc" -eq 0 ]; then
+    pass "close exits 0"
+  else
+    fail "close rc=$close_rc: $(printf '%s\n' "$close_out" | tail -3 | tr '\n' ' ')"
+  fi
+}
+
+export IWE_GOVERNANCE_REPO=DS-strategy IWE_FROZEN_CANONICAL_PATH=""
 unset IWE_SESSIONS_ROOT
 AGENT=claude-code
-SID="t1577-$$"
-export IWE_AGENT="$AGENT" IWE_SESSION_ID="$SID"
+export IWE_AGENT="$AGENT"
 
-[ ! -e "$IWE_ROOT/scripts/isolate-push.sh" ] && [ ! -e "$GOV/scripts/isolate-push.sh" ] \
-  || { echo "fixture error: isolate-push.sh must exist only next to session-guard.sh"; exit 1; }
-
-OUT=$(cd "$IWE_ROOT" && bash "$SG" open --wp WP-485 --agent "$AGENT" \
-  --task "isolate root" --slug "$SID" --isolate 2>&1)
-WT=$(printf '%s\n' "$OUT" | grep -o '{.*}' | tail -1 \
-  | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["worktree_path"])' 2>/dev/null)
-if [ -z "$WT" ] || [ ! -d "$WT" ]; then
-  echo "FAIL: open --isolate from the root returned no worktree: $(printf '%s\n' "$OUT" | tail -3 | tr '\n' ' ')"
-  exit 1
-fi
-
-# --- #1577 ---
-if [ ! -e "$WT/inbox/open-sessions.log" ]; then
-  pass "#1577 the root copy got no inbox/open-sessions.log"
-else
-  fail "#1577 open-log line written into the root copy: $WT/inbox/open-sessions.log"
-fi
-if grep -q "| WP-485 | $AGENT | isolate root" "$GOV/inbox/open-sessions.log" 2>/dev/null; then
-  pass "#1577 the open-log line is in the governance repo's log"
-else
-  fail "#1577 governance log has no line for this open"
-fi
-
-# --- #1578 ---
-# The session's own work in the root copy.
-echo "work" > "$WT/work.txt"
-git -C "$WT" add work.txt
-git -C "$WT" commit -qm "session work"
-WORK_SHA=$(git -C "$WT" rev-parse HEAD)
-
-# The ORZ scaffold stays in the governance repo for a root isolate; close
-# wants it staged, and a completed Quick Close card for this slug.
-ORZ=$(find "$GOV/sessions" -name "*-$SID.md" -type f 2>/dev/null | head -1)
-[ -n "$ORZ" ] || { echo "FAIL: ORZ scaffold not found under $GOV/sessions"; exit 1; }
-printf '\n## Итог\n\nСделано.\n' >> "$ORZ"
-git -C "$GOV" add -- "${ORZ#"$GOV"/}"
-mkdir -p "$GOV/inbox/agent/tasks"
-printf -- '---\nprocess_id: quick-close\nstatus: completed\n---\n' > "$GOV/inbox/agent/tasks/RUN-quick-close-$SID.md"
-
-CLOSE_RC=0
-# Without IWE_GOVERNANCE_REPO in the environment (the shipped default name):
-# isolate-push.sh refuses to run without it, so close must pass its own value.
-CLOSE_OUT=$(cd "$IWE_ROOT" && env -u IWE_GOVERNANCE_REPO bash "$SG" close --wp WP-485 --agent "$AGENT" --slug "$SID" 2>&1) || CLOSE_RC=$?
-if printf '%s\n' "$CLOSE_OUT" | grep -q "isolate-push.sh не найден"; then
-  fail "#1578 close did not find isolate-push.sh next to session-guard.sh"
-else
-  pass "#1578 close found isolate-push.sh"
-fi
-if git -C "$SANDBOX/root-origin.git" cat-file -e "$(git -C "$SANDBOX/root-origin.git" rev-parse main 2>/dev/null):work.txt" 2>/dev/null; then
-  pass "#1578 the session's commit reached the root's origin"
-else
-  fail "#1578 origin/main has no work.txt (session commit $WORK_SHA not pushed)"
-fi
-if [ ! -d "$WT" ] && ! git -C "$IWE_ROOT" worktree list --porcelain | grep -qxF "worktree $WT"; then
-  pass "#1578 the isolated copy is removed after close"
-else
-  fail "#1578 the isolated copy is left behind: $WT"
-fi
-if [ "$CLOSE_RC" -eq 0 ]; then
-  pass "close exits 0"
-else
-  fail "close rc=$CLOSE_RC: $(printf '%s\n' "$CLOSE_OUT" | tail -3 | tr '\n' ' ')"
-fi
+run_case main
+run_case trunk
 
 if [ "$FAIL" -eq 0 ]; then
   echo "PASS: issues #1577 #1578 isolate of the IWE root"

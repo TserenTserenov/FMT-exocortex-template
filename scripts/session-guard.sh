@@ -2649,7 +2649,12 @@ print(json.dumps({"wp": sys.argv[1], "slug": sys.argv[2], "agent": sys.argv[3], 
   if [ -n "$ISOLATE_WT" ] && [ -d "$ISOLATE_WT" ]; then
     if PUSH_BIN=$(resolve_isolate_push_script); then
       echo "session-guard: close: isolate-push через $PUSH_BIN" >&2
-      if ! IWE_GOVERNANCE_REPO="$GOV_REPO" bash "$PUSH_BIN" "$ISOLATE_WT" main; then
+      # The same target open isolated from: origin's default branch, `main`
+      # only when origin/HEAD is unknown. A hard-coded `main` never delivered
+      # a repo whose default branch is named otherwise.
+      ISOLATE_TARGET_BRANCH="$(git -C "$ISOLATE_WT" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#^refs/remotes/origin/##' || true)"
+      ISOLATE_TARGET_BRANCH="${ISOLATE_TARGET_BRANCH:-main}"
+      if ! IWE_GOVERNANCE_REPO="$GOV_REPO" bash "$PUSH_BIN" "$ISOLATE_WT" "$ISOLATE_TARGET_BRANCH"; then
         echo "⚠️  isolate-push не завершился успешно — worktree оставлен: $ISOLATE_WT" >&2
       else
         git -C "$(git -C "$ISOLATE_WT" rev-parse --git-common-dir 2>/dev/null | sed "s|/.git$||;s|/$||" || true)" worktree remove --force "$ISOLATE_WT" 2>/dev/null           || git worktree remove --force "$ISOLATE_WT" 2>/dev/null           || echo "⚠️  не удалось удалить isolate worktree $ISOLATE_WT" >&2

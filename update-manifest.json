@@ -2929,7 +2929,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "9c3f45008471caedd94990c1538a43aa5f74add44cf5b1379ed53fa69b25b6c2"
+      "sha256": "92c8a5c753c4bbb5459aa7abd460cf50f50f8c87ef6cd9a887f450bc8517a0df"
     },
     {
       "path": "scripts/session-manifest-write.sh",
