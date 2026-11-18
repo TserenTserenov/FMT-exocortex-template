@@ -56,11 +56,13 @@ fi
 # The pre-download filter must not skip an unchanged program that lacks +x.
 grep -q 'if ! \$UPDATE_EXEC_REPAIR || \[ -x "\$SCRIPT_DIR/\$fpath" \] || ! update_needs_exec_bit "\$fpath" "\$SCRIPT_DIR/\$fpath"; then' "$UPDATE_SH" \
   || { echo "  FAIL: the download filter skips unchanged programs without checking +x"; FAILS=$((FAILS + 1)); }
-# rc.6 red team F2: on Git Bash chmod is a no-op, so the repair must be off there (no endless re-delivery).
-grep -E '^UPDATE_EXEC_REPAIR=|^case "\$\(uname -s 2>/dev/null\)" in MINGW\* \| MSYS\*\) UPDATE_EXEC_REPAIR=false' "$UPDATE_SH" > "$TMP/repair-switch.sh"
-for os_name in Darwin Linux MINGW64_NT-10.0 MSYS_NT-10.0; do
+# rc.6 red team F2, rc.8 F7: on Git Bash and Cygwin chmod is a no-op, so the repair must be off there
+# (no endless re-delivery).
+grep -E '^UPDATE_EXEC_REPAIR=true$|^case "\$\(uname -s 2>/dev/null\)" in MINGW\* \| MSYS\* \| CYGWIN\*\) UPDATE_EXEC_REPAIR=false' "$UPDATE_SH" > "$TMP/repair-switch.sh"
+[ "$(wc -l < "$TMP/repair-switch.sh")" -eq 2 ] || { echo "  FAIL: the Git Bash/Cygwin repair switch is not found"; FAILS=$((FAILS + 1)); }
+for os_name in Darwin Linux MINGW64_NT-10.0 MSYS_NT-10.0 CYGWIN_NT-10.0; do
   got=$(uname() { echo "$os_name"; }; . "$TMP/repair-switch.sh"; echo "${UPDATE_EXEC_REPAIR:-}")
-  case "$os_name" in MINGW* | MSYS*) want=false ;; *) want=true ;; esac
+  case "$os_name" in MINGW* | MSYS* | CYGWIN*) want=false ;; *) want=true ;; esac
   [ "$got" = "$want" ] || { echo "  FAIL: UPDATE_EXEC_REPAIR on $os_name is '$got', want $want"; FAILS=$((FAILS + 1)); }
 done
 
