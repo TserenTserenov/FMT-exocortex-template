@@ -2929,7 +2929,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "92c8a5c753c4bbb5459aa7abd460cf50f50f8c87ef6cd9a887f450bc8517a0df"
+      "sha256": "24fa79eb82fdd11ab11560a782d29f035ae4b49c315a416cbc2d635aca73d89e"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3585,6 +3585,7 @@
     "scripts/tests/test-issue-1411-secret-scan-fp.sh",
     "scripts/tests/test-issue-1411-update-rollback-unrelated-history.sh",
     "scripts/tests/test-issue-1569-extensionless-author-scan.sh",
+    "scripts/tests/test-issue-1572-isolate-root-records.sh",
     "scripts/tests/test-iwe-audit-fpf-copy.sh",
     "scripts/tests/test-peer-session-finalize-index-lock.sh",
     "scripts/tests/test-setup-extractor-feeders-linux-env.sh",
