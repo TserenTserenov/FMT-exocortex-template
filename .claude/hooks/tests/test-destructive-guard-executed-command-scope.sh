@@ -291,5 +291,106 @@ expect "F4: настоящий here-doc после \$((…)) и \${…} оста
 git push --force
 EOF'
 
+
+# === WP-529 F275, rc.8 red team F5/F6: comments, quotes and expansions around `<<` ===
+# A backslash ending a comment line is part of the comment; `<<` in a comment, an array subscript,
+# for((/if((, or a $(…) closed on its line opens no here-doc; quotes of $'…' and "${…"…"}" nest.
+# A lone backslash ending a script run by another shell is dropped by that shell.
+expect 'F5: два << в $((…)), затем комментарий с обратной косой — git push --force' block \
+': $((1<<true)) $((1<<true))
+# c \
+git push --force
+true'
+expect 'F5: три << в разных подстановках, затем комментарий с обратной косой — find -delete' block \
+': $((1<<true)) ${x:-<<true} $[1<<true]
+# c \
+find . -delete
+true'
+expect 'F5: то же — git branch -D' block \
+': $((1<<true)) $((1<<true))
+# c \
+git branch -D main
+true'
+expect 'F6: обратная коса в конце комментария не склеивает следующую строку' block \
+': # c \
+git push --force'
+expect 'F6: строка-комментарий с обратной косой, затем rm -rf' block \
+'# c \
+rm -rf /Users/.../IWE/DS-strategy/sessions'
+expect 'F6: << в комментарии не открывает here-doc' block \
+': # <<true
+data \
+true
+git push --force
+true'
+expect 'F6: кавычка в комментарии, затем << в кавычках' block \
+': # '"'"'
+echo '"'"'<<EOF'"'"'
+git push --force
+EOF'
+expect 'F6: $'"'"'…'"'"' с экранированной кавычкой и <<' block \
+'echo $'"'"'\'"'"'<<EOF'"'"'
+git push --force
+EOF'
+expect 'F6: вложенные кавычки в "${…}"' block \
+'echo "${x:-"<<EOF"}"
+git push --force
+EOF'
+expect 'F6: << в индексе массива' block \
+'x[1<<EOF]=5
+git push --force
+EOF'
+expect 'F6: << в составном присваивании массива' block \
+'x=([1<<true]=5)
+find . -delete
+true'
+expect 'F6: for(( без пробела' block \
+'for((i=1<<EOF;i<1;i++)); do :; done
+git push --force
+EOF'
+expect 'F6: if(( без пробела' block \
+'if((1<<EOF)); then :; fi
+git branch -D main
+EOF'
+expect 'F6: here-doc внутри $(…), закрытой на той же строке' block \
+': $( (:) <<true )
+git push --force
+true'
+expect 'F6: $((1)<<…) — это $( (1)<<… )' block \
+': $((1)<<true)
+data \
+true
+git push --force
+true'
+expect 'F6: комментарий в обратных кавычках' block \
+'echo `# '"'"'`; echo '"'"'<<EOF'"'"'
+git push --force
+EOF'
+expect 'F6: ${#x} не начинает комментарий' block \
+': ${#x} ; git push --force'
+expect 'F6: bash -c с обратной косой в конце' block \
+'bash -c '"'"'git push --force\'"'"''
+expect 'F6: eval с обратной косой в конце' block \
+'eval '"'"'git branch --unset-upstream\'"'"''
+expect 'F6: тело bash <<'"'"'EOF'"'"' с обратной косой в конце' block \
+'bash <<'"'"'EOF'"'"'
+find . -delete\
+EOF'
+expect 'F6: here-string для bash' block \
+'bash <<< '"'"'git push --force\'"'"''
+expect 'F6: printf | sh с обратной косой в конце' block \
+'printf '"'"'%s'"'"' '"'"'git push --force\'"'"' | sh'
+expect 'F6 контроль: настоящий here-doc с данными проходит' pass \
+'cat <<EOF
+git push --force
+EOF'
+expect 'F6 контроль: ${#arr[@]} проходит' pass \
+'echo ${#arr[@]}'
+expect 'F6 контроль: безобидная here-string для bash проходит' pass \
+'bash <<< '"'"'ls'"'"''
+expect 'F6 контроль: комментарий с обратной косой перед безобидной командой проходит' pass \
+'# c \
+git status'
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]
