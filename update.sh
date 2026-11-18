@@ -5479,6 +5479,12 @@ for _dq_i in "${!DOWNLOAD_QUEUE[@]}"; do
             case "$fpath" in
                 memory/*.md|memory/*.yaml|memory/*.yml) record_memory_old_hash "$fpath" "$LOCAL_HASH" ;;
             esac
+        elif update_needs_exec_bit "$fpath" "$REMOTE_FILE" && [ ! -x "$SCRIPT_DIR/$fpath" ]; then
+            # WP-529 F275 (rc.3 upgrade-from-release, NOEXEC 27): a program whose content did not
+            # change but which lacks +x (a git mode flip, or an older install that delivered it
+            # without +x) is re-delivered with the same content, so the plan sets +x on it.
+            UPDATED_FILES+=("$fpath")
+            UPDATED_LINES+=("0")
         else
             UNCHANGED=$((UNCHANGED + 1))
         fi
