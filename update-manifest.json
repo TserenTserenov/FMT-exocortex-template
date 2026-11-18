@@ -209,7 +209,7 @@
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/hook_cases.py",
-      "sha256": "6ec469aab733dc512e1c418c96f9541eedd533f29a2008dbb9c75bc78ffe412b"
+      "sha256": "7121bc20ba0d321c73ab3f4125421b2d589fbf9a868d6b37605a59d52ecf8d44"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/long_cases.py",
@@ -1025,7 +1025,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "157e00c086ccded6c93e4c785cff519dedff8c8b3624e3e5cb4df9fa9b35fa0b"
+      "sha256": "8da1c8f61f146868e139236a4b228710927b9d43795944b455a09f0c7bb154b8"
     },
     {
       "path": "docs/IWE-HELP.md",
