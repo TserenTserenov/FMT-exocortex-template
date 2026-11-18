@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "e6349dfc616e458675cdc83bf5562258b89f6afb4431a758a9e31c27b372b854"
+      "sha256": "91737bb58d1fd552597cb84185fe62514d9ac078cf3a9566446863194c23de2f"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -221,7 +221,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
-      "sha256": "a4275e5385da0de8455de40de3445d21a8368c38f000531bb5e5c8cb5a0ddb10"
+      "sha256": "833e03139e5a93dc988dec87f1f22c1d7aa9eceb2903822d5428be1b92717782"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-file-writers.sh",
@@ -257,7 +257,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-reader-overwrite.sh",
-      "sha256": "1b5f8ba5a23297da98ae9a07005877a3d777cb7c6a6a3424f7282b1968462e32"
+      "sha256": "c5e8361b2e024be9a1f40f78536b05895e8858acc76cb8ddfff0f6e93e75c778"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-mcp-guard-malformed-json.sh",

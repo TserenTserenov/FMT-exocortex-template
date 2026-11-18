@@ -235,5 +235,61 @@ expect "непарный << (сдвиг/проза) не прячет после
 'echo "$(( 1 << 2 ))"
 rm -rf /Users/.../IWE/DS-strategy/sessions'
 
+# === WP-529 F275, rc.6 red team F3: a backslash that ends the call escapes nothing ===
+# bash, zsh and sh drop it and run the command; the guard used to keep it glued to the last word.
+expect "F3: git push --force с обратной косой в конце блокируется" block \
+'git push --force\'
+expect "F3: git push --force с обратной косой и переводом строки в конце блокируется" block \
+'git push --force\
+'
+expect "F3: git reset --hard с обратной косой в конце блокируется" block \
+'git reset --hard\'
+expect "F3: find -delete с обратной косой в конце блокируется" block \
+'find . -name x -delete\'
+expect "F3: git remote update --prune с обратной косой и переводом строки блокируется" block \
+'git remote update --prune\
+'
+expect "F3: git branch --unset-upstream после переноса и с обратной косой в конце блокируется" block \
+'git -C repo \
+  branch --unset-upstream\'
+expect "F3: экранированная обратная коса в конце остаётся словом, безобидная команда проходит" pass \
+'git log --format=%h -1 -- a\\'
+
+# === WP-529 F275, rc.6 red team F4: `<<` inside an expansion is not a here-doc ===
+# The guard dropped the lines up to WORD as a data body; bash runs them.
+expect "F4: << внутри \${…} не прячет git push --force" block \
+'ls ${x:-<<ls}
+git push --force
+ls'
+expect "F4: << внутри \$((…)) не прячет rm -rf" block \
+'ls $((1<<ls))
+rm -rf /Users/.../IWE/DS-strategy/sessions
+ls'
+expect "F4: << внутри \$[…] не прячет git reset --hard" block \
+'ls $[1<<ls]
+git reset --hard
+ls'
+expect "F4: << внутри ((…)) не прячет find -delete" block \
+'(( a = 1<<ls ))
+find . -delete
+ls'
+expect "F4: << внутри if ((…)) не прячет git branch -D" block \
+'if (( 1<<ls )); then :; fi
+git branch -D main
+ls'
+expect "F4: << внутри вложенного \${…} не прячет запись в settings.json" block \
+'ls ${x:-${y:-<<ls}}
+cat README.md > .claude/settings.json
+ls'
+expect "F4: \$((…)) на двух строках с << не прячет git push --force" block \
+'echo $((1+
+1<<ls))
+git push --force
+ls'
+expect "F4: настоящий here-doc после \$((…)) и \${…} остаётся данными" pass \
+'x=${y:-1}; echo $((1<<2)); cat <<EOF
+git push --force
+EOF'
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]
