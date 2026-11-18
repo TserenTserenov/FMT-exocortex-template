@@ -110,6 +110,10 @@ expect "comment opener after the continued target" block "cat README.md > \\
 .claude/hooks/x # <<EOF"
 expect "continuation inside the operator word" block "cat README.md \\
 > .claude//hooks/x # <<EOF"
+expect "a quote left open still joins the continuation" block "ls # \\
+'
+cat README.md > \\
+.claude/hooks/x"
 expect "tee split by a continuation after a comment quote" block "ls # don't
 cat README.md | tee \\
 .claud?/hooks/x"

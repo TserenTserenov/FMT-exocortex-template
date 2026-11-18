@@ -143,7 +143,7 @@ JOIN_CONTINUATIONS_PL='
     return 1;
   }
   sub join_text {
-    my ($s, $heredocs) = @_;
+    my ($s, $heredocs, $quotes) = @_;
     my $out = q{};
     my @stack = (q{N});   # N code, S single quote, A $quote, D double quote, B backtick, P $( … )
     my @depth;            # parentheses open inside each P frame
@@ -178,9 +178,9 @@ JOIN_CONTINUATIONS_PL='
         next;
       }
       if ($word_start && $s =~ /\G#[^\n]*/gc) { $out .= $&; next; }
-      if ($s =~ /\G\x27/gc) { $out .= "\x27"; push @stack, q{S}; $word_start = 0; next; }
-      if ($s =~ /\G\$\x27/gc) { $out .= "\$\x27"; push @stack, q{A}; $word_start = 0; next; }
-      if ($s =~ /\G"/gc) { $out .= q{"}; push @stack, q{D}; $word_start = 0; next; }
+      if ($quotes && $s =~ /\G\x27/gc) { $out .= "\x27"; push @stack, q{S}; $word_start = 0; next; }
+      if ($quotes && $s =~ /\G\$\x27/gc) { $out .= "\$\x27"; push @stack, q{A}; $word_start = 0; next; }
+      if ($quotes && $s =~ /\G"/gc) { $out .= q{"}; push @stack, q{D}; $word_start = 0; next; }
       if ($s =~ /\G\$\(/gc) { $out .= q{$(}; push @stack, q{P}; push @depth, 0; $word_start = 1; next; }
       if ($s =~ /\G`/gc) {
         $out .= "`";
@@ -215,12 +215,15 @@ JOIN_CONTINUATIONS_PL='
       $s =~ /\G./gcs; $out .= $&; $word_start = $& =~ /[\s;&|()<>]/ ? 1 : 0;
     }
     return undef if @pending;
-    return $out;
+    # A single quote left open: bash stops with a syntax error there, but the passes below may
+    # still read the text differently, so the call is joined again with quotes ignored.
+    return ($out, scalar grep { $_ eq q{S} || $_ eq q{A} } @stack);
   }
   # Most calls have no continuation at all: nothing to join.
   if (index($text, "\\\n") < 0) { print $text; exit 0; }
-  my $joined = join_text($text, 1);
-  $joined = join_text($text, 0) unless defined $joined;
+  sub join_any { my $q = shift; my @r = join_text($text, 1, $q); @r = join_text($text, 0, $q) unless defined $r[0]; return @r; }
+  my ($joined, $open) = join_any(1);
+  ($joined) = join_any(0) if $open;
   print $joined;
 '
 CMD=$(printf '%s' "$CMD" | perl -e "$JOIN_CONTINUATIONS_PL") || fail_check "perl, склейка переносов строк"
@@ -1731,8 +1734,7 @@ TEXT_TARGETS_SUB='
     }gse;
     return $s;
   }
-  my $nest;
-  $nest = qr/\((?:[^()\x27"]++|\x27[^\x27]*\x27|"(?:[^"\\]|\\.)*"|(??{$nest}))*\)/s;
+  my $nest = qr/(\((?:[^()\x27"]++|\x27[^\x27]*\x27|"(?:[^"\\]|\\.)*"|(?-1))*\))/s;
   # One shell word from $$i on: quotes, $(…), ${…}, backticks and escapes are kept whole.
   sub word_at {
     my ($s, $i) = @_;
@@ -1793,17 +1795,20 @@ TEXT_TARGETS_SUB='
       }
       pos($s) = $i;
     }
-    return grep { length } map { normal_target($_) } @t;
+    my %seen;
+    return grep { length && !$seen{$_}++ } map { normal_target($_) } @t;
   }
 '
 TEXT_TARGETS_PL="$TEXT_TARGETS_SUB"'
   use strict; use warnings;
-  my $text = do { local $/; <STDIN> };
-  my @t = text_targets($text);
+  my ($text, $checked) = split /\0/, do { local $/; <STDIN> }, 2;
+  my @t = text_targets($text // q{});
   print((grep { protected_text($_) } @t) ? "HIT\n" : q{});
-  print "x\tT\t$_\t-\n" for @t;
+  # Targets the scanner above already compared need no second (brace, glob) comparison.
+  my %done = map { (split /\t/, $_, 4)[2] // q{} => 1 } split /\n/, $checked // q{};
+  print "x\tT\t$_\t-\n" for grep { !$done{$_} } @t;
 '
-TEXT_TARGETS=$(printf '%s' "$CMD_EXEC" | perl -e "$TEXT_TARGETS_PL") || fail_check "perl, цели записи по тексту"
+TEXT_TARGETS=$(printf '%s\0%s' "$CMD_EXEC" "$WRITE_TARGETS" | perl -e "$TEXT_TARGETS_PL") || fail_check "perl, цели записи по тексту"
 case "$TEXT_TARGETS" in
   HIT*) TEXT_PROTECTED=HIT ;;
   *) TEXT_PROTECTED=$(printf '%s\n' "$TEXT_TARGETS" | perl -e "$PROTECTED_TARGET_PL") || fail_check "perl, сравнение целей по тексту" ;;
