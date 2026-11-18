@@ -27,14 +27,18 @@
 #   access, inherited by files and subdirectories) and SYSTEM.
 #
 # API (sets globals, never exits — the caller decides how to fail):
-#   dry_run_resolve_paths            → DRY_RUN_DIR, DRY_RUN_SENTINEL; rc 1 + DRY_RUN_ERR
+#   dry_run_resolve_paths            → DRY_RUN_DIR, DRY_RUN_SENTINEL, DRY_RUN_TEST_MODE (1 = explicit
+#                                      test-mode override); rc 1 + DRY_RUN_ERR
 #   dry_run_dir_check create|existing → rc 0 when private; rc 1 + DRY_RUN_ERR
 #     create: a missing directory is created (on Git Bash with its ACL set up;
 #     a directory we just created and could not secure is removed again).
+#   dry_run_stat uid|mode|mtime <path>, dry_run_proc_start|dry_run_proc_pgid <pid>,
+#   dry_run_pid_pgid_snapshot, dry_run_sha256 — portable helpers (issue #1586).
 
 DRY_RUN_ERR=""
 DRY_RUN_DIR=""
 DRY_RUN_SENTINEL=""
+DRY_RUN_TEST_MODE=0
 
 dry_run_is_windows() {
     case "$(uname -s 2>/dev/null)" in
@@ -47,12 +51,14 @@ dry_run_resolve_paths() {
     DRY_RUN_ERR=""
     DRY_RUN_DIR=""
     DRY_RUN_SENTINEL="/tmp/iwe-dry-run.flag"
+    DRY_RUN_TEST_MODE=0
     # Env overrides — explicit test mode only (Codex r1): the marker must be
     # inside the override directory; ambient IWE_DRY_RUN_DIR/IWE_DRY_RUN_SENTINEL
     # from a launch configuration do not move the production paths.
     if [ -n "${IWE_DRY_RUN_DIR:-}" ] && [ -f "$IWE_DRY_RUN_DIR/.iwe-dry-run-test-mode" ]; then
         DRY_RUN_DIR="$IWE_DRY_RUN_DIR"
         DRY_RUN_SENTINEL="${IWE_DRY_RUN_SENTINEL:-/tmp/iwe-dry-run.flag}"
+        DRY_RUN_TEST_MODE=1
         return 0
     fi
     if dry_run_is_windows; then
@@ -75,16 +81,69 @@ dry_run_resolve_paths() {
     DRY_RUN_DIR="/tmp/iwe-dry-run-$(id -u)"
 }
 
-_dry_run_stat() { # <uid|mode> <path>
-    local fmt
-    case "$(uname):$1" in
-        Darwin:uid)  fmt="-f %u" ;;
-        Darwin:mode) fmt="-f %Lp" ;;
-        *:uid)       fmt="-c %u" ;;
-        *)           fmt="-c %a" ;;
+# stat by the tool's flavour, not by uname: GNU coreutils stat can come first
+# in PATH on macOS, and BSD stat can sit under a non-Darwin uname. GNU first —
+# BSD stat rejects -c, while GNU `stat -f` means "file system" and would print
+# the wrong thing.
+dry_run_stat() { # <uid|mode|mtime> <path>
+    local gnu bsd
+    case "$1" in
+        uid)   gnu="%u"; bsd="%u" ;;
+        mode)  gnu="%a"; bsd="%Lp" ;;
+        mtime) gnu="%Y"; bsd="%m" ;;
+        *) return 1 ;;
     esac
-    # shellcheck disable=SC2086  # fmt is two words by design
-    stat $fmt "$2" 2>/dev/null
+    stat -c "$gnu" "$2" 2>/dev/null || stat -f "$bsd" "$2" 2>/dev/null
+}
+
+# Process facts for the owner record and the orphan check (issue #1586).
+# POSIX `ps -o` first, unchanged output; Git Bash's cygwin ps has no -o, so
+# there its default table (PID PPID PGID WINPID TTY UID STIME COMMAND, an
+# optional status letter before PID) is read instead.
+_dry_run_ps_table() { # <ps args...> → "pid pgid start" lines
+    ps "$@" 2>/dev/null | awk '
+        NR == 1 { ok = ($0 ~ /PGID/ && $0 ~ /STIME/); next }
+        ok {
+            i = 1
+            if ($1 !~ /^[0-9]+$/) i = 2
+            if (NF < i + 6 || $i !~ /^[0-9]+$/ || $(i + 2) !~ /^[0-9]+$/) next
+            s = $(i + 6)
+            for (k = i + 7; k <= NF; k++) s = s " " $k
+            print $i, $(i + 2), s
+        }'
+}
+dry_run_proc_start() { # <pid> → start signature; rc 1 when unknown
+    local out
+    out=$(ps -o lstart= -p "$1" 2>/dev/null)
+    if [ -z "$out" ]; then
+        out=$(_dry_run_ps_table -p "$1" | awk -v p="$1" '$1 == p { $1 = ""; $2 = ""; sub(/^  /, ""); print "cygwin:" $0; exit }')
+    fi
+    [ -n "$out" ] || return 1
+    printf '%s\n' "$out"
+}
+dry_run_proc_pgid() { # <pid> → pgid; rc 1 when unknown
+    local out
+    out=$(ps -o pgid= -p "$1" 2>/dev/null | tr -d ' ')
+    [ -n "$out" ] || out=$(_dry_run_ps_table -p "$1" | awk -v p="$1" '$1 == p { print $2; exit }')
+    [ -n "$out" ] || return 1
+    printf '%s\n' "$out"
+}
+dry_run_pid_pgid_snapshot() { # → "pid pgid" lines of every process; rc 1 when unknown
+    local out
+    out=$(ps -eo pid=,pgid= 2>/dev/null)
+    [ -n "$out" ] || out=$(_dry_run_ps_table -e | awk '{ print $1, $2 }')
+    [ -n "$out" ] || return 1
+    printf '%s\n' "$out"
+}
+
+# sha256 of stdin, hex only: sha256sum (coreutils, Git Bash) first, then
+# shasum (macOS); Git Bash has no shasum (issue #1586).
+dry_run_sha256() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum | awk '{print $1}'
+    else
+        shasum -a 256 | awk '{print $1}'
+    fi
 }
 
 dry_run_dir_check() { # <create|existing>
@@ -103,7 +162,13 @@ dry_run_dir_check() { # <create|existing>
             DRY_RUN_ERR="no dry-run dir $dir"
             return 1
         fi
-        mkdir -m 0700 "$dir" 2>/dev/null || { DRY_RUN_ERR="cannot create $dir with 0700"; return 1; }
+        if dry_run_is_windows; then
+            # Git Bash: `mkdir -m` creates the directory but fails on the
+            # chmod (issue #1586); the ACL below is the access control there.
+            mkdir "$dir" 2>/dev/null || { DRY_RUN_ERR="cannot create $dir"; return 1; }
+        else
+            mkdir -m 0700 "$dir" 2>/dev/null || { DRY_RUN_ERR="cannot create $dir with 0700"; return 1; }
+        fi
         created=1
     fi
     if dry_run_is_windows; then
@@ -118,13 +183,13 @@ dry_run_dir_check() { # <create|existing>
         [ "$created" = 1 ] && rmdir "$dir" 2>/dev/null
         return 1
     fi
-    owner=$(_dry_run_stat uid "$dir")
+    owner=$(dry_run_stat uid "$dir")
     if [ "$owner" != "$(id -u)" ]; then
         DRY_RUN_ERR="dry-run dir $dir owned by uid ${owner:-unknown}, expected $(id -u)"
         [ "$created" = 1 ] && rmdir "$dir" 2>/dev/null
         return 1
     fi
-    perms=$(_dry_run_stat mode "$dir")
+    perms=$(dry_run_stat mode "$dir")
     case "$perms" in
         ''|*[!0-7]*)
             DRY_RUN_ERR="cannot stat permissions of $dir"

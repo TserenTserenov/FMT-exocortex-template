@@ -232,13 +232,13 @@ orphan_proven() { # <pid> <pid_start> <pgid>
     case "$pid" in ''|*[!0-9]*|0) return 2 ;; esac
     case "$pgid" in ''|*[!0-9]*|0) return 2 ;; esac
     if kill -0 "$pid" 2>/dev/null; then
-        cur_start=$(ps -o lstart= -p "$pid" 2>/dev/null) || return 2
+        cur_start=$(dry_run_proc_start "$pid") || return 2
         [ -n "$cur_start" ] || return 2
         # Alive and start matches — the owner is alive, no orphanhood.
         [ "$cur_start" = "$pid_start" ] && return 1
         # Alive but a different start — pid reuse: the original owner is dead.
     fi
-    snapshot=$(ps -eo pid=,pgid= 2>/dev/null) || return 2
+    snapshot=$(dry_run_pid_pgid_snapshot) || return 2
     [ -n "$snapshot" ] || return 2
     if printf '%s\n' "$snapshot" | awk -v pg="$pgid" '$1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ && $2 == pg {f=1} END{exit f?0:1}'; then
         return 1  # the rehearsal tree is still alive — not an orphan
@@ -337,10 +337,7 @@ fi
 # not only by the TTL below. A sentinel of the old format (no gate_id) follows the
 # previous TTL+whitelist path unchanged.
 # lstat invariants of the sentinel (Codex r1): a regular file of the same owner.
-case "$(uname)" in
-    Darwin) S_UID=$(stat -f %u "$SENTINEL" 2>/dev/null || true) ;;
-    *)      S_UID=$(stat -c %u "$SENTINEL" 2>/dev/null || true) ;;
-esac
+S_UID=$(dry_run_stat uid "$SENTINEL" || true)
 [ -n "$S_UID" ] && [ "$S_UID" = "$(id -u)" ] || fail_closed "sentinel $SENTINEL owned by uid ${S_UID:-unknown}, expected $(id -u)"
 SENTINEL_GID=$(jq -r '.gate_id // empty' "$SENTINEL" 2>/dev/null || true)
 if [ -n "$SENTINEL_GID" ]; then
@@ -390,10 +387,7 @@ if [ -n "$SENTINEL_GID" ]; then
     esac
 fi
 
-case "$(uname)" in
-    Darwin) MTIME=$(stat -f %m "$SENTINEL" 2>/dev/null) ;;
-    *)      MTIME=$(stat -c %Y "$SENTINEL" 2>/dev/null) ;;
-esac
+MTIME=$(dry_run_stat mtime "$SENTINEL")
 
 if [ -z "$MTIME" ]; then
     # File vanished between test and stat (race with parallel cleanup) — allow.
@@ -851,6 +845,15 @@ if [ "$TOOL_NAME" = "Bash" ]; then
         block "$CMD (BASH_ENV/BASH_FUNC_/SHELLOPTS/PYTHONPATH/PYTHONUSERBASE/LD_*/DYLD_* would run code the gate cannot see)"
     fi
 
+    # issue #1468: git runs a command named in its configuration (core.pager,
+    # core.fsmonitor, diff.external, alias.*, *.textconv, core.sshCommand,
+    # ...); these variables set that configuration or the program directly.
+    # Only an assignment counts, as above.
+    if printf '%s\n' "$ASSIGN_SPLIT" | grep -qE '(^|[[:space:]])(GIT_CONFIG[A-Za-z0-9_]*|GIT_EXTERNAL_DIFF|GIT_PAGER|PAGER|MANPAGER|GIT_SSH|GIT_SSH_COMMAND|GIT_ASKPASS|SSH_ASKPASS|GIT_EDITOR|GIT_SEQUENCE_EDITOR|EDITOR|VISUAL|GIT_EXEC_PATH|GIT_PROXY_COMMAND|GIT_TEMPLATE_DIR)(\[[^]]*\])?\+?='; then
+        block "$CMD (GIT_CONFIG_*/GIT_PAGER/GIT_EXTERNAL_DIFF/GIT_SSH*/EDITOR... would make git run a command)"
+    fi
+
+
     # issue #1258 (independent red-team audit, 2026-10-17): the `cd|pushd`
     # alternative the regex above used to carry only matched the literal
     # bytes "cd"/"pushd" with real whitespace around them — exactly the PoC
@@ -970,6 +973,206 @@ if [ "$TOOL_NAME" = "Bash" ]; then
         OK) ;;
         "BLOCK "*) block "$CMD (indirect execution under dry-run: program run by path: ${RUN_BY_PATH#BLOCK })" ;;
         *) fail_closed "command reader returned '$RUN_BY_PATH' — cannot classify command" ;;
+    esac
+
+    # issue #1468: forms the word loop below cannot see, read by a quote-aware
+    # scanner of the whole command: a quoted or escaped command word
+    # ("git" push, \rm), an assignment with a quoted value before the command
+    # (X='a' git push), git -c/--config-env, find -exec/-ok/-delete, awk
+    # system()/getline/print >|, sed e/w, python -c with code that can run
+    # commands or write, perl/ruby/node -e, let/declare -i, and arithmetic on
+    # a variable's value (a subscript like a[$(cmd)] in the value runs cmd).
+    # It only adds blocks; the loop below still applies to every command.
+    # read -d '' (not $(cat <<...)): bash 3.2 misparses a here-document with
+    # parentheses inside a command substitution.
+    IFS= read -r -d '' EXEC_FORMS_PL <<'PERL' || true
+use strict; use warnings;
+# Reads the command (heredoc bodies and comments already stripped) on stdin,
+# prints "OK" or "BLOCK <reason>".
+local $/; my $s = <STDIN> // "";
+my $sentinel = $ENV{GATE_SENTINEL} // "";
+sub out { print "BLOCK $_[0]\n"; exit 0; }
+
+# --- 1. simple commands with de-quoted words ----------------------------------
+# Separators (; & | ( ) { } newline) count only outside quotes. $( and a
+# backtick open a nested command also inside double quotes (it runs).
+my @cmds; my @frames;
+my %st = (cur => [], word => "", raw => "", in => 0, q => "", type => "", depth => 0);
+sub endword { if ($st{in}) { push @{$st{cur}}, [$st{raw}, $st{word}]; } $st{word} = ""; $st{raw} = ""; $st{in} = 0; }
+sub endcmd { endword(); push @cmds, $st{cur} if @{$st{cur}}; $st{cur} = []; }
+sub open_frame { my $t = shift; push @frames, {%st}; %st = (cur => [], word => "", raw => "", in => 0, q => "", type => $t, depth => 0); }
+sub close_frame { endcmd(); my $f = pop @frames; %st = %$f; }
+my $n = length $s;
+for (my $i = 0; $i < $n; $i++) {
+    my $c = substr($s, $i, 1); my $nx = $i + 1 < $n ? substr($s, $i + 1, 1) : "";
+    if ($st{q} eq "'" || $st{q} eq "ansi") {
+        if ($st{q} eq "ansi" && $c eq "\\" && $nx ne "") { $st{word} .= $nx; $st{raw} .= $c . $nx; $i++; next; }
+        if ($c eq "'") { $st{q} = ""; $st{raw} .= $c; next; }
+        $st{word} .= $c; $st{raw} .= $c; next;
+    }
+    if ($st{q} eq '"') {
+        if ($c eq "\\" && $nx =~ /[\$`"\\\n]/) { $st{word} .= $nx; $st{raw} .= $c . $nx; $i++; next; }
+        if ($c eq '"') { $st{q} = ""; $st{raw} .= $c; next; }
+        if ($c eq '$' && $nx eq '(' && substr($s, $i + 2, 1) ne '(') { $st{raw} .= '$('; $st{word} .= '$('; $i++; open_frame("paren"); next; }
+        if ($c eq '`') { $st{raw} .= $c; open_frame("bt"); next; }
+        $st{word} .= $c; $st{raw} .= $c; next;
+    }
+    # unquoted
+    if ($c eq "\\" && $nx ne "") { if ($nx ne "\n") { $st{word} .= $nx; $st{raw} .= $c . $nx; $st{in} = 1; } $i++; next; }
+    if ($c eq "'") { $st{q} = "'"; $st{raw} .= $c; $st{in} = 1; next; }
+    if ($c eq '$' && $nx eq "'") { $st{q} = "ansi"; $st{raw} .= "\$'"; $st{in} = 1; $i++; next; }
+    if ($c eq '"') { $st{q} = '"'; $st{raw} .= $c; $st{in} = 1; next; }
+    if ($c eq '$' && $nx eq '(' && substr($s, $i + 2, 1) ne '(') { endcmd(); $i++; open_frame("paren"); next; }
+    if ($c eq '`') {
+        if ($st{type} eq "bt") { close_frame(); } else { endcmd(); open_frame("bt"); }
+        next;
+    }
+    if ($c eq '(') { $st{depth}++ if $st{type} eq "paren"; endcmd(); next; }
+    if ($c eq ')') {
+        if ($st{type} eq "paren") { if ($st{depth} > 0) { $st{depth}--; endcmd(); } else { close_frame(); } next; }
+        endcmd(); next;
+    }
+    if ($c =~ /[;&|{}\n]/) { endcmd(); next; }
+    if ($c =~ /\s/) { endword(); next; }
+    $st{word} .= $c; $st{raw} .= $c; $st{in} = 1;
+}
+endcmd(); while (@frames) { close_frame(); }
+
+# --- 2. per command checks ---------------------------------------------------
+my %wrap = map { $_ => 1 } qw(command builtin exec env nohup time nice sudo timeout stdbuf ionice setsid if then elif else while until do ! -- coproc);
+my %argopt = map { $_ => 1 } qw(-n -u -g -C -s -k -p -a -i -o -e -t -D -h -r -U -T --signal --kill-after --chdir --unset --adjustment);
+my $quoted_re = qr/^(git|rm|mv|tee|sed|gsed|curl|psql|bash|sh|zsh|dash|ksh|source|\.|eval|xargs|python[0-9.]*|uv|uvx|find|gfind|awk|gawk|mawk|nawk|perl|ruby|node|let|declare|typeset|local|export|env|command|builtin|exec|sudo|nohup|time|nice|timeout|stdbuf|ionice|setsid|hash|enable)$/;
+
+sub sed_runs_or_writes {
+    my $t = shift;
+    while ($t =~ /(?:^|[;{}\n\s!0-9\$,\/])s([^\\\n\s])((?:\\.|(?!\1).)*)\1((?:\\.|(?!\1).)*)\1([A-Za-z0-9]*)/g) {
+        return 1 if $4 =~ /[ewW]/;
+    }
+    $t =~ s/(^|[;{}\n\s!0-9\$,\/])[sy]([^\\\n\s])(?:\\.|(?!\2).)*\2(?:\\.|(?!\2).)*\2[A-Za-z0-9]*/$1/g;
+    $t =~ s{/(?:\\.|[^/\\\n])*/}{ }g;
+    return $t =~ /(?:^|[;{}\n0-9\$,!\s])[ewW](?:[\s;}]|$)/ ? 1 : 0;
+}
+sub py_runs_or_writes {
+    my $t = shift;
+    $t =~ s/\bopen\s*\(\s*(?:[^(),]|\([^()]*\))*\)//g;    # a one-argument open() only reads
+    return $t =~ /\b(open|exec|eval|compile|__import__|system|popen|spawn\w*|subprocess|os|shutil|pathlib|Path|io|socket|urllib|http|requests|importlib|builtins|__builtins__|getattr|setattr|delattr|globals|locals|vars|ctypes|pty|tempfile|sqlite3|write\w*|remove|unlink|rmdir|rename|mkdir|makedirs|chmod|chown|symlink|truncate|codecs|fileinput|runpy|pickle|marshal|webbrowser|asyncio|multiprocessing|signal|breakpoint)\b/ ? 1 : 0;
+}
+
+for my $w (@cmds) {
+    my @w = @$w; my $i = 0;
+    while ($i < @w) {
+        my $x = $w[$i][1];
+        if ($x =~ /^[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=/) { $i++; next; }
+        if ($x =~ /^[0-9]*(<|>|&>)/) { $i++; $i++ if $x =~ /^[0-9]*(<|>|>>|&>|&>>|<<<|>&|<&|>\|)$/; next; }
+        (my $b = $x) =~ s{.*/}{};
+        if ($wrap{$b}) {
+            $i++;
+            # command -v/-V only looks a name up
+            if ($b eq 'command' && $i < @w && $w[$i][1] =~ /^-[A-Za-z]*[vV]/) { $i = @w; last; }
+            while ($i < @w && $w[$i][1] =~ /^-/) { my $o = $w[$i][1]; $i++; $i++ if $argopt{$o} && $i < @w; }
+            $i++ if $b eq 'timeout' && $i < @w && $w[$i][1] =~ /^[0-9.]+[smhd]?$/;
+            next;
+        }
+        last;
+    }
+    next if $i >= @w;
+    my ($raw0, $cmd) = @{$w[$i]};
+    (my $b = $cmd) =~ s{.*/}{};
+    my @a = map { $_->[1] } @w[$i + 1 .. $#w];
+    out("quoted or escaped command word '$b'") if $raw0 =~ /["'\\]/ && $b =~ $quoted_re;
+    if ($b eq 'git') {
+        my $j = 0;
+        while ($j < @a) {
+            my $o = $a[$j];
+            out("git $o can run a configured command") if $o eq '-c' || $o =~ /^-c./ || $o =~ /^--config-env(=|$)/ || $o =~ /^--exec-path=/;
+            if ($o =~ /^(-C|--git-dir|--work-tree|--namespace)$/) { $j += 2; next; }
+            if ($o =~ /^-/) { $j++; next; }
+            last;
+        }
+        my $sub = $a[$j] // "";
+        out("git write") if $sub =~ /^(add|commit|push|pull|reset|merge|rebase|mv|rm)$/;
+        out("git checkout -") if $sub eq 'checkout' && ($a[$j + 1] // "") =~ /^-/;
+    } elsif ($b eq 'rm' || $b eq 'mv') {
+        my @p = grep { !/^-/ } @a;
+        out("filesystem mutation") unless @p == 1 && $sentinel ne "" && $p[0] eq $sentinel;
+    } elsif ($b eq 'tee') {
+        out("tee write") unless ($a[0] // "") eq '/dev/null';
+    } elsif ($b =~ /^g?find$/) {
+        for (@a) { out("find $_ runs a command or writes") if /^-(exec|execdir|ok|okdir|delete|fprint|fprint0|fprintf|fls)$/; }
+    } elsif ($b =~ /^[gmn]?awk$/) {
+        my (@prog, $given); my $j = 0;
+        while ($j < @a) {
+            my $o = $a[$j];
+            out("awk program or extension from a file ($o)") if $o =~ /^(-f|--file|-i|--include|-l|--load|-E|--exec)$/ || $o =~ /^-[filE]./ || $o =~ /^--(file|include|load|exec)=/;
+            if ($o =~ /^(-e|--source)$/) { push @prog, $a[$j + 1] // ""; $given = 1; $j += 2; next; }
+            if ($o =~ /^--source=(.*)$/s) { push @prog, $1; $given = 1; $j++; next; }
+            if ($o =~ /^(-v|-F|--assign|--field-separator)$/) { $j += 2; next; }
+            if ($o eq '--') { $j++; last; }
+            if ($o =~ /^-/) { $j++; next; }
+            last;
+        }
+        push @prog, $a[$j] // "" unless $given;
+        for (@prog) { out("awk program runs commands or writes files") if /system\s*\(|getline|\|&|\bprintf?\b[^;{}\n]*(>|\|)|\@load|\@include/; }
+    } elsif ($b =~ /^g?sed$/) {
+        my (@sc, $given); my $j = 0;
+        while ($j < @a) {
+            my $o = $a[$j];
+            out("sed script from a file") if $o eq '--file' || $o =~ /^--file=/ || $o =~ /^-[A-Za-z]*f/;
+            if ($o =~ /^-[A-Za-z]*e$/ || $o eq '--expression') { push @sc, $a[$j + 1] // ""; $given = 1; $j += 2; next; }
+            if ($o =~ /^--expression=(.*)$/s) { push @sc, $1; $given = 1; $j++; next; }
+            if ($o =~ /^(-l|--line-length)$/) { $j += 2; next; }
+            if ($o eq '--') { $j++; last; }
+            if ($o =~ /^-/) { $j++; next; }
+            last;
+        }
+        push @sc, $a[$j] // "" unless $given;
+        for (@sc) { out("sed script runs a command or writes a file (e/w)") if sed_runs_or_writes($_); }
+    } elsif ($b =~ /^python[0-9.]*$/) {
+        out("python -c snippet that can run commands or write") if ($a[0] // "") eq '-c' && py_runs_or_writes($a[1] // "");
+    } elsif ($b =~ /^(perl|ruby|node)$/) {
+        for (@a) { out("$b runs code from an argument") if /^-[A-Za-z]*[eE]/ || /^--(eval|print)/; }
+    } elsif ($b eq 'let') {
+        out("let evaluates arithmetic on variable values");
+    } elsif ($b =~ /^(declare|typeset|local)$/) {
+        for (@a) { out("$b -i evaluates arithmetic on assignment") if /^[-+][A-Za-z]*i/; }
+    }
+}
+
+# --- 3. arithmetic on a variable's value ---------------------------------------
+# An array subscript inside the value (a[$(cmd)]) runs cmd when the value is
+# evaluated as arithmetic, wherever the value came from. Arithmetic is
+# allowed only on literal numbers and visible $(...) substitutions.
+sub strip_subst { my $t = shift; 1 while $t =~ s/\$\((?!\()(?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)/ 0 /g; return $t; }
+out("\$[ ] arithmetic") if $s =~ /\$\[/;
+my $p = 0;
+while (($p = index($s, "((", $p)) >= 0) {
+    my ($d, $k) = (0, $p);
+    for (; $k < $n; $k++) { my $c = substr($s, $k, 1); $d++ if $c eq '('; if ($c eq ')') { $d--; last if $d == 0; } }
+    my $body = strip_subst(substr($s, $p + 2, ($k - 1) - ($p + 2)));
+    out("arithmetic on a variable or a string") if $body =~ /[A-Za-z_\$'"`\\\[]/;
+    $p = $k > $p ? $k : $p + 2;
+}
+while ($s =~ /\[\[(.*?)\]\]/gs) {
+    my $t = $1;
+    next unless $t =~ /(^|\s)-(eq|ne|lt|le|gt|ge)(\s|$)/;
+    $t = strip_subst($t);
+    $t =~ s/(^|\s)-(eq|ne|lt|le|gt|ge)(?=\s|$)/ /g;
+    $t =~ s/&&|\|\||[!()]/ /g;
+    for my $tok (split ' ', $t) { out("[[ -eq ]] on a variable or a string") unless $tok =~ /^[-+]?[0-9]+$/; }
+}
+while ($s =~ /\$\{[#!]?[A-Za-z_0-9@*]+(\[([^\]]*)\])?(:(?![-=?+])([^}]*))?\}/g) {
+    my ($sub, $off) = ($2, $4);
+    out("array subscript on a variable") if defined $sub && $sub !~ /^[@*]$/ && $sub =~ /[A-Za-z_\$'"`]/;
+    out("substring offset on a variable") if defined $off && strip_subst($off) =~ /[A-Za-z_\$'"`]/;
+}
+print "OK\n";
+PERL
+    EXEC_FORMS=$(printf '%s' "$CMD_CODE" | GATE_SENTINEL="$SENTINEL" perl -e "$EXEC_FORMS_PL") \
+        || fail_closed "command reader failed — cannot classify command"
+    case "$EXEC_FORMS" in
+        OK) ;;
+        "BLOCK "*) block "$CMD (${EXEC_FORMS#BLOCK })" ;;
+        *) fail_closed "command reader returned '$EXEC_FORMS' — cannot classify command" ;;
     esac
 
     while IFS= read -r SEG; do
