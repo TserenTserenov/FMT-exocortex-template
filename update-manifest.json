@@ -68,8 +68,16 @@
       "sha256": "fcfabb7eafcd288c29d210bca041fae9a86d68fcc0fb771f31333bfde1397961"
     },
     {
+      "path": ".claude/hooks/destructive-guard.d/v0.42.1-rc.6.sh",
+      "sha256": "3a5f36125a7e25ec21c15e3257cf2f49d962ff9a81de52535684a04a69b72fa0"
+    },
+    {
+      "path": ".claude/hooks/destructive-guard.d/v0.42.1-rc.8.sh",
+      "sha256": "9e62ba99f07f36465c7dbf92fccd345b85e270d99e77236425ee4f492e8a676d"
+    },
+    {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "16893e3f95e1ac3b1ace196415e4fce7e7d9c580900ce81bff14e1476a5e7207"
+      "sha256": "9637735e245dacfe8670457d64da6d722701a00c9669643f09bb439a57961721"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -221,7 +229,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
-      "sha256": "7b15e7091a0ae7b85d5fc777f96f58bb419d293ac0d419a8784a069ef6bf4717"
+      "sha256": "f6c2c63744c5e5e100c34b6c4e01efc1c6ec4eaf6fe2ff5f0d72ceecb10e3a08"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-file-writers.sh",
@@ -250,6 +258,10 @@
     {
       "path": ".claude/hooks/tests/test-destructive-guard-malformed-json.sh",
       "sha256": "639f5beded67e1fe9618cbfdd6105af6987a709f82790092b133bc9ad6fa1c20"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-monotone.sh",
+      "sha256": "09a8e5b072f7c4393995e232a9a1d2d791ea13d7aacf59aa8d789785be92e1a5"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-path-spellings.sh",
@@ -941,7 +953,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "c1e1d93751cd2d4160f4a4d503e557399ad3905b89022f1fe86750c391fbf53e"
+      "sha256": "2ccee8cfee5c547bbe169afafd711427ed5b87837a054f51b59560b508da0ec4"
     },
     {
       "path": ".gitignore",
@@ -969,7 +981,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9993c7d1522677736fffca1aaf68e007603623715b618dbc1221ec73deed6531"
+      "sha256": "16081bfdd29442ffcf256a24bcb36013d12ef2f0d3dd3b7485a96d148aa897cb"
     },
     {
       "path": "CLAUDE.md",

@@ -392,5 +392,193 @@ expect 'F6 контроль: комментарий с обратной косо
 '# c \
 git status'
 
+
+# === WP-529 F275, rc.10 red team F8/F11: readings that disagree about quote state ===
+# The parser of this hook and the released guards in destructive-guard.d/ read these texts
+# differently; each reading is judged on its own and the strictest verdict wins.
+expect 'F8: : x[ <<W, тело с открытой кавычкой, затем find .' block \
+': x[ <<W
+echo '"'"'a
+W
+find . -delete'
+expect 'F8: : x[ <<W, тело с открытой кавычкой, затем rm -rf' block \
+': x[ <<W
+echo '"'"'a
+W
+rm -rf /Users/.../IWE/DS-strategy/sessions'
+expect 'F8: : x[ <<W, тело с открытой кавычкой, затем git push' block \
+': x[ <<W
+echo '"'"'a
+W
+git push --force'
+expect 'F8: : x[ <<W, тело с открытой кавычкой, затем git reset' block \
+': x[ <<W
+echo '"'"'a
+W
+git reset --hard'
+expect 'F8: : x[ <<W, тело с открытой кавычкой, затем git clean' block \
+': x[ <<W
+echo '"'"'a
+W
+git clean -fdx'
+expect 'F8: : x[ <<W, тело с открытой кавычкой, затем git branch' block \
+': x[ <<W
+echo '"'"'a
+W
+git branch -D main'
+expect 'F8: : x[ <<W, тело с открытой кавычкой, затем git add' block \
+': x[ <<W
+echo '"'"'a
+W
+git add -A'
+expect 'F8: cat notes[ <<W, тело с открытой кавычкой, затем find .' block \
+'cat notes[ <<W
+echo '"'"'a
+W
+find . -delete'
+expect 'F8: cat notes[ <<W, тело с открытой кавычкой, затем rm -rf' block \
+'cat notes[ <<W
+echo '"'"'a
+W
+rm -rf /Users/.../IWE/DS-strategy/sessions'
+expect 'F8: cat notes[ <<W, тело с открытой кавычкой, затем git push' block \
+'cat notes[ <<W
+echo '"'"'a
+W
+git push --force'
+expect 'F8: cat notes[ <<W, тело с открытой кавычкой, затем git reset' block \
+'cat notes[ <<W
+echo '"'"'a
+W
+git reset --hard'
+expect 'F8: cat notes[ <<W, тело с открытой кавычкой, затем git clean' block \
+'cat notes[ <<W
+echo '"'"'a
+W
+git clean -fdx'
+expect 'F8: cat notes[ <<W, тело с открытой кавычкой, затем git branch' block \
+'cat notes[ <<W
+echo '"'"'a
+W
+git branch -D main'
+expect 'F8: cat notes[ <<W, тело с открытой кавычкой, затем git add' block \
+'cat notes[ <<W
+echo '"'"'a
+W
+git add -A'
+expect 'F8: : a\ #b <<W, тело с открытой кавычкой, затем find .' block \
+': a\ #b <<W
+echo '"'"'a
+W
+find . -delete'
+expect 'F8: : a\ #b <<W, тело с открытой кавычкой, затем rm -rf' block \
+': a\ #b <<W
+echo '"'"'a
+W
+rm -rf /Users/.../IWE/DS-strategy/sessions'
+expect 'F8: : a\ #b <<W, тело с открытой кавычкой, затем git push' block \
+': a\ #b <<W
+echo '"'"'a
+W
+git push --force'
+expect 'F8: : a\ #b <<W, тело с открытой кавычкой, затем git reset' block \
+': a\ #b <<W
+echo '"'"'a
+W
+git reset --hard'
+expect 'F8: : a\ #b <<W, тело с открытой кавычкой, затем git clean' block \
+': a\ #b <<W
+echo '"'"'a
+W
+git clean -fdx'
+expect 'F8: : a\ #b <<W, тело с открытой кавычкой, затем git branch' block \
+': a\ #b <<W
+echo '"'"'a
+W
+git branch -D main'
+expect 'F8: : a\ #b <<W, тело с открытой кавычкой, затем git add' block \
+': a\ #b <<W
+echo '"'"'a
+W
+git add -A'
+expect 'F8: : $(:)#b <<W, тело с открытой кавычкой, затем find .' block \
+': $(:)#b <<W
+echo '"'"'a
+W
+find . -delete'
+expect 'F8: : $(:)#b <<W, тело с открытой кавычкой, затем rm -rf' block \
+': $(:)#b <<W
+echo '"'"'a
+W
+rm -rf /Users/.../IWE/DS-strategy/sessions'
+expect 'F8: : $(:)#b <<W, тело с открытой кавычкой, затем git push' block \
+': $(:)#b <<W
+echo '"'"'a
+W
+git push --force'
+expect 'F8: : $(:)#b <<W, тело с открытой кавычкой, затем git reset' block \
+': $(:)#b <<W
+echo '"'"'a
+W
+git reset --hard'
+expect 'F8: : $(:)#b <<W, тело с открытой кавычкой, затем git clean' block \
+': $(:)#b <<W
+echo '"'"'a
+W
+git clean -fdx'
+expect 'F8: : $(:)#b <<W, тело с открытой кавычкой, затем git branch' block \
+': $(:)#b <<W
+echo '"'"'a
+W
+git branch -D main'
+expect 'F8: : $(:)#b <<W, тело с открытой кавычкой, затем git add' block \
+': $(:)#b <<W
+echo '"'"'a
+W
+git add -A'
+expect 'F10: (( сразу после )' block \
+'f()((1<<W))
+find . -delete
+W'
+expect 'F10: (( после case-метки' block \
+'case x in x)((1<<W));; esac
+git push --force
+W'
+expect 'F10: << внутри <(…)' block \
+': <(: <<W)
+find . -delete
+W'
+expect 'F10: << внутри >(…)' block \
+': >(: <<'"'"'W'"'"')
+git push --force
+W'
+expect 'F10: $( с here-doc, закрытая на следующей строке' block \
+': $( : <<W
+)
+find . -delete
+W'
+expect 'F10: обратные кавычки с here-doc, закрытые на следующей строке' block \
+': `: <<W
+`
+git push --force
+W'
+expect 'F10: << в литерале массива с комментарием' block \
+'x=(a <<W #b
+find . -delete
+W'
+expect 'F10: here-string, затем комментарий' block \
+': x<<<W #b
+find . -delete
+W'
+expect 'F10: here-string и here-doc для bash, обратная коса в теле' block \
+'bash <<< '"'"'x'"'"' <<'"'"'W'"'"'
+git push --force\
+W'
+expect 'F8 контроль: настоящий here-doc с открытой кавычкой в теле остаётся данными' pass \
+'cat <<W
+echo '"'"'a
+W
+git status'
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

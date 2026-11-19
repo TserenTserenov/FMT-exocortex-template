@@ -17,11 +17,48 @@ block() {
 fail_check() {
   block "ошибка проверки destructive-guard ($1) — команда не пропущена. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 }
+# Monotone by construction (WP-529 F275, rc.10 red team F8): the same input also goes, in
+# parallel, through the released guards in destructive-guard.d/ (v0.42.1-rc.6 and rc.8, unchanged
+# but for the hook-directory line), each over the whole text with its own pipeline. The verdict is
+# the strictest of all, so this guard is never looser than those releases on any input, whatever
+# its own parser gets wrong. Without the directory (a test copy of this file alone) only this
+# file decides.
+DG_LEGACY_TMP=
+DG_LEGACY_PIDS=()
+DG_NEW_ASKED=0
+dg_legacy_cleanup() {
+  [ -n "$DG_LEGACY_TMP" ] || return 0
+  kill ${DG_LEGACY_PIDS[@]+"${DG_LEGACY_PIDS[@]}"} 2>/dev/null || true
+  rm -f "$DG_LEGACY_TMP"/* 2>/dev/null || true
+  rmdir "$DG_LEGACY_TMP" 2>/dev/null || true
+  DG_LEGACY_TMP=
+}
+# Called when this guard allows or asks: a legacy block wins, a legacy ask is asked.
+dg_legacy_verdict() {
+  local f n rc asked=
+  [ -n "$DG_LEGACY_TMP" ] || return 0
+  wait ${DG_LEGACY_PIDS[@]+"${DG_LEGACY_PIDS[@]}"} 2>/dev/null || true
+  for f in "$DG_LEGACY_TMP"/*.rc; do
+    [ -e "$f" ] || continue
+    n=${f%.rc}
+    rc=$(cat "$f" 2>/dev/null || echo none)
+    case "$rc" in
+      0) grep -q '"ask"' "$n.out" 2>/dev/null && asked="$n.out" ;;
+      2) cat "$n.err" >&2 2>/dev/null || true; dg_legacy_cleanup; exit 2 ;;
+      *) dg_legacy_cleanup; fail_check "прежняя проверка ${n##*/}, код $rc" ;;
+    esac
+  done
+  if [ -n "$asked" ] && [ "$DG_NEW_ASKED" = 0 ]; then cat "$asked" 2>/dev/null || true; fi
+  dg_legacy_cleanup
+}
 on_exit() {
   local rc=$?
   if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ]; then
+    dg_legacy_cleanup
     fail_check "неожиданный выход, код $rc"
   fi
+  if [ "$rc" -eq 0 ]; then dg_legacy_verdict; fi
+  dg_legacy_cleanup
 }
 trap on_exit EXIT
 
@@ -70,6 +107,22 @@ _safe_timeout() {
 # silently zeroed out $CWD on every invocation (found WP-547, 03.09, while
 # verifying the stash-pop/apply check below, which depends on the real cwd).
 HOOK_INPUT=$(cat 2>/dev/null || true)
+
+DG_LEGACY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/destructive-guard.d"
+if [ -d "$DG_LEGACY_DIR" ]; then
+  DG_LEGACY_TMP=$(mktemp -d "${TMPDIR:-/tmp}/dg-legacy.XXXXXX") || fail_check "mktemp, прежние проверки"
+  for dg_legacy in "$DG_LEGACY_DIR"/*.sh; do
+    [ -f "$dg_legacy" ] || continue
+    dg_name=$(basename "$dg_legacy" .sh)
+    (
+      dg_rc=0
+      printf '%s' "$HOOK_INPUT" | DG_LEGACY_HOOK_DIR="${DG_LEGACY_DIR%/*}" bash "$dg_legacy" \
+        >"$DG_LEGACY_TMP/$dg_name.out" 2>"$DG_LEGACY_TMP/$dg_name.err" || dg_rc=$?
+      echo "$dg_rc" >"$DG_LEGACY_TMP/$dg_name.rc"
+    ) </dev/null >/dev/null 2>&1 &
+    DG_LEGACY_PIDS+=("$!")
+  done
+fi
 
 # Fail-closed on a malformed/schema-invalid envelope (WP-544 Д22, peer session
 # 2026-09-08-25-wp544-continue-f7, Codex). The old `jq ... // empty || true`
@@ -124,7 +177,7 @@ JOIN_CONTINUATIONS_PL='
     # Reads the bodies of @$pending from $$i; returns 0 when a body is not closed.
     my ($s, $i, $pending, $out) = @_;
     my $n = length $s;
-    for my $h (grep { !$_->[3] } @$pending) {
+    for my $h (@$pending) {
       my ($delim, $quoted, $dash) = @$h;
       my $closed = 0;
       while ($$i < $n) {
@@ -155,10 +208,7 @@ JOIN_CONTINUATIONS_PL='
                           # X ${ … }, $(( … )), $[ … ] or (( … )), closed by $close[-1]
     my @depth;            # parentheses open inside each P frame
     my (@close, @xdepth, @xdollar); # closing bracket, brackets open inside, `$((` flag of each X frame
-    my @pending;          # here-docs whose bodies start at the next code newline: [delim, quoted, dash, fake, stack size]
-    # A here-doc opened inside $( … ) or a backquote that closes on the same line has no body for
-    # the lines after it (`: $( (:) <<W )`): those lines are commands (rc.8 red team, F6).
-    my $closed_frame = sub { $_->[3] = 1 for grep { $_->[4] > @stack } @pending; };
+    my @pending;          # here-docs whose bodies start at the next code newline
     my $push_x = sub { my ($close, $dollar) = @_; push @stack, q{X}; push @xdepth, 0; push @close, $close; push @xdollar, $dollar; };
     my $word_start = 1;
     my $n = length $s;
@@ -189,7 +239,6 @@ JOIN_CONTINUATIONS_PL='
       }
       if ($s =~ /\G\n/gc) {
         $out .= "\n"; $word_start = 1;
-        @pending = grep { !$_->[3] } @pending;
         if (@pending) {
           my $i = pos($s);
           return undef unless body_lines($s, \$i, \@pending, \$out);
@@ -207,7 +256,12 @@ JOIN_CONTINUATIONS_PL='
       if ($s =~ /\G(?:\$\(\(|\$\{|\$\[)/gc) { $xo = $&; }
       elsif (substr($s, pos($s), 2) eq "((") {
         my $back = length($out) > 16 ? substr($out, -16) : $out;
-        if ($back =~ /(?:^|[\s;&|(!{])(?:(?:if|elif|while|until|for|then|do|else|time|coproc)[ \t]*)?\z/) { $xo = "(("; pos($s) += 2; }
+        if ($back =~ /(?:^|[\s;&|()!{])(?:(?:if|elif|while|until|for|then|do|else|time|coproc)[ \t]*)?\z/) { $xo = "(("; pos($s) += 2; }
+      }
+      elsif (substr($s, pos($s), 1) eq "(") {
+        # An array literal `x=(…)` (rc.10 red team, F10).
+        my $back = length($out) > 64 ? substr($out, -64) : $out;
+        if ($back =~ /(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*\+?=\z/) { $xo = "("; pos($s) += 1; }
       }
       elsif (substr($s, pos($s), 1) eq "[") {
         my $back = length($out) > 64 ? substr($out, -64) : $out;
@@ -218,16 +272,16 @@ JOIN_CONTINUATIONS_PL='
         $push_x->(substr($xo, -1) eq "{" ? "}" : substr($xo, -1) eq "[" ? "]" : ")", $xo eq "\$((" ? 1 : 0);
         $word_start = $xo =~ /\(\z/ ? 1 : 0; next;
       }
-      if ($s =~ /\G\$\(/gc) { $out .= q{$(}; push @stack, q{P}; push @depth, 0; $word_start = 1; next; }
+      if ($s =~ /\G(?:\$|[<>])\(/gc) { $out .= $&; push @stack, q{P}; push @depth, 0; $word_start = 1; next; }
       if ($s =~ /\G`/gc) {
         $out .= "`";
-        if ($top eq q{B}) { pop @stack; $closed_frame->(); $word_start = 0; } else { push @stack, q{B}; $word_start = 1; }
+        if ($top eq q{B}) { pop @stack; $word_start = 0; } else { push @stack, q{B}; $word_start = 1; }
         next;
       }
       if ($top eq q{P} && $s =~ /\G([()])/gc) {
         $out .= $1;
         if ($1 eq "(") { $depth[-1]++; $word_start = 1; next; }
-        if ($depth[-1]) { $depth[-1]--; } else { pop @stack; pop @depth; $closed_frame->(); }
+        if ($depth[-1]) { $depth[-1]--; } else { pop @stack; pop @depth; }
         $word_start = 0; next;
       }
       if ($top eq q{X} && $s =~ /\G[(){}\[\]]/gc) {
@@ -244,12 +298,15 @@ JOIN_CONTINUATIONS_PL='
           else {
             # `))` closes an arithmetic frame; a single `)` ends it as well.
             $out .= ")" if $c eq ")" && $s =~ /\G\)/gc;
-            pop @stack; pop @xdepth; pop @close; pop @xdollar; $closed_frame->();
+            pop @stack; pop @xdepth; pop @close; pop @xdollar;
           }
         }
         $word_start = $c eq "(" ? 1 : 0; next;
       }
-      if ($heredocs && !@close && $s =~ /\G<<(?!<)(-?)[ \t]*/gc) {
+      # A here-doc opens a body only at command level: one inside $(…), a backquote, <(…) or an
+      # expansion may close before its body, and shells disagree (rc.10 red team, F10).
+      if ($s =~ /\G<<</gc) { $out .= "<<<"; $word_start = 1; next; }
+      if ($heredocs && $top eq q{N} && $s =~ /\G<<(?!<)(-?)[ \t]*/gc) {
         my $dash = $1 eq q{-};
         $out .= $&;
         # The delimiter word: quotes and backslashes make it quoted; a continuation inside is joined.
@@ -262,7 +319,7 @@ JOIN_CONTINUATIONS_PL='
           if ($s =~ /\G[^\s;&|()<>\\\x27"]+/gc) { $out .= $&; $delim .= $&; next; }
           last;
         }
-        push @pending, [ $delim, $quoted, $dash, 0, scalar @stack ];
+        push @pending, [ $delim, $quoted, $dash ];
         $word_start = 0; next;
       }
       if ($top eq q{X} && $s =~ /\G[^\\\n#\x27"`\$()<{}\[\]]+/gc) {
@@ -273,7 +330,7 @@ JOIN_CONTINUATIONS_PL='
       }
       $s =~ /\G./gcs; $out .= $&; $word_start = $& =~ /[\s;&|()<>]/ ? 1 : 0;
     }
-    return undef if grep { !$_->[3] } @pending;
+    return undef if @pending;
     # A single quote left open: bash stops with a syntax error there, but the passes below may
     # still read the text differently, so the call is joined again with quotes ignored.
     return ($out, scalar grep { $_ eq q{S} || $_ eq q{A} } @stack);
@@ -316,12 +373,10 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   # exit 0, bypassing every check below it). Stdin has no such limit.
   my $text = do { local $/; <STDIN> };
   my @lines = split(/\n/, $text, -1);
-  # Set when a `<<` was not taken for a here-doc: inside ${…}, $((…)), $[…], ((…)) or an array
-  # subscript (rc.6 red team, F4), in a comment, or in $(…) or a backquote closed on its line (rc.8, F6).
+  # Set when a `<<` was not taken for a here-doc: inside ${…}, $((…)), $[…], ((…)), an array
+  # subscript or literal (rc.6 red team, F4; rc.10, F10), in a comment, or in $(…), <(…) or a
+  # backquote (rc.8, F6; rc.10, F10).
   my $shift_in_expansion = 0;
-  # 1 while the text is read as rc.6 read it (every `<<` a here-doc, no comments): used only to fail
-  # closed when that reading leaves a body open (rc.8 red team, F5).
-  my $legacy = 0;
   # Скан состояния кавычек — чистая функция (состояние, текст): заголовок с
   # переносами сканируется инкрементально, каждый новый сегмент один раз,
   # состояние переносится между итерациями. Прежняя continued_header заново
@@ -338,9 +393,9 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
         undef $quote if $char eq ($quote eq "a" ? chr(39) : $quote);
       } elsif ($char eq "\\" && $i + 1 < length($line)) {
         $i++;
-      } elsif (!$legacy && $char eq "#" && ($i == 0 || substr($line, $i - 1, 1) =~ /[\s;&|()<>`]/)) {
+      } elsif ($char eq "#" && ($i == 0 || substr($line, $i - 1, 1) =~ /[\s;&|()<>`]/)) {
         return (undef, 1);
-      } elsif (!$legacy && $char eq chr(39) && $i && substr($line, $i - 1, 1) eq "\$") {
+      } elsif ($char eq chr(39) && $i && substr($line, $i - 1, 1) eq "\$") {
         $quote = "a";
       } elsif ($char eq chr(39) || $char eq q{"}) {
         $quote = $char;
@@ -486,7 +541,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       my $char = substr($line, $i, 1);
       if (defined $quote) {
         if ($quote ne chr(39) && $char eq "\\" && $i + 1 < length($line)) { $i++; next; }
-        if (!$legacy && $quote eq q{"} && $char eq "\$" && substr($line, $i + 1, 1) eq "{") {
+        if ($quote eq q{"} && $char eq "\$" && substr($line, $i + 1, 1) eq "{") {
           # `"${x:-"<<EOF"}"`: the word of ${…} has quotes of its own (rc.8 red team, F6).
           push @$expansions, { close => "}", skip => 0, depth => 0, requote => q{"} };
           undef $quote; $i++; next;
@@ -495,39 +550,44 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
         next;
       }
       if ($char eq "\\" && $i + 1 < length($line)) { $i++; next; }
-      unless ($legacy) {
-        if ($char eq "`") { $in_bq = !$in_bq; next; }
-        # A comment: a `<<` or a quote in it means nothing; in backquotes it ends at the backquote.
-        # Inside ${…} and the like `#` starts no comment. A `<<` after it sends the text to the
-        # rc.6 check below (fail closed).
-        if ($char eq "#" && ($i == 0 || substr($line, $i - 1, 1) =~ /[\s;&|()<>`]/)
-            && !grep { !$_->{comsub} } @$expansions) {
-          $shift_in_expansion = 1 if index($line, "<<", $i) >= 0;
-          last unless $in_bq;
-          my $e = index($line, "`", $i);
-          last if $e < 0;
-          $i = $e - 1; next;
-        }
-        if ($char eq chr(39) && $i && substr($line, $i - 1, 1) eq "\$") { $quote = "a"; next; }
+      if ($char eq "`") { $in_bq = !$in_bq; next; }
+      # A comment: a `<<` or a quote in it means nothing; in backquotes it ends at the backquote.
+      # Inside ${…} and the like `#` starts no comment; in an array literal it does.
+      if ($char eq "#" && ($i == 0 || substr($line, $i - 1, 1) =~ /[\s;&|()<>`]/)
+          && !grep { !$_->{comsub} && !$_->{array} } @$expansions) {
+        $shift_in_expansion = 1 if index($line, "<<", $i) >= 0;
+        last unless $in_bq;
+        my $e = index($line, "`", $i);
+        last if $e < 0;
+        $i = $e - 1; next;
       }
+      if ($char eq chr(39) && $i && substr($line, $i - 1, 1) eq "\$") { $quote = "a"; next; }
       if ($char eq chr(39) || $char eq q{"}) { $quote = $char; next; }
-      # Open expansions ${…}, $((…)), $[…], ((…)) (also after for/if/while…), an array subscript
-      # x[…] or x=([…]=…), and command substitutions $(…), kept across lines in @$expansions: a `<<`
-      # inside one is not a here-doc, nor is one in a $(…) closed on its own line. Only tracked here;
-      # the group logic below is unchanged.
-      if (!$legacy && $char =~ /[\$(){}\[\]]/) {
+      # Open expansions ${…}, $((…)), $[…], ((…)) (also after for/if/while/`)`…), array subscripts
+      # x[…] and literals x=(…), command and process substitutions $(…), <(…), >(…), kept across
+      # lines in @$expansions: a `<<` inside one is not a here-doc. Only tracked here; the group
+      # logic below is unchanged.
+      if ($char =~ /[\$(){}\[\]]/) {
         my $top = @$expansions ? $expansions->[-1] : undef;
         my $two = substr($line, $i, 2);
         if ($char eq "\$" && substr($line, $i + 1, 2) eq "((") { push @$expansions, { close => ")", skip => 2, depth => 0, arith => 1, dollar => 1 }; }
-        elsif ($two eq "\$(") { push @$expansions, { close => ")", skip => 1, depth => 0, comsub => 1 }; }
+        elsif ($two eq "\$(" || ($char eq "(" && $i && substr($line, $i - 1, 1) =~ /[<>]/)) {
+          # $(…) and a process substitution <(…), >(…) (rc.10 red team, F10).
+          push @$expansions, { close => ")", skip => 1, depth => 0, comsub => 1 };
+        }
         elsif ($two eq "\$\{" || $two eq "\$[") { push @$expansions, { close => substr($two, 1) eq "{" ? "}" : "]", skip => 1, depth => 0 }; }
         elsif ($two eq "((" && !($top && $top->{skip})
-               && substr($line, $i > 16 ? $i - 16 : 0, $i > 16 ? 16 : $i) =~ /(?:^|[\s;&|(!{])(?:(?:if|elif|while|until|for|then|do|else|time|coproc)[ \t]*)?$/) {
+               && substr($line, $i > 16 ? $i - 16 : 0, $i > 16 ? 16 : $i) =~ /(?:^|[\s;&|()!{])(?:(?:if|elif|while|until|for|then|do|else|time|coproc)[ \t]*)?$/) {
           push @$expansions, { close => ")", skip => 2, depth => 0, arith => 1 };
         }
         elsif ($char eq "[" && !($top && $top->{close} eq "]")
                && substr($line, $i > 64 ? $i - 64 : 0, $i > 64 ? 64 : $i) =~ /(?:(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*|[A-Za-z0-9_]\+?=\()$/) {
           push @$expansions, { close => "]", skip => 1, depth => 0 };
+        }
+        elsif ($char eq "(" && !($top && $top->{skip})
+               && substr($line, $i > 64 ? $i - 64 : 0, $i > 64 ? 64 : $i) =~ /(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*\+?=$/) {
+          # An array literal x=(…) (rc.10 red team, F10).
+          push @$expansions, { close => ")", skip => 1, depth => 0, array => 1 };
         }
         if ($top = @$expansions ? $expansions->[-1] : undef) {
           my $open = { ")" => "(", "}" => "{", "]" => "[" }->{$top->{close}};
@@ -540,7 +600,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
               $top->{arith} = 0; $top->{comsub} = 1;
             }
             else {
-              pop @$expansions; $top->{closed} = 1;
+              pop @$expansions;
               $swallow_at = $i + 1 if $top->{arith} && substr($line, $i + 1, 1) eq ")";
               if ($top->{requote}) { $quote = $top->{requote}; next; }
             }
@@ -573,12 +633,10 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
         next;
       }
       next unless substr($line, $i, 2) eq "<<";
-      next if substr($line, $i, 3) eq "<<<";
-      my $in_comsub;
-      if (@$expansions) {
-        if (grep { !$_->{comsub} } @$expansions) { $shift_in_expansion = 1; next; }
-        $in_comsub = $expansions->[-1];
-      }
+      if (substr($line, $i, 3) eq "<<<") { $i += 2; next; }
+      # A here-doc opens a body only at command level: inside an expansion, $(…), <(…) or a
+      # backquote it may close before its body, and shells disagree (rc.10 red team, F10).
+      if (@$expansions || $in_bq) { $shift_in_expansion = 1; next; }
       my $tail = substr($line, $i);
       next unless $tail =~ /^<<(-?)\s*(?!<)(?:([\x27"])([A-Za-z_][A-Za-z0-9_]*)\2|([A-Za-z_][A-Za-z0-9_]*))/;
       my $match_length = length($&);
@@ -611,7 +669,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       for my $stage (@right_stages[1 .. $#right_stages]) {
         $keep ||= heredoc_recipient($stage);
       }
-      push @specs, { indent => $indent, delim => $delim, keep => $keep, in => $in_comsub, bq => $in_bq };
+      push @specs, { indent => $indent, delim => $delim, keep => $keep };
       $last_heredoc_end = $i + $match_length;
       $i += $match_length - 1;
     }
@@ -627,10 +685,6 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       $frame->{source} .= substr($line, $frame->{line_start}) . "\n";
       $frame->{line_start} = 0;
     }
-    # A here-doc in $(…) or a backquote closed on this line has no body on the next lines.
-    my $opened = @specs;
-    @specs = grep { !(($_->{in} && $_->{in}{closed}) || ($_->{bq} && !$in_bq)) } @specs;
-    $shift_in_expansion = 1 if @specs < $opened;
     return (\@specs, $quote, $group_depth);
   }
 
@@ -678,18 +732,10 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   }
   return (scalar @pending, $empty_body, \@out);
   }
+  # One reading only: the released guards in destructive-guard.d/ read the text their own way, and
+  # the strictest verdict wins (rc.10 red team, F8: two readings joined into one text let the open
+  # quote of one swallow the other).
   my ($left, $empty_body, $out) = reduce();
-  # Where this reading can differ from rc.6 (comments, $\x27…\x27, `<<`, ${…}), the text is also read as
-  # rc.6 read it, and both readings are scanned: a body rc.6 left open sends the whole text to the
-  # checks, and lines rc.6 joined or kept differently are added. This reading is never the looser
-  # one (rc.8 red team, F5: a comment line ending in a backslash, `${x:- #}`, `@(#a|b)`).
-  if (!$left && $text =~ /[#`]|\$\x27|<<|\$\{/) {
-    $legacy = 1;
-    my ($left6, $empty6, $out6) = reduce();
-    $legacy = 0;
-    if ($left6) { $left = 1; }
-    elsif (join("\n", @$out6) ne join("\n", @$out)) { push @$out, @$out6; $empty_body ||= $empty6; }
-  }
   # An unterminated body means this was not a heredoc at all (an arithmetic
   # shift, a quoted "<<" in prose): stripping there would hide real commands,
   # so the whole reduction is discarded rather than trusted.
@@ -2205,6 +2251,7 @@ fi
 # Not forbidden, but not for silent approval either: ask the person (issue #1568). Emitted last,
 # after every block above has had its say.
 if [ -n "${ASK_REASON:-}" ]; then
+  DG_NEW_ASKED=1
   jq -n --arg reason "$ASK_REASON" \
     '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $reason}}' \
     || fail_check "jq, ответ с запросом"
