@@ -3,7 +3,8 @@
 Two sources of unapproved names are reported per file:
 * a local-glossary candidate whose Russian form occurs in the source;
 * a name the model chose for a system term outside the glossary (declared by
-  the model in an <unlisted_terms> block).
+  the model in an <unlisted_terms> block, or recovered from a bold Russian
+  name when the model left it off that list).
 """
 
 from __future__ import annotations
@@ -104,6 +105,75 @@ def test_report_names_local_candidates_and_model_choices_but_not_glossary_terms(
             "source": "model",
         },
     ]
+
+
+def test_bold_role_omitted_by_the_model_is_still_reported():
+    """Acceptance of iwesys/iwe-dev CONTRIBUTING.md: three role names were silent."""
+    source = (
+        "- **Постановщик** — оформляет нужду.\n"
+        "- **Архитектор** — проходит проверки.\n"
+        "- **Исполнитель** — ведёт задачу.\n"
+        "- **Верификатор** — проверяет результат.\n"
+    )
+    translated = (
+        "- **Task Formulator** — turns a need into a card.\n"
+        "- **Architect** — passes checks.\n"
+        "- **Work Executor** — moves the task.\n"
+        "- **Verifier** — checks the result.\n"
+    )
+    items = translate.unapproved_report_items(
+        "CONTRIBUTING.md",
+        source,
+        glossary={
+            "Исполнитель работы": "Work Executor",
+            "Верификатор допуска": "Admission class verifier",
+            "Артефактор-Постановщик задач IWE": "IWE Task Formulator",
+        },
+        unapproved={},
+        unlisted=[],
+        translated=translated,
+    )
+    assert [(it["term_ru"], it["term_en"]) for it in items] == [
+        ("Постановщик", "Task Formulator"),
+        ("Архитектор", "Architect"),
+        ("Верификатор", "Verifier"),
+    ]
+
+
+def test_bold_name_already_confessed_is_not_duplicated():
+    source = "- **Ведущий разработчик** — согласует вливание.\n"
+    translated = "- **Lead Developer** — approves the merge.\n"
+    items = translate.unapproved_report_items(
+        "CONTRIBUTING.md",
+        source,
+        glossary={},
+        unapproved={},
+        unlisted=[("Ведущий разработчик", "Lead Developer")],
+        translated=translated,
+    )
+    assert items == [{
+        "file": "CONTRIBUTING.md",
+        "term_ru": "Ведущий разработчик",
+        "term_en": "Lead Developer",
+        "source": "model",
+    }]
+
+
+def test_unpaired_bold_spans_leave_the_english_unnamed():
+    items = translate.unapproved_report_items(
+        "a.md",
+        "- **Постановщик** — роль.\n",
+        glossary={},
+        unapproved={},
+        unlisted=[],
+        translated="A paragraph with no bold span.\n",
+    )
+    assert items == [{
+        "file": "a.md",
+        "term_ru": "Постановщик",
+        "term_en": "не названо",
+        "source": "model",
+    }]
 
 
 def test_local_candidate_only_in_code_is_not_reported():
