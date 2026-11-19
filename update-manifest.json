@@ -281,7 +281,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-windows-smoke.sh",
-      "sha256": "e312066948d19848617ce789f3ba4226e1c4942911312b983961874468ffbcae"
+      "sha256": "238f23bd354871032944979b8d53d7ac60e3be2ce9ba369091e68f58d11a3ea6"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-mcp-guard-malformed-json.sh",

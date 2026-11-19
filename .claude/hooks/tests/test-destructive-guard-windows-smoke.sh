@@ -43,6 +43,15 @@ leftover=$(ls -d "${TMPDIR:-/tmp}"/dg-legacy.* 2>/dev/null | wc -l | tr -d ' ')
 echo "dg-legacy folders in TMPDIR after the run: $leftover"
 
 if [ "$FAILS" -gt 0 ]; then
+  # Diagnostics: each released guard alone on the F8 text, and the runner as the hook starts it.
+  input=$(jq -n --arg c "$F8" --arg d "$ROOT" '{tool_name: "Bash", tool_input: {command: $c}, cwd: $d}')
+  for g in "$(dirname "$HOOK")"/destructive-guard.d/*.sh; do
+    printf '%s' "$input" | DG_LEGACY_HOOK_DIR="$(dirname "$HOOK")" bash "$g" >/dev/null 2>"$OTHER.e"; rc=$?
+    echo "diag: $(basename "$g") alone -> exit $rc $(head -c 200 "$OTHER.e")"
+  done
+  rm -f "$OTHER.e"
+  command -v bash perl jq; perl -v | sed -n 2p
+  perl -MPOSIX -e 'my $p = fork(); if (!$p) { setpgrp(0, 0); exec("bash", "-c", "exit 7"); } my $w = 0; for (1 .. 400) { $w = waitpid($p, POSIX::WNOHANG()); last if $w == $p; select(undef, undef, undef, 0.01); } print "diag: fork/waitpid -> w=$w st=", $? >> 8, "\n";'
   echo "FAILED: $FAILS"
   exit 1
 fi
