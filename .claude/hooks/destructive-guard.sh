@@ -3,6 +3,10 @@
 # push/reset/clean), filesystem (recursive forced rm — only through
 # .claude/bin/guarded-rm), prod DB (psql DROP/TRUNCATE/DELETE without WHERE),
 # GitHub repo deletion. Exit 2 = block.
+# A start file in BASH_ENV or ENV runs before this line and could redefine its commands: run again
+# without it (rc.11 red team F12). Whoever sets the hook's environment can still bypass it, as with
+# CC_ALLOW_DESTRUCTIVE_INPUT.
+if [ -n "${BASH_ENV-}${ENV-}" ]; then exec env -u BASH_ENV -u ENV bash "${BASH_SOURCE[0]}"; fi
 set -euo pipefail
 
 block() {
@@ -18,34 +22,58 @@ fail_check() {
   block "ошибка проверки destructive-guard ($1) — команда не пропущена. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 }
 # Monotone by construction (WP-529 F275, rc.10 red team F8): the same input also goes, in
-# parallel, through the released guards in destructive-guard.d/ (v0.42.1-rc.6 and rc.8, unchanged
-# but for the hook-directory line), each over the whole text with its own pipeline. The verdict is
-# the strictest of all, so this guard is never looser than those releases on any input, whatever
-# its own parser gets wrong. Without the directory (a test copy of this file alone) only this
-# file decides.
+# parallel, through the released guards in destructive-guard.d/ (v0.42.1-rc.6, rc.8 and rc.10,
+# unchanged but for the hook-directory line), each over the whole text with its own pipeline. The
+# verdict is the strictest of all, so this guard is never looser than those releases on any input,
+# whatever its own parser gets wrong. Every failure of that floor blocks (rc.11 red team F12): the
+# folder or a file missing, changed (sha256 below) or unreadable; a run that gives no verdict, a
+# verdict other than allow, ask or block, or runs over DG_LEGACY_LIMIT seconds. Each run is its own
+# process group, killed when the hook ends or is killed; its temporary folder is removed.
+DG_LEGACY_NAMES=(v0.42.1-rc.6 v0.42.1-rc.8 v0.42.1-rc.10)
+DG_LEGACY_SHA256=(
+  3a5f36125a7e25ec21c15e3257cf2f49d962ff9a81de52535684a04a69b72fa0
+  9e62ba99f07f36465c7dbf92fccd345b85e270d99e77236425ee4f492e8a676d
+  be3698952655a6ea720310b4bd76c90ce9888fab2536b96687e5d359e43d66a7
+)
+DG_LEGACY_LIMIT=45
 DG_LEGACY_TMP=
 DG_LEGACY_PIDS=()
 DG_NEW_ASKED=0
+DG_LEGACY_BYPASS=0
 dg_legacy_cleanup() {
+  local pid n
+  for pid in ${DG_LEGACY_PIDS[@]+"${DG_LEGACY_PIDS[@]}"}; do
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  DG_LEGACY_PIDS=()
   [ -n "$DG_LEGACY_TMP" ] || return 0
-  kill ${DG_LEGACY_PIDS[@]+"${DG_LEGACY_PIDS[@]}"} 2>/dev/null || true
-  rm -f "$DG_LEGACY_TMP"/* 2>/dev/null || true
+  for n in input "${DG_LEGACY_NAMES[@]}"; do
+    rm -f "$DG_LEGACY_TMP/$n" "$DG_LEGACY_TMP/$n.out" "$DG_LEGACY_TMP/$n.err" "$DG_LEGACY_TMP/$n.rc" "$DG_LEGACY_TMP/$n.rc.tmp" 2>/dev/null || true
+  done
   rmdir "$DG_LEGACY_TMP" 2>/dev/null || true
   DG_LEGACY_TMP=
 }
-# Called when this guard allows or asks: a legacy block wins, a legacy ask is asked.
+# Called when this guard allows or asks: every released guard must have answered allow, ask or
+# block; a block wins, an ask is asked, anything else blocks.
 dg_legacy_verdict() {
-  local f n rc asked=
-  [ -n "$DG_LEGACY_TMP" ] || return 0
+  local n rc base asked=
+  if [ -z "$DG_LEGACY_TMP" ]; then
+    [ "$DG_LEGACY_BYPASS" = 1 ] && return 0
+    fail_check "прежние проверки не запущены"
+  fi
   wait ${DG_LEGACY_PIDS[@]+"${DG_LEGACY_PIDS[@]}"} 2>/dev/null || true
-  for f in "$DG_LEGACY_TMP"/*.rc; do
-    [ -e "$f" ] || continue
-    n=${f%.rc}
-    rc=$(cat "$f" 2>/dev/null || echo none)
+  for n in "${DG_LEGACY_NAMES[@]}"; do
+    base="$DG_LEGACY_TMP/$n"
+    rc=$(cat "$base.rc" 2>/dev/null || true)
     case "$rc" in
-      0) grep -q '"ask"' "$n.out" 2>/dev/null && asked="$n.out" ;;
-      2) cat "$n.err" >&2 2>/dev/null || true; dg_legacy_cleanup; exit 2 ;;
-      *) dg_legacy_cleanup; fail_check "прежняя проверка ${n##*/}, код $rc" ;;
+      0)
+        if [ -s "$base.out" ]; then
+          jq -e '.hookSpecificOutput.permissionDecision == "ask"' "$base.out" >/dev/null 2>&1 \
+            || { dg_legacy_cleanup; fail_check "прежняя проверка $n: неожиданный ответ"; }
+          asked="$base.out"
+        fi ;;
+      2) cat "$base.err" >&2 2>/dev/null || true; dg_legacy_cleanup; exit 2 ;;
+      *) dg_legacy_cleanup; fail_check "прежняя проверка $n, итог «${rc:-нет}»" ;;
     esac
   done
   if [ -n "$asked" ] && [ "$DG_NEW_ASKED" = 0 ]; then cat "$asked" 2>/dev/null || true; fi
@@ -61,6 +89,14 @@ on_exit() {
   dg_legacy_cleanup
 }
 trap on_exit EXIT
+# Killed while waiting (a harness timeout): the legacy runs go with it, and the answer is a block.
+trap 'dg_legacy_cleanup; exit 2' TERM INT HUP
+# The caller's shell settings must not change how this file reads the text (rc.11 red team F12:
+# SHELLOPTS=noglob reached the hook).
+set +f
+shopt -u nullglob failglob 2>/dev/null || true
+unset GLOBIGNORE CDPATH
+IFS=$' \t\n'
 
 # matches TEXT <grep options and pattern...> — 0 = match, 1 = no match. A grep or printf that
 # FAILS (exit code 2 or more: a broken binary, a bad pattern) is a failed check and blocks;
@@ -83,7 +119,7 @@ matches() {
 # (there it is -n) is acceptable for existing code, but should not be copied into a new one
 # (Codex peer review, WP-544 Phase 1, 20.08): -n would let CC_ALLOW_DESTRUCTIVE_INPUT=0 through as a bypass.
 # First thing, before parsing the input: the pilot's bypass must work even with a broken jq.
-[ "${CC_ALLOW_DESTRUCTIVE_INPUT:-}" = "1" ] && exit 0
+[ "${CC_ALLOW_DESTRUCTIVE_INPUT:-}" = "1" ] && { DG_LEGACY_BYPASS=1; exit 0; }
 
 # Portable timeout (same helper as rule-engine.sh:_safe_timeout — kept local,
 # not sourced, since this hook has no other dependency on rule-engine.sh).
@@ -108,21 +144,70 @@ _safe_timeout() {
 # verifying the stash-pop/apply check below, which depends on the real cwd).
 HOOK_INPUT=$(cat 2>/dev/null || true)
 
-DG_LEGACY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/destructive-guard.d"
-if [ -d "$DG_LEGACY_DIR" ]; then
-  DG_LEGACY_TMP=$(mktemp -d "${TMPDIR:-/tmp}/dg-legacy.XXXXXX") || fail_check "mktemp, прежние проверки"
-  for dg_legacy in "$DG_LEGACY_DIR"/*.sh; do
-    [ -f "$dg_legacy" ] || continue
-    dg_name=$(basename "$dg_legacy" .sh)
-    (
-      dg_rc=0
-      printf '%s' "$HOOK_INPUT" | DG_LEGACY_HOOK_DIR="${DG_LEGACY_DIR%/*}" bash "$dg_legacy" \
-        >"$DG_LEGACY_TMP/$dg_name.out" 2>"$DG_LEGACY_TMP/$dg_name.err" || dg_rc=$?
-      echo "$dg_rc" >"$DG_LEGACY_TMP/$dg_name.rc"
-    ) </dev/null >/dev/null 2>&1 &
-    DG_LEGACY_PIDS+=("$!")
-  done
-fi
+# The folder is found from the real path of this file, so a hook reached through a symlink still
+# finds it. Each file is checked against its sha256 before it runs.
+DG_HOOK_REAL_DIR=$(perl -MCwd=abs_path -MFile::Basename=dirname -e 'my $p = abs_path($ARGV[0]); print dirname($p) if defined $p' -- "${BASH_SOURCE[0]}") \
+  || fail_check "perl, путь хука"
+[ -n "$DG_HOOK_REAL_DIR" ] || fail_check "путь хука не найден"
+DG_LEGACY_DIR="$DG_HOOK_REAL_DIR/destructive-guard.d"
+DG_LEGACY_CHECK=$(perl -MDigest::SHA -e '
+  my $dir = shift;
+  while (@ARGV) {
+    my ($name, $want) = (shift, shift);
+    my $f = "$dir/$name.sh";
+    if (-l $f || !-f $f || !-r $f) { print "$name: нет файла"; exit 0; }
+    my $sha = Digest::SHA->new(256);
+    eval { $sha->addfile($f); 1 } or do { print "$name: не читается"; exit 0; };
+    if ($sha->hexdigest ne $want) { print "$name: изменён"; exit 0; }
+  }
+  print "OK";
+' -- "$DG_LEGACY_DIR" "${DG_LEGACY_NAMES[0]}" "${DG_LEGACY_SHA256[0]}" "${DG_LEGACY_NAMES[1]}" "${DG_LEGACY_SHA256[1]}" \
+  "${DG_LEGACY_NAMES[2]}" "${DG_LEGACY_SHA256[2]}") || fail_check "perl, проверка прежних проверок"
+[ "$DG_LEGACY_CHECK" = OK ] || block "прежние проверки в $DG_LEGACY_DIR не в порядке (${DG_LEGACY_CHECK}) — без них проверка опасных команд не работает, команда не пропущена. Восстанови папку обновлением (update.sh). Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+# One run: the released guard in its own process group, the shell settings of the caller removed.
+# The runner writes the exit code to NAME.rc when the guard ends; "timeout" past the time limit,
+# "orphan" when the hook is gone. Killed (TERM), or on either of those, it kills the whole group
+# of the guard, so no process of it outlives the hook.
+DG_LEGACY_RUN_PL='
+  use strict; use warnings; use POSIX ();
+  my ($guard, $hookdir, $in, $out, $err, $rcf, $limit) = @ARGV;
+  my $parent = getppid();
+  delete @ENV{qw(BASH_ENV ENV SHELLOPTS BASHOPTS GLOBIGNORE CDPATH IFS POSIXLY_CORRECT)};
+  $ENV{DG_LEGACY_HOOK_DIR} = $hookdir;
+  my $put = sub {
+    open(my $fh, ">", "$rcf.tmp") or return;
+    print $fh "$_[0]\n"; close $fh; rename("$rcf.tmp", $rcf);
+  };
+  my $pid = fork();
+  defined $pid or exit 1;
+  if (!$pid) {
+    setpgrp(0, 0);
+    open(STDIN, "<", $in) and open(STDOUT, ">", $out) and open(STDERR, ">", $err) or POSIX::_exit(127);
+    exec("bash", $guard) or POSIX::_exit(127);
+  }
+  my $stop = sub { kill("KILL", -$pid); kill("KILL", $pid); waitpid($pid, 0); };
+  $SIG{TERM} = $SIG{INT} = $SIG{HUP} = sub { $stop->(); exit 0; };
+  my $deadline = time() + $limit;
+  while (1) {
+    if (waitpid($pid, POSIX::WNOHANG()) == $pid) {
+      my $st = $?;
+      $put->(($st & 127) ? 128 + ($st & 127) : $st >> 8);
+      kill("KILL", -$pid);
+      exit 0;
+    }
+    if (time() > $deadline) { $stop->(); $put->("timeout"); exit 0; }
+    if (getppid() != $parent) { $stop->(); exit 0; }
+    select(undef, undef, undef, 0.005);
+  }
+'
+DG_LEGACY_TMP=$(mktemp -d "${TMPDIR:-/tmp}/dg-legacy.XXXXXX") || fail_check "mktemp, прежние проверки"
+printf '%s' "$HOOK_INPUT" >"$DG_LEGACY_TMP/input" || fail_check "запись входа прежних проверок"
+for dg_name in "${DG_LEGACY_NAMES[@]}"; do
+  perl -e "$DG_LEGACY_RUN_PL" -- "$DG_LEGACY_DIR/$dg_name.sh" "$DG_HOOK_REAL_DIR" "$DG_LEGACY_TMP/input" \
+    "$DG_LEGACY_TMP/$dg_name.out" "$DG_LEGACY_TMP/$dg_name.err" "$DG_LEGACY_TMP/$dg_name.rc" "$DG_LEGACY_LIMIT" \
+    </dev/null >/dev/null 2>&1 &
+  DG_LEGACY_PIDS+=("$!")
+done
 
 # Fail-closed on a malformed/schema-invalid envelope (WP-544 Д22, peer session
 # 2026-09-08-25-wp544-continue-f7, Codex). The old `jq ... // empty || true`
