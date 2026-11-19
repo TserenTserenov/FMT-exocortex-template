@@ -981,7 +981,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "16081bfdd29442ffcf256a24bcb36013d12ef2f0d3dd3b7485a96d148aa897cb"
+      "sha256": "8e9fb65b283266a9d6bc6f57e41b1c0c7093865f2a290bfe616425a613ec9b56"
     },
     {
       "path": "CLAUDE.md",
@@ -1085,7 +1085,7 @@
     },
     {
       "path": "docs/SETUP-GUIDE.md",
-      "sha256": "a669827d98d45682014521ec9ded33975638d84f8c83c933dbcecd07b84f28fa"
+      "sha256": "5f53da5e85791d2a4ee81ada60cd6ad5e80da13a22c0abf3679ad6d696952f6c"
     },
     {
       "path": "docs/VERIFY-KNOWLEDGE-MCP.md",
