@@ -1,5 +1,190 @@
-files_translated: []
-last_run_utc: '2026-11-19T08:34:08Z'
-last_synced_sha: 241a57deedf7abc54a2f10db4d60b144d680a3b6
+files_translated:
+- docs/SETUP-GUIDE.md
+last_run_utc: '2026-11-19T09:28:31Z'
+last_synced_sha: 980ed6ba86f71fb384149840e8f7158b2a78bddd
 schema_version: 1
-unapproved_terms: []
+unapproved_terms:
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Architecture
+  term_ru: Архитектура
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Closing
+  term_ru: Закрытие
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Knowledge
+  term_ru: Знание
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Integration
+  term_ru: Интеграция
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Interface
+  term_ru: Интерфейс
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Component
+  term_ru: Компонент
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Configuration
+  term_ru: Конфигурация
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Manifest
+  term_ru: Манифест
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Method
+  term_ru: Метод
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Module
+  term_ru: Модуль
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Skill
+  term_ru: Навык
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Operation
+  term_ru: Операция
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Opening
+  term_ru: Открытие
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Pack
+  term_ru: Пак
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Memory
+  term_ru: Память
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Persona
+  term_ru: Персона
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Platform
+  term_ru: Платформа
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Priority
+  term_ru: Приоритет
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Progress
+  term_ru: Прогресс
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Protocol
+  term_ru: Протокол
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Profile
+  term_ru: Профиль
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Review
+  term_ru: Ревью
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Registry
+  term_ru: Реестр
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Repository
+  term_ru: Репозиторий
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Service
+  term_ru: Сервис
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Session
+  term_ru: Сессия
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Skill
+  term_ru: Скилл
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Script
+  term_ru: Скрипт
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Environment
+  term_ru: Среда
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Formatting
+  term_ru: Форматирование
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Hook
+  term_ru: Хук
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Template
+  term_ru: Шаблон
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Step
+  term_ru: Шаг
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: Encryption
+  term_ru: Шифрование
+- file: docs/SETUP-GUIDE.md
+  source: local-glossary
+  term_en: System
+  term_ru: Система
+- file: docs/SETUP-GUIDE.md
+  source: model
+  term_en: Strategist
+  term_ru: Стратег
+- file: docs/SETUP-GUIDE.md
+  source: model
+  term_en: Extractor
+  term_ru: Экстрактор
+- file: docs/SETUP-GUIDE.md
+  source: model
+  term_en: Synchronizer
+  term_ru: Синхронизатор
+- file: docs/SETUP-GUIDE.md
+  source: model
+  term_en: exocortex
+  term_ru: Экзокортекс
+- file: docs/SETUP-GUIDE.md
+  source: model
+  term_en: Opening
+  term_ru: Открытие (стадия сессии)
+- file: docs/SETUP-GUIDE.md
+  source: model
+  term_en: Work
+  term_ru: Работа (стадия сессии)
+- file: docs/SETUP-GUIDE.md
+  source: model
+  term_en: Closing
+  term_ru: Закрытие (стадия сессии)
+- file: docs/SETUP-GUIDE.md
+  source: model
+  term_en: Work Product
+  term_ru: Рабочий продукт (контекст РП)
+- file: docs/SETUP-GUIDE.md
+  source: model
+  term_en: MIM
+  term_ru: МИМ
+- file: docs/SETUP-GUIDE.md
+  source: model
+  term_en: governance repository
+  term_ru: governance-репозиторий
+- file: docs/SETUP-GUIDE.md
+  source: model
+  term_en: Engineering of Intelligence
+  term_ru: Инженерия интеллекта (подписка)
