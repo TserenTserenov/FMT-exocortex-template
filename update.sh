@@ -5212,20 +5212,20 @@ update_needs_exec_bit() {
 UPDATE_EXEC_REPAIR=true
 case "$(uname -s 2>/dev/null)" in MINGW* | MSYS* | CYGWIN*) UPDATE_EXEC_REPAIR=false ;; esac
 # update_exec_bit_takes_effect DIR — whether a file in DIR given the mode the plan sets for a
-# program (666 and `chmod +x`, masked by umask) is executable. It is not under umask 177, 111 or
-# 133 (no x bit is left) or on a noexec mount (`-x` is false whatever the mode); the repair would
-# then queue the same programs on every run (rc.8 red team F7). In --check nothing is written:
-# only the umask is checked.
+# program (666 and `chmod +x`, masked by umask) would be executable. It is not under umask 177,
+# 111 or 133 (no x bit is left), in a directory the run cannot write, or on a noexec mount: there
+# a program whose mode has the owner x bit is still not executable (`-x` is false). The repair
+# would then queue the same programs on every run (rc.8 red team F7). Nothing is written, so
+# --check reaches the same verdict as the run (rc.10 red team F9). With no such program to look
+# at, a noexec mount cannot be told and the repair stays on, in both modes alike.
 update_exec_bit_takes_effect() {
-    local _um _mode _probe _ok=1
+    local _um _mode _program
     _um=$(umask)
     _mode=$(( (8#666 & ~8#$_um) | (8#111 & ~8#$_um) ))
     [ $(( _mode & 8#100 )) -ne 0 ] || return 1
-    $CHECK_ONLY && return 0
-    _probe=$(mktemp "$1/.iwe-exec-probe.XXXXXX" 2>/dev/null) || return 1
-    chmod "$(printf '%03o' "$_mode")" "$_probe" 2>/dev/null && [ -x "$_probe" ] && _ok=0
-    rm -f "$_probe"
-    return "$_ok"
+    [ -d "$1" ] && [ -w "$1" ] || return 1
+    _program=$(find "$1" -maxdepth 2 -type f -name '*.sh' -perm -u+x 2>/dev/null | head -n 1) || true
+    [ -z "$_program" ] || [ -x "$_program" ]
 }
 UPDATE_EXEC_REPAIR_OFF_HERE=false
 if $UPDATE_EXEC_REPAIR && ! update_exec_bit_takes_effect "$SCRIPT_DIR"; then

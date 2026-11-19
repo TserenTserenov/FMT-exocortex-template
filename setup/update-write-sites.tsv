@@ -35,7 +35,6 @@ fn:run_build_runtime_or_die	B	staging	build-runtime.sh rebuilds .iwe-runtime; bu
 fn:begin_update_transaction	A	plan	writes the .update-incomplete marker; the rollback restores it to the snapshot state, status of the new mechanism lives in its own journal
 fn:require_env_before_update	A	plan	draft .exocortex.env and hard link into place; one of the two allowed writes before the plan exists, removes its own draft on every failure branch, provisional
 fn:require_backup_root_writable	A	plan	creates the backup root and probes it with a temp directory; the second allowed write before the plan
-fn:update_exec_bit_takes_effect	A	none	probe before the plan: creates one empty temp file .iwe-exec-probe.* in the install root, chmods it and removes it at once to learn whether +x takes effect; nothing to undo; an interrupted run can leave that empty file; skipped in --check
 fn:finish_update_transaction	A	plan	removes the .update-incomplete marker
 fn:atomic_copy_executable	H	caller	copy to a sibling temp file, chmod on the temp file, rename; the pattern the executor reuses
 fn:apply_legacy_agent_fault_shims	A	plan	local transaction with its own rollback of a prefix; dismantle when the executor exists, two rollback mechanisms must not touch the same files
