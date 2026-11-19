@@ -754,5 +754,120 @@ echo '"'"'x
 git reset --hard
 )"'
 
+
+# === WP-529 F275, rc.12 red team F16: CR characters around here-docs ===
+# Every CR variant of the generated set that rc.12 let through while bash, sh or zsh run the last
+# command. Written with $'...' so the CRs survive the LF normalisation of .gitattributes.
+expect 'F16 cr858: CR у here-doc, bash,sh,zsh' block \
+$'let a=1<<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr861: CR у here-doc, bash,sh,zsh' block \
+$'let a=1<<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1155: CR у here-doc, bash,sh,zsh' block \
+$': a#<<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1158: CR у here-doc, bash,sh,zsh' block \
+$': a#<<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1391: CR у here-doc, bash,sh,zsh' block \
+$'(:)<<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1394: CR у here-doc, bash,sh,zsh' block \
+$'(:)<<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1402: CR у here-doc, bash,sh,zsh' block \
+$': <<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1405: CR у here-doc, bash,sh,zsh' block \
+$': <<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1413: CR у here-doc, bash,sh,zsh' block \
+$'cat <<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1416: CR у here-doc, bash,sh,zsh' block \
+$'cat <<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1424: CR у here-doc, bash,sh,zsh' block \
+$': <<-W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1427: CR у here-doc, bash,sh,zsh' block \
+$': <<-W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1435: CR у here-doc, bash,sh,zsh' block \
+$': <<\'W\'\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1438: CR у here-doc, bash,sh,zsh' block \
+$': <<\'W\'\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1446: CR у here-doc, bash,sh,zsh' block \
+$': <<"W"\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1449: CR у here-doc, bash,sh,zsh' block \
+$': <<"W"\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1457: CR у here-doc, bash,sh,zsh' block \
+$': <<\\W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1460: CR у here-doc, bash,sh,zsh' block \
+$': <<\\W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1468: CR у here-doc, bash,sh,zsh' block \
+$': 2<<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1471: CR у here-doc, bash,sh,zsh' block \
+$': 2<<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1490: CR у here-doc, bash,sh,zsh' block \
+$': ${x:-}<<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1493: CR у here-doc, bash,sh,zsh' block \
+$': ${x:-}<<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1501: CR у here-doc, bash,sh,zsh' block \
+$': $((1))<<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1504: CR у here-doc, bash,sh,zsh' block \
+$': $((1))<<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1512: CR у here-doc, bash,sh,zsh' block \
+$': $[1]<<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1515: CR у here-doc, bash,sh,zsh' block \
+$': $[1]<<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1523: CR у here-doc, bash,sh,zsh' block \
+$'((a=1))<<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1526: CR у here-doc, bash,sh,zsh' block \
+$'((a=1))<<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1534: CR у here-doc, bash,sh,zsh' block \
+$': ${x:-} <<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1537: CR у here-doc, bash,sh,zsh' block \
+$': ${x:-} <<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1545: CR у here-doc, bash,sh,zsh' block \
+$': $((1)) <<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1548: CR у here-doc, bash,sh,zsh' block \
+$': $((1)) <<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1611: CR у here-doc, bash,sh' block \
+$': } <<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1614: CR у here-doc, bash,sh' block \
+$': } <<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1622: CR у here-doc, bash,sh,zsh' block \
+$': ]] <<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1625: CR у here-doc, bash,sh,zsh' block \
+$': ]] <<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1754: CR у here-doc, bash,sh,zsh' block \
+$'integer a=1<<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1757: CR у here-doc, bash,sh,zsh' block \
+$'integer a=1<<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1809: CR у here-doc, bash,sh' block \
+$': x[ <<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1812: CR у here-doc, bash,sh' block \
+$': x[ <<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1820: CR у here-doc, bash,sh,zsh' block \
+$'cat notes[ <<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1823: CR у here-doc, bash,sh,zsh' block \
+$'cat notes[ <<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1831: CR у here-doc, bash,sh,zsh' block \
+$': a\\ #b <<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1834: CR у here-doc, bash,sh,zsh' block \
+$': a\\ #b <<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1842: CR у here-doc, bash,sh,zsh' block \
+$': $(:)#b <<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1845: CR у here-doc, bash,sh,zsh' block \
+$': $(:)#b <<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1853: CR у here-doc, bash,sh,zsh' block \
+$': `:`#b <<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1856: CR у here-doc, bash,sh,zsh' block \
+$': `:`#b <<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1919: CR у here-doc, bash,sh,zsh' block \
+$'cat <<\'W\'\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1922: CR у here-doc, bash,sh,zsh' block \
+$'cat <<\'W\'\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1930: CR у here-doc, bash,sh,zsh' block \
+$'cat <<-W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1933: CR у here-doc, bash,sh,zsh' block \
+$'cat <<-W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 cr1941: CR у here-doc, bash,sh,zsh' block \
+$'bash <<W\r\necho \'a\r\nW\r\nfind . -delete'
+expect 'F16 cr1944: CR у here-doc, bash,sh,zsh' block \
+$'bash <<W\r\necho \'a\nW\r\nfind . -delete'
+expect 'F16 контроль: here-doc с CR в данных остаётся данными' pass \
+$'cat > /tmp/n <<\'EOF\'\r\ndon\'t\r\nEOF\r\n'
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

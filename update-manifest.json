@@ -81,7 +81,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "e2eb79cffba576baa8b2c65a3e3487ba3ca62dc197755ee43c8ed4f3958f3e88"
+      "sha256": "741a0fcea81ef347e12a477246b709d0ecd5d8d66e7edf54bfccc1340ba808c5"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -233,7 +233,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
-      "sha256": "23c4810dfb56fe375327f742f7ae9763a88847f1bf72a06416e5b5a748515768"
+      "sha256": "722e479a4b36d745460f2a8296b61454a01aefb92dfe894f52f6b296594252f2"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-file-writers.sh",
@@ -261,7 +261,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-legacy-floor.sh",
-      "sha256": "ea4f86c1e503af63e9509b3735406ed6dc25d43461259e39aff6b991bbf3fddf"
+      "sha256": "a7cbc941b962d6640f3b197e539f6c08c717eb8e73280bb19ea531d06f589b76"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-malformed-json.sh",
@@ -993,7 +993,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "4e9666762c6ce18bc018e046537621659508bdc8845b87f31edd6b7135f97def"
+      "sha256": "8348753bcc4a2e1e8301fa864f8530e5d76bbbdd429228d68657a97d7f996749"
     },
     {
       "path": "CLAUDE.md",
