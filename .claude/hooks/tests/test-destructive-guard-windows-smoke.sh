@@ -20,20 +20,25 @@ F8=$(printf ': x[ <<W\necho %sa\nW\nfind . -delete' "'")
 check() {
   local want=$1 dir=$2 cmd=$3 input out err rc got
   input=$(jq -n --arg c "$cmd" --arg d "$dir" '{tool_name: "Bash", tool_input: {command: $c}, cwd: $d}')
+  local t0=${EPOCHREALTIME:-0}
   out=$(cd "$dir" && printf '%s' "$input" | bash "$HOOK" 2>"$OTHER.err")
   rc=$?
+  local took
+  took=$(awk -v a="$t0" -v b="${EPOCHREALTIME:-0}" 'BEGIN { printf "%.2f", b - a }')
   err=$(cat "$OTHER.err" 2>/dev/null); rm -f "$OTHER.err"
   if [ "$rc" -eq 2 ]; then got=block
   elif [ "$rc" -eq 0 ] && [ -z "$out" ]; then got=pass
   else got="exit $rc, output ${out:0:80}"; fi
   if [ "$got" = "$want" ]; then
-    echo "ok   $want: ${cmd%%$'\n'*}"
+    echo "ok   $want: ${cmd%%$'\n'*} (${took} s)"
   else
     echo "FAIL $want: ${cmd%%$'\n'*} -> $got ${err:0:300}"
     FAILS=$((FAILS + 1))
   fi
 }
 
+# How jq writes a newline here (a native Windows jq writes CR LF in text mode).
+echo "jq: $(jq --version 2>&1); jq -j of \"a\\nb\": $(printf '"a\\nb"' | jq -j . | od -c | head -1)"
 check pass "$ROOT" "git status"
 check pass "$ROOT" "ls -la"
 check block "$ROOT" "$F8"

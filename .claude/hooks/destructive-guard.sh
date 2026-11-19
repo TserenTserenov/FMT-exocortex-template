@@ -50,6 +50,8 @@ dg_legacy_cleanup() {
   for n in input "${DG_LEGACY_NAMES[@]}"; do
     rm -f "$DG_LEGACY_TMP/$n" "$DG_LEGACY_TMP/$n.out" "$DG_LEGACY_TMP/$n.err" "$DG_LEGACY_TMP/$n.rc" "$DG_LEGACY_TMP/$n.rc.tmp" 2>/dev/null || true
   done
+  rm -f "$DG_LEGACY_TMP/bin/jq" 2>/dev/null || true
+  rmdir "$DG_LEGACY_TMP/bin" 2>/dev/null || true
   rmdir "$DG_LEGACY_TMP" 2>/dev/null || true
   DG_LEGACY_TMP=
 }
@@ -170,8 +172,9 @@ DG_LEGACY_CHECK=$(perl -MDigest::SHA -e '
 # of the guard, so no process of it outlives the hook.
 DG_LEGACY_RUN_PL='
   use strict; use warnings; use POSIX ();
-  my ($guard, $hookdir, $in, $out, $err, $rcf, $limit) = @ARGV;
+  my ($guard, $hookdir, $in, $out, $err, $rcf, $limit, $pathpre) = @ARGV;
   my $parent = getppid();
+  $ENV{PATH} = "$pathpre:$ENV{PATH}" if defined $pathpre && length $pathpre;
   delete @ENV{qw(BASH_ENV ENV SHELLOPTS BASHOPTS GLOBIGNORE CDPATH IFS POSIXLY_CORRECT)};
   $ENV{DG_LEGACY_HOOK_DIR} = $hookdir;
   my $put = sub {
@@ -202,9 +205,27 @@ DG_LEGACY_RUN_PL='
 '
 DG_LEGACY_TMP=$(mktemp -d "${TMPDIR:-/tmp}/dg-legacy.XXXXXX") || fail_check "mktemp, прежние проверки"
 printf '%s' "$HOOK_INPUT" >"$DG_LEGACY_TMP/input" || fail_check "запись входа прежних проверок"
+# The released guards read the command with `jq -r`. A native Windows jq writes CR LF for every
+# newline of the text, so on Git Bash they get a jq that writes the bytes as they are: `jq -b`
+# where it exists, else the CRs that text mode added are removed from its output.
+DG_LEGACY_PATH=
+case "$(uname -s 2>/dev/null)" in
+  MINGW* | MSYS* | CYGWIN*)
+    if printf '"a\\nb"' | jq -j . 2>/dev/null | grep -q $'\r'; then
+      dg_jq=$(command -v jq) || fail_check "jq не найден"
+      mkdir "$DG_LEGACY_TMP/bin" || fail_check "mkdir, прежние проверки"
+      if [ "$(printf '"a\\nb"' | jq -b -j . 2>/dev/null; printf x)" = $'a\nbx' ]; then
+        printf '#!/bin/bash\nexec %q -b "$@"\n' "$dg_jq" >"$DG_LEGACY_TMP/bin/jq"
+      else
+        printf '#!/bin/bash\nset -o pipefail\n%q "$@" | tr -d %q\n' "$dg_jq" $'\r' >"$DG_LEGACY_TMP/bin/jq"
+      fi
+      chmod +x "$DG_LEGACY_TMP/bin/jq" || fail_check "chmod, прежние проверки"
+      DG_LEGACY_PATH="$DG_LEGACY_TMP/bin"
+    fi ;;
+esac
 for dg_name in "${DG_LEGACY_NAMES[@]}"; do
   perl -e "$DG_LEGACY_RUN_PL" -- "$DG_LEGACY_DIR/$dg_name.sh" "$DG_HOOK_REAL_DIR" "$DG_LEGACY_TMP/input" \
-    "$DG_LEGACY_TMP/$dg_name.out" "$DG_LEGACY_TMP/$dg_name.err" "$DG_LEGACY_TMP/$dg_name.rc" "$DG_LEGACY_LIMIT" \
+    "$DG_LEGACY_TMP/$dg_name.out" "$DG_LEGACY_TMP/$dg_name.err" "$DG_LEGACY_TMP/$dg_name.rc" "$DG_LEGACY_LIMIT" "$DG_LEGACY_PATH" \
     </dev/null >/dev/null 2>&1 &
   DG_LEGACY_PIDS+=("$!")
 done
@@ -238,9 +259,14 @@ fi
 # to not make.
 # `jq -j` and the `x` sentinel keep trailing newlines: `$(…)` would strip them, and with them the
 # newline of a final backslash-newline, which then hid the last word (rc.6 red team, F3).
-CMD=$(printf '%s' "$HOOK_INPUT" | jq -j '.tool_input.command' && printf x) || block "jq отказал при извлечении команды после успешной валидации — блокирую."
+# Base64 keeps the exact bytes of the command: a native Windows jq writes every newline of a raw
+# string as CR LF, and the stray CR broke here-doc delimiters and quotes on Git Bash (Windows check
+# of the rc.11 red team F12 fix).
+CMD=$(printf '%s' "$HOOK_INPUT" | jq -j '.tool_input.command | @base64' | perl -MMIME::Base64 -0777 -ne 'print decode_base64($_)' && printf x) \
+  || block "jq отказал при извлечении команды после успешной валидации — блокирую."
 CMD=${CMD%x}
 CWD=$(printf '%s' "$HOOK_INPUT" | jq -r '.cwd // .tool_input.cwd // empty' 2>/dev/null || true)
+CWD=${CWD%$'\r'}
 
 # Line continuations are removed first, the way bash does before it reads the words (rc.2 red team,
 # finding A): `ls # don't` + `grep zz F > \` + `params.yaml` ran `grep zz F > params.yaml`, while the
