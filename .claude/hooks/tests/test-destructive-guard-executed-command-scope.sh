@@ -580,5 +580,179 @@ echo '"'"'a
 W
 git status'
 
+
+# === WP-529 F275, rc.11 red team F13: texts rc.10 blocked and rc.11 let through ===
+# An unterminated quote or substitution after a fake here-doc: the shell runs nothing, rc.10
+# blocked; the released rc.10 in destructive-guard.d/ keeps that verdict.
+expect 'F13 m66: строже, как в rc.10' block \
+': a\ #b <<W
+W
+: "${x:-
+git reset --hard
+W
+)'
+expect 'F13 m74: строже, как в rc.10' block \
+'cat notes[ <<W
+x
+W
+echo "x
+W
+git reset --hard
+W
+)'
+expect 'F13 m175: строже, как в rc.10' block \
+'cat notes[ <<W
+x
+W
+echo '"'"'x
+git reset --hard
+	W
+)'
+expect 'F13 m196: строже, как в rc.10' block \
+': $(:)#b <<W
+W
+echo "x`
+git reset --hard
+'
+expect 'F13 m47: строже, как в rc.10' block \
+': a\ #b <<W
+W
+echo "x
+git reset --hard
+'"'"''
+expect 'F13 m166: строже, как в rc.10' block \
+'cat notes[ <<W
+x
+W
+echo "$(
+git reset --hard
+'
+expect 'F13 m59: строже, как в rc.10' block \
+'cat notes[ <<W
+x
+W
+echo '"'"'x
+git reset --hard
+W
+)'
+expect 'F13 m170: строже, как в rc.10' block \
+'cat notes[ <<W
+W
+echo '"'"'x
+git reset --hard
+)"'
+expect 'F13 m37: строже, как в rc.10' block \
+': ${x:-<<W}
+W
+echo "x
+W`
+git reset --hard
+W
+`'
+expect 'F13 m57: строже, как в rc.10' block \
+': x[ <<W
+W
+echo '"'"'x
+git reset --hard
+	W'
+expect 'F13 m164: строже, как в rc.10' block \
+'cat notes[ <<W
+x
+W
+: "${x:-
+git reset --hard
+W
+)'
+expect 'F13 m187: строже, как в rc.10' block \
+'cat notes[ <<W
+x
+W
+: "${x:-
+git reset --hard
+W
+`'
+expect 'F13 m194: строже, как в rc.10' block \
+': # <<W
+W
+echo "x`
+git reset --hard
+	W
+)'
+expect 'F13 m33: строже, как в rc.10' block \
+'cat notes[ <<W
+x
+W
+echo "x`
+git reset --hard
+	W
+)'
+expect 'F13 m18: строже, как в rc.10' block \
+': $(:)#b <<W
+W
+echo "x
+W
+git reset --hard
+)'
+expect 'F13 m136: строже, как в rc.10' block \
+': ${x:-<<W}
+W
+echo "x
+W`
+git reset --hard
+W
+)'
+expect 'F13 m54: строже, как в rc.10' block \
+'cat notes[ <<W
+x
+W
+echo "x
+W`
+git reset --hard
+)'
+expect 'F13 m75: строже, как в rc.10' block \
+': x[ <<W
+W
+echo "x
+git reset --hard
+'"'"''
+expect 'F13 m7: строже, как в rc.10' block \
+': $(:)#b <<W
+W
+echo "x`
+git reset --hard
+`'
+expect 'F13 m110: строже, как в rc.10' block \
+': ${x:-<<W}
+W
+echo '"'"'x
+git reset --hard
+`"'
+expect 'F13 m32: строже, как в rc.10' block \
+': $(:)#b <<W
+W
+echo "x
+git reset --hard
+	W
+)'
+expect 'F13 m195: строже, как в rc.10' block \
+'cat notes[ <<W
+W
+echo "$(
+git reset --hard
+)'
+expect 'F13 m155: строже, как в rc.10' block \
+'cat notes[ <<W
+W
+echo "x
+W
+git reset --hard
+'
+expect 'F13 m3: строже, как в rc.10' block \
+': x[ <<W
+W
+echo '"'"'x
+git reset --hard
+)"'
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

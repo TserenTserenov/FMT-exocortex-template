@@ -68,6 +68,10 @@
       "sha256": "fcfabb7eafcd288c29d210bca041fae9a86d68fcc0fb771f31333bfde1397961"
     },
     {
+      "path": ".claude/hooks/destructive-guard.d/v0.42.1-rc.10.sh",
+      "sha256": "be3698952655a6ea720310b4bd76c90ce9888fab2536b96687e5d359e43d66a7"
+    },
+    {
       "path": ".claude/hooks/destructive-guard.d/v0.42.1-rc.6.sh",
       "sha256": "3a5f36125a7e25ec21c15e3257cf2f49d962ff9a81de52535684a04a69b72fa0"
     },
@@ -77,7 +81,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "9637735e245dacfe8670457d64da6d722701a00c9669643f09bb439a57961721"
+      "sha256": "e2eb79cffba576baa8b2c65a3e3487ba3ca62dc197755ee43c8ed4f3958f3e88"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -217,7 +221,7 @@
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/hook_cases.py",
-      "sha256": "7121bc20ba0d321c73ab3f4125421b2d589fbf9a868d6b37605a59d52ecf8d44"
+      "sha256": "8b6368fcb8d6c639a5c64b52caa0d83f7844c693c2531f595fdb0f013f475d93"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/long_cases.py",
@@ -229,7 +233,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
-      "sha256": "f6c2c63744c5e5e100c34b6c4e01efc1c6ec4eaf6fe2ff5f0d72ceecb10e3a08"
+      "sha256": "23c4810dfb56fe375327f742f7ae9763a88847f1bf72a06416e5b5a748515768"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-file-writers.sh",
@@ -256,6 +260,10 @@
       "sha256": "a319954406d8aff562cedb62d1a87ec787eea2f219bb1e9b953a01ac56f3d39d"
     },
     {
+      "path": ".claude/hooks/tests/test-destructive-guard-legacy-floor.sh",
+      "sha256": "ea4f86c1e503af63e9509b3735406ed6dc25d43461259e39aff6b991bbf3fddf"
+    },
+    {
       "path": ".claude/hooks/tests/test-destructive-guard-malformed-json.sh",
       "sha256": "639f5beded67e1fe9618cbfdd6105af6987a709f82790092b133bc9ad6fa1c20"
     },
@@ -270,6 +278,10 @@
     {
       "path": ".claude/hooks/tests/test-destructive-guard-reader-overwrite.sh",
       "sha256": "c5e8361b2e024be9a1f40f78536b05895e8858acc76cb8ddfff0f6e93e75c778"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-windows-smoke.sh",
+      "sha256": "68665592183574f35521316177ea7f435e39e7aff3e04a9f091284f7b956db82"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-mcp-guard-malformed-json.sh",
@@ -953,7 +965,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "2ccee8cfee5c547bbe169afafd711427ed5b87837a054f51b59560b508da0ec4"
+      "sha256": "c763f9eeca1052bda31e66d3dbf4d44052140eef36938d9492b79978072836fb"
     },
     {
       "path": ".gitignore",
@@ -981,7 +993,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "8e9fb65b283266a9d6bc6f57e41b1c0c7093865f2a290bfe616425a613ec9b56"
+      "sha256": "4e9666762c6ce18bc018e046537621659508bdc8845b87f31edd6b7135f97def"
     },
     {
       "path": "CLAUDE.md",
