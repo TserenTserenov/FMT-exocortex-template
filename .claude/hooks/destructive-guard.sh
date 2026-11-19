@@ -694,10 +694,11 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   }
 
   sub line_heredocs {
-    my ($line, $initial_quote, $initial_depth, $prior_group_source, $compound_frames, $expansions) = @_;
+    my ($line, $initial_quote, $initial_depth, $prior_group_source, $compound_frames, $expansions, $bq_state) = @_;
     my (@specs, $start, $group_depth, $closed_prior_group, $last_heredoc_end);
     my $swallow_at = -1;
-    my $in_bq = 0;
+    # A backquote open at the end of a line stays open on the next one (rc.12 comparison, row r480).
+    my $in_bq = $$bq_state;
     my $in_word_at = -1;   # the char at this index ends inside a word: escaped, or closing $(…) or a backquote
     my $quote = $initial_quote;
     $start = 0;
@@ -857,6 +858,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       $frame->{source} .= substr($line, $frame->{line_start}) . "\n";
       $frame->{line_start} = 0;
     }
+    $$bq_state = $in_bq;
     return (\@specs, $quote, $group_depth);
   }
 
@@ -864,6 +866,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   my (@out, @pending);
   my ($header_quote, $header_group_depth, $group_source, @compound_frames) = (undef, 0, q{});
   my @expansions;
+  my $in_bq_state = 0;
   # Set when some here-doc body has no non-blank line (issue #1568): `cat > f <<EOF` + `EOF`
   # empties f, so the reader-overwrite rule below must not exempt here-docs in this call.
   my $empty_body = 0;
@@ -905,7 +908,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
     }
     $line = @segments ? join(q{}, @segments, $joined) : $joined;
     push @out, $line;
-    my ($specs, $after_quote, $after_depth) = line_heredocs($line, $header_quote, $header_group_depth, $group_source, \@compound_frames, \@expansions);
+    my ($specs, $after_quote, $after_depth) = line_heredocs($line, $header_quote, $header_group_depth, $group_source, \@compound_frames, \@expansions, \$in_bq_state);
     push @pending, @$specs;
     $header_quote = $after_quote;
     $group_source = $after_depth ? $group_source . $line . "\n" : q{};
