@@ -6,7 +6,7 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Агрегат,Aggregate,DDD tactical patterns,Core DDD term,2
 Адаптер Claude Code,Claude Code adapter,Reference implementation,IWE component mapping; pending_review=true,3
 Антикоррупционный слой,Anti-Corruption Layer,DDD integration patterns,Abbrev. ACL common,2
-Артефакт,Artifact,systems engineering deliverable or output,"Also spelled ""artefact"" (British)",2
+Артефакт,Artifact,systems engineering deliverable or output,"Also spelled ""artefact"" (British). approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5)",2
 Архитектура,Architecture,system and software design structure,Standard SE/DDD term,2
 Атрофия мышления при ежедневной работе с ИИ,Cognitive Atrophy With Daily AI Use,professional development risk,IWE-specific cognitive concern; pending_review=true,3
 Аудит,Audit,Audit process,,1
@@ -20,7 +20,7 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Заинтересованная сторона,Stakeholder,requirements and systems engineering,Standard SE/BABOK term,2
 Закрытие,Closing,ORZ Closing phase,,1
 Замена терминологии,Multi-pass terminology replacement,Semantic consistency,IWE-specific peer verification; pending_review=true,3
-Знание,Knowledge,learning and knowledge management,cognitive domain,2
+Знание,Knowledge,learning and knowledge management,cognitive domain; approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
 Интеграция,Integration,system or service integration,straightforward,2
 Интерфейс,Interface,system boundary and integration design,Standard technical term,2
 Инфраструктура,Infrastructure,deployment and operational environment,Standard DevOps/SE term,2
@@ -125,3 +125,11 @@ IWE у разработчика,Developer IWE,change accounting (WP-611),approve
 Действие D/D' конфликтного облака,Prerequisite,"Evaporating Cloud method (TOC, MIM.M.015); the Russian card says «действие»","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
 Сила,Strength,"Unpacking a Concern method (DP.METHOD.053); of a dissatisfaction, 1-5","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
 Ближайшее действие,Nearest action,"Unpacking a Concern method (DP.METHOD.053)","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
+Двойной выход,double output,IWE team practice,approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
+Ядро,core,IWE team practice,approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
+Активный круг,active circle,IWE team practice,approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
+Ведущий разработчик,Lead Developer,IWE team practice,approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
+Синк команды,team sync,IWE team practice,approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
+Ведущий встречи,meeting facilitator,IWE team practice,approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
+Кворум,quorum,IWE team practice,approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
+Асинхронное решение,Async decision,IWE team practice,approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
