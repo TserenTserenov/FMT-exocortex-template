@@ -211,7 +211,9 @@ printf '%s' "$HOOK_INPUT" >"$DG_LEGACY_TMP/input" || fail_check "запись в
 DG_LEGACY_PATH=
 case "$(uname -s 2>/dev/null)" in
   MINGW* | MSYS* | CYGWIN*)
-    if printf '"a\\nb"' | jq -j . 2>/dev/null | grep -q $'\r'; then
+    # Captured, not piped into `grep -q`: under pipefail its early exit would fail the probe.
+    dg_nl=$(printf '"a\\nb"' | jq -j . 2>/dev/null; printf x)
+    if [ "$dg_nl" != $'a\nbx' ]; then
       dg_jq=$(command -v jq) || fail_check "jq не найден"
       mkdir "$DG_LEGACY_TMP/bin" || fail_check "mkdir, прежние проверки"
       if [ "$(printf '"a\\nb"' | jq -b -j . 2>/dev/null; printf x)" = $'a\nbx' ]; then
