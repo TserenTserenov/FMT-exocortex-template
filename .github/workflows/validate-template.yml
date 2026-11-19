@@ -1172,6 +1172,11 @@ jobs:
           export GRM_BASH
           python -c 'import os, subprocess; subprocess.run([os.environ["GRM_BASH"], "-c", "command -v cygpath"], check=True)'
           python .claude/hooks/tests/destructive-guard/guarded_rm_cases.py .claude/bin/guarded-rm
+      # rc.11 red team F12: the released-guard floor (perl Digest::SHA, Cwd, process groups,
+      # time limit) must work on Git Bash, or the hook blocks every command there.
+      - name: destructive-guard and its released-guard floor on Git Bash
+        shell: bash
+        run: bash .claude/hooks/tests/test-destructive-guard-windows-smoke.sh
 
   # WP-529 Phase 3: single fail-closed receipt for this commit, built from the
   # results of THIS workflow run (needs.<job>.result — same trigger, same

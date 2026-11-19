@@ -280,6 +280,10 @@
       "sha256": "c5e8361b2e024be9a1f40f78536b05895e8858acc76cb8ddfff0f6e93e75c778"
     },
     {
+      "path": ".claude/hooks/tests/test-destructive-guard-windows-smoke.sh",
+      "sha256": "e312066948d19848617ce789f3ba4226e1c4942911312b983961874468ffbcae"
+    },
+    {
       "path": ".claude/hooks/tests/test-destructive-mcp-guard-malformed-json.sh",
       "sha256": "2cde8950a400719a688132669aae108638e95ede9c59e37a916cc14bfa2e5f30"
     },
@@ -961,7 +965,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "2cbac6bbf3efe06fa1b2a4c0b8cc4cade205a77663c7fb83977fe29355b2c937"
+      "sha256": "c763f9eeca1052bda31e66d3dbf4d44052140eef36938d9492b79978072836fb"
     },
     {
       "path": ".gitignore",
