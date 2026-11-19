@@ -106,6 +106,47 @@ left = sorted(set(os.listdir(tmp)) - before)
 if left:
     fails.append("temporary folders left: %s" % left)
 
+# rc.12 red team F15: a jq that writes CR LF (as on Windows) on any platform. The floor gets a jq
+# without the CRs, wherever the probe sees them; the F8 text still blocks.
+fakejq = work + "/crjq"
+os.makedirs(fakejq)
+real_jq = shutil.which("jq")
+open(fakejq + "/jq", "w").write(
+    "#!/bin/bash\nset -o pipefail\nargs=(); b=0\nfor a in \"$@\"; do if [ \"$a\" = -b ]; then b=1; else args+=(\"$a\"); fi; done\n"
+    "if [ $b = 1 ]; then exec '%s' \"${args[@]}\"; fi\n'%s' \"${args[@]}\" | perl -pe 's/\\n/\\r\\n/'\n" % (real_jq, real_jq))
+os.chmod(fakejq + "/jq", 0o755)
+expect("jq writing CR LF, F8 text", verdict(base, F8, env=dict(ENV, PATH=fakejq + ":" + ENV["PATH"])))
+expect("jq writing CR LF, ls", verdict(base, "ls -la", env=dict(ENV, PATH=fakejq + ":" + ENV["PATH"])), "pass")
+
+# rc.12 red team F17: the command text does not outlive a hook killed by a signal it cannot trap.
+big = "ls " + "a" * 200000
+for sig in (signal.SIGKILL, signal.SIGQUIT):
+    before = set(os.listdir(tmp))
+    p = subprocess.Popen(["bash", base + "/.claude/hooks/destructive-guard.sh", "--dg-budget"], stdin=subprocess.PIPE,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=ENV, cwd=base)
+    p.stdin.write(json.dumps({"tool_input": {"command": big}, "cwd": base}).encode()); p.stdin.close()
+    time.sleep(1.0)
+    p.send_signal(sig)
+    p.wait(30)
+    time.sleep(1.5)
+    left = sorted(set(os.listdir(tmp)) - before)
+    if left:
+        fails.append("%s: temporary folder left: %s" % (sig.name, left))
+
+# The total time budget: past it the hook's process group is stopped and the answer is a block.
+src_wrap = open(hooks + "/destructive-guard.sh").read()
+w0 = src_wrap.index("--dg-budget ]; then\n  perl -e '") + len("--dg-budget ]; then\n  perl -e '")
+wrapper = src_wrap[w0:src_wrap.index("' -- 40 bash", w0)]
+mark2 = "DGBUDGETMARK%d" % os.getpid()
+t0 = time.time()
+q = subprocess.run(["perl", "-e", wrapper, "--", "1", "bash", "-c", "exec -a %s sleep 30" % mark2], capture_output=True, timeout=60)
+took = time.time() - t0
+if q.returncode != 2 or b"BLOCKED" not in q.stderr or took > 10:
+    fails.append("budget: exit %d after %.1f s, %r" % (q.returncode, took, q.stderr[:120]))
+time.sleep(0.3)
+if [x for x in subprocess.run(["pgrep", "-f", mark2], capture_output=True).stdout.split() if x]:
+    fails.append("budget: the stopped hook is still running")
+
 # The runner of one released guard, taken from the hook: time limit, kill, gone hook.
 src = open(hooks + "/destructive-guard.sh").read()
 if "DG_LEGACY_RUN_PL='" not in src:

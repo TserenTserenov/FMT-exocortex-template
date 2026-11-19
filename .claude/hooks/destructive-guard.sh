@@ -7,6 +7,43 @@
 # without it (rc.11 red team F12). Whoever sets the hook's environment can still bypass it, as with
 # CC_ALLOW_DESTRUCTIVE_INPUT.
 if [ -n "${BASH_ENV-}${ENV-}" ]; then exec env -u BASH_ENV -u ENV bash "${BASH_SOURCE[0]}"; fi
+# A total time budget (rc.12 red team): Claude Code gives a hook 60 s and treats a time-out as a
+# non-blocking error, so the call would go ahead. The hook runs as a child in its own process group;
+# past DG_BUDGET seconds the group is stopped and the answer is a block. The marker is an argument,
+# which the caller's environment cannot set.
+if [ "${1:-}" != --dg-budget ]; then
+  perl -e '
+    use strict; use warnings; use POSIX ();
+    my $budget = shift;
+    my $pid = fork();
+    defined $pid or do { print STDERR "BLOCKED: ошибка проверки destructive-guard (fork) — команда не пропущена.\n"; exit 2; };
+    if (!$pid) { setpgrp(0, 0); exec(@ARGV) or POSIX::_exit(127); }
+    my $stop = sub { kill("TERM", -$pid); my $t = time() + 2;
+                     while (time() < $t) { last if waitpid($pid, POSIX::WNOHANG()) == $pid; select(undef, undef, undef, 0.05); }
+                     kill("KILL", -$pid); };
+    $SIG{$_} = sub { $stop->(); exit 2; } for qw(TERM INT HUP QUIT);
+    my $deadline = time() + $budget;
+    while (1) {
+      if (waitpid($pid, POSIX::WNOHANG()) == $pid) { my $st = $?; exit(($st & 127) ? 2 : $st >> 8); }
+      if (time() > $deadline) {
+        $stop->();
+        print STDERR "BLOCKED: проверка destructive-guard не уложилась в $budget с — команда не пропущена. Раздели команду на части поменьше.\n";
+        exit 2;
+      }
+      select(undef, undef, undef, 0.005);
+    }
+  ' -- 40 bash "${BASH_SOURCE[0]}" --dg-budget <&0 &
+  dg_budget_pid=$!
+  # Killed while waiting: the timer stops the hook's group; the answer is a block.
+  trap 'kill -TERM "$dg_budget_pid" 2>/dev/null; wait "$dg_budget_pid" 2>/dev/null; exit 2' TERM INT HUP QUIT
+  dg_budget_rc=0
+  wait "$dg_budget_pid" || dg_budget_rc=$?
+  # Only an allow (0) or a block (2) passes through: a broken or missing perl blocks.
+  case "$dg_budget_rc" in
+    0 | 2) exit "$dg_budget_rc" ;;
+    *) echo "BLOCKED: ошибка проверки destructive-guard (счётчик времени, код $dg_budget_rc) — команда не пропущена. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота." >&2; exit 2 ;;
+  esac
+fi
 set -euo pipefail
 
 block() {
@@ -35,7 +72,7 @@ DG_LEGACY_SHA256=(
   9e62ba99f07f36465c7dbf92fccd345b85e270d99e77236425ee4f492e8a676d
   be3698952655a6ea720310b4bd76c90ce9888fab2536b96687e5d359e43d66a7
 )
-DG_LEGACY_LIMIT=45
+DG_LEGACY_LIMIT=35
 DG_LEGACY_TMP=
 DG_LEGACY_PIDS=()
 DG_NEW_ASKED=0
@@ -70,7 +107,7 @@ dg_legacy_verdict() {
     case "$rc" in
       0)
         if [ -s "$base.out" ]; then
-          jq -e '.hookSpecificOutput.permissionDecision == "ask"' "$base.out" >/dev/null 2>&1 \
+          jq -e -s 'length > 0 and all(.[]; (.hookSpecificOutput.permissionDecision? // "") == "ask")' "$base.out" >/dev/null 2>&1 \
             || { dg_legacy_cleanup; fail_check "прежняя проверка $n: неожиданный ответ"; }
           asked="$base.out"
         fi ;;
@@ -92,7 +129,7 @@ on_exit() {
 }
 trap on_exit EXIT
 # Killed while waiting (a harness timeout): the legacy runs go with it, and the answer is a block.
-trap 'dg_legacy_cleanup; exit 2' TERM INT HUP
+trap 'dg_legacy_cleanup; exit 2' TERM INT HUP QUIT
 # The caller's shell settings must not change how this file reads the text (rc.11 red team F12:
 # SHELLOPTS=noglob reached the hook).
 set +f
@@ -172,8 +209,11 @@ DG_LEGACY_CHECK=$(perl -MDigest::SHA -e '
 # of the guard, so no process of it outlives the hook.
 DG_LEGACY_RUN_PL='
   use strict; use warnings; use POSIX ();
-  my ($guard, $hookdir, $in, $out, $err, $rcf, $limit, $pathpre) = @ARGV;
+  my ($guard, $hookdir, $in, $out, $err, $rcf, $limit, $pathpre, $watch) = @ARGV;
   my $parent = getppid();
+  # Removes the whole folder of this call: the command text must not outlive the hook (rc.12, F17).
+  my $dir = $in; $dir =~ s{/[^/]*$}{};
+  my $wipe = sub { unlink(glob("$dir/bin/*"), glob("$dir/*")); rmdir("$dir/bin"); rmdir($dir); };
   $ENV{PATH} = "$pathpre:$ENV{PATH}" if defined $pathpre && length $pathpre;
   delete @ENV{qw(BASH_ENV ENV SHELLOPTS BASHOPTS GLOBIGNORE CDPATH IFS POSIXLY_CORRECT)};
   $ENV{DG_LEGACY_HOOK_DIR} = $hookdir;
@@ -189,47 +229,56 @@ DG_LEGACY_RUN_PL='
     exec("bash", $guard) or POSIX::_exit(127);
   }
   my $stop = sub { kill("KILL", -$pid); kill("KILL", $pid); waitpid($pid, 0); };
-  $SIG{TERM} = $SIG{INT} = $SIG{HUP} = sub { $stop->(); exit 0; };
+  $SIG{TERM} = $SIG{INT} = $SIG{HUP} = $SIG{QUIT} = sub { $stop->(); exit 0; };
   my $deadline = time() + $limit;
   while (1) {
     if (waitpid($pid, POSIX::WNOHANG()) == $pid) {
       my $st = $?;
       $put->(($st & 127) ? 128 + ($st & 127) : $st >> 8);
       kill("KILL", -$pid);
+      # One runner leaves a watcher behind that removes the folder if the hook dies by a signal
+      # it cannot trap (KILL), after it has stopped waiting for the runners.
+      if ($watch && !fork()) {
+        POSIX::setsid();
+        select(undef, undef, undef, 0.05) while kill(0, $parent);
+        $wipe->();
+        POSIX::_exit(0);
+      }
       exit 0;
     }
     if (time() > $deadline) { $stop->(); $put->("timeout"); exit 0; }
-    if (getppid() != $parent) { $stop->(); exit 0; }
+    if (getppid() != $parent) { $stop->(); $wipe->(); exit 0; }
     select(undef, undef, undef, 0.005);
   }
 '
 DG_LEGACY_TMP=$(mktemp -d "${TMPDIR:-/tmp}/dg-legacy.XXXXXX") || fail_check "mktemp, прежние проверки"
+chmod 700 "$DG_LEGACY_TMP" || fail_check "chmod, прежние проверки"
 printf '%s' "$HOOK_INPUT" >"$DG_LEGACY_TMP/input" || fail_check "запись входа прежних проверок"
-# The released guards read the command with `jq -r`. A native Windows jq writes CR LF for every
-# newline of the text, so on Git Bash they get a jq that writes the bytes as they are: `jq -b`
-# where it exists, else the CRs that text mode added are removed from its output.
+# The released guards read the command with `jq -r`. A jq that writes CR LF for every newline of
+# the text (native Windows jq) gets replaced for them by one that writes the bytes as they are:
+# `jq -b` where it exists, else the CRs that text mode added are removed from its output. The probe
+# runs on every platform, not only where uname says Windows (rc.12 red team, F15).
 DG_LEGACY_PATH=
-case "$(uname -s 2>/dev/null)" in
-  MINGW* | MSYS* | CYGWIN*)
-    # Captured, not piped into `grep -q`: under pipefail its early exit would fail the probe.
-    dg_nl=$(printf '"a\\nb"' | jq -j . 2>/dev/null; printf x)
-    if [ "$dg_nl" != $'a\nbx' ]; then
-      dg_jq=$(command -v jq) || fail_check "jq не найден"
-      mkdir "$DG_LEGACY_TMP/bin" || fail_check "mkdir, прежние проверки"
-      if [ "$(printf '"a\\nb"' | jq -b -j . 2>/dev/null; printf x)" = $'a\nbx' ]; then
-        printf '#!/bin/bash\nexec %q -b "$@"\n' "$dg_jq" >"$DG_LEGACY_TMP/bin/jq"
-      else
-        printf '#!/bin/bash\nset -o pipefail\n%q "$@" | tr -d %q\n' "$dg_jq" $'\r' >"$DG_LEGACY_TMP/bin/jq"
-      fi
-      chmod +x "$DG_LEGACY_TMP/bin/jq" || fail_check "chmod, прежние проверки"
-      DG_LEGACY_PATH="$DG_LEGACY_TMP/bin"
-    fi ;;
-esac
+# Captured, not piped into `grep -q`: under pipefail its early exit would fail the probe.
+DG_JQ_NL=$(printf '"a\\nb"' | jq -j . 2>/dev/null; printf x)
+if [ "$DG_JQ_NL" != $'a\nbx' ]; then
+  dg_jq=$(command -v jq) || fail_check "jq не найден"
+  mkdir "$DG_LEGACY_TMP/bin" || fail_check "mkdir, прежние проверки"
+  if [ "$(printf '"a\\nb"' | jq -b -j . 2>/dev/null; printf x)" = $'a\nbx' ]; then
+    printf '#!/bin/bash\nexec %q -b "$@"\n' "$dg_jq" >"$DG_LEGACY_TMP/bin/jq"
+  else
+    printf '#!/bin/bash\nset -o pipefail\n%q "$@" | tr -d %q\n' "$dg_jq" $'\r' >"$DG_LEGACY_TMP/bin/jq"
+  fi
+  chmod +x "$DG_LEGACY_TMP/bin/jq" || fail_check "chmod, прежние проверки"
+  DG_LEGACY_PATH="$DG_LEGACY_TMP/bin"
+fi
+dg_watch=1
 for dg_name in "${DG_LEGACY_NAMES[@]}"; do
   perl -e "$DG_LEGACY_RUN_PL" -- "$DG_LEGACY_DIR/$dg_name.sh" "$DG_HOOK_REAL_DIR" "$DG_LEGACY_TMP/input" \
     "$DG_LEGACY_TMP/$dg_name.out" "$DG_LEGACY_TMP/$dg_name.err" "$DG_LEGACY_TMP/$dg_name.rc" "$DG_LEGACY_LIMIT" "$DG_LEGACY_PATH" \
-    </dev/null >/dev/null 2>&1 &
+    "$dg_watch" </dev/null >/dev/null 2>&1 &
   DG_LEGACY_PIDS+=("$!")
+  dg_watch=0
 done
 
 # Fail-closed on a malformed/schema-invalid envelope (WP-544 Д22, peer session
@@ -267,8 +316,9 @@ fi
 CMD=$(printf '%s' "$HOOK_INPUT" | jq -j '.tool_input.command | @base64' | perl -MMIME::Base64 -0777 -ne 'print decode_base64($_)' && printf x) \
   || block "jq отказал при извлечении команды после успешной валидации — блокирую."
 CMD=${CMD%x}
-CWD=$(printf '%s' "$HOOK_INPUT" | jq -r '.cwd // .tool_input.cwd // empty' 2>/dev/null || true)
-CWD=${CWD%$'\r'}
+# Base64 too: the exact bytes, without stripping a CR that is really in the path (rc.12, F14).
+CWD=$(printf '%s' "$HOOK_INPUT" | jq -j '(.cwd // .tool_input.cwd // empty) | @base64' 2>/dev/null \
+  | perl -MMIME::Base64 -0777 -ne 'print decode_base64($_)' 2>/dev/null || true)
 
 # Line continuations are removed first, the way bash does before it reads the words (rc.2 red team,
 # finding A): `ls # don't` + `grep zz F > \` + `params.yaml` ran `grep zz F > params.yaml`, while the
@@ -378,7 +428,9 @@ JOIN_CONTINUATIONS_PL='
       }
       elsif (substr($s, pos($s), 1) eq "[") {
         my $back = length($out) > 64 ? substr($out, -64) : $out;
-        if ($back =~ /(?:(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*|[A-Za-z0-9_]\+?=\()\z/) { $xo = "["; pos($s) += 1; }
+        # Only a real subscript, closed by `]=` or `]+=` on the line: `: x[ <<W` is a word and a
+        # here-doc (rc.12 red team, F16).
+        if ($back =~ /(?:(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*|[A-Za-z0-9_]\+?=\()\z/ && $s =~ /\G\[[^\]\n]{0,256}\]\+?=/) { $xo = "["; pos($s) += 1; }
       }
       if (defined $xo) {
         $out .= $xo;
@@ -429,7 +481,7 @@ JOIN_CONTINUATIONS_PL='
           if ($s =~ /\G\\(.)/gcs) { $out .= $&; $delim .= $1; $quoted = 1; next; }
           if ($s =~ /\G\$?\x27([^\x27]*)\x27?/gc) { $out .= $&; $delim .= $1; $quoted = 1; next; }
           if ($s =~ /\G"((?:[^"\\]|\\.)*)"?/gcs) { $out .= $&; $delim .= $1; $quoted = 1; next; }
-          if ($s =~ /\G[^\s;&|()<>\\\x27"]+/gc) { $out .= $&; $delim .= $&; next; }
+          if ($s =~ /\G[^ \t\n;&|()<>\\\x27"]+/gc) { $out .= $&; $delim .= $&; next; }
           last;
         }
         push @pending, [ $delim, $quoted, $dash ];
@@ -499,14 +551,15 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   # comment: a backslash there is part of the comment, not a continuation (rc.8 red team, F5).
   sub scan_quote_state {
     my ($line, $quote) = @_;
+    my $escaped = -1;
     for (my $i = 0; $i < length($line); $i++) {
       my $char = substr($line, $i, 1);
       if (defined $quote) {
         if ($quote ne chr(39) && $char eq "\\" && $i + 1 < length($line)) { $i++; next; }
         undef $quote if $char eq ($quote eq "a" ? chr(39) : $quote);
       } elsif ($char eq "\\" && $i + 1 < length($line)) {
-        $i++;
-      } elsif ($char eq "#" && ($i == 0 || substr($line, $i - 1, 1) =~ /[\s;&|()<>`]/)) {
+        $i++; $escaped = $i;
+      } elsif ($char eq "#" && ($i == 0 || ($escaped != $i - 1 && substr($line, $i - 1, 1) =~ /[\s;&|()<>`]/))) {
         return (undef, 1);
       } elsif ($char eq chr(39) && $i && substr($line, $i - 1, 1) eq "\$") {
         $quote = "a";
@@ -645,6 +698,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
     my (@specs, $start, $group_depth, $closed_prior_group, $last_heredoc_end);
     my $swallow_at = -1;
     my $in_bq = 0;
+    my $in_word_at = -1;   # the char at this index ends inside a word: escaped, or closing $(…) or a backquote
     my $quote = $initial_quote;
     $start = 0;
     $group_depth = $initial_depth;
@@ -662,11 +716,12 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
         undef $quote if $char eq ($quote eq "a" ? chr(39) : $quote);
         next;
       }
-      if ($char eq "\\" && $i + 1 < length($line)) { $i++; next; }
-      if ($char eq "`") { $in_bq = !$in_bq; next; }
+      if ($char eq "\\" && $i + 1 < length($line)) { $i++; $in_word_at = $i; next; }
+      if ($char eq "`") { $in_bq = !$in_bq; $in_word_at = $i unless $in_bq; next; }
       # A comment: a `<<` or a quote in it means nothing; in backquotes it ends at the backquote.
       # Inside ${…} and the like `#` starts no comment; in an array literal it does.
-      if ($char eq "#" && ($i == 0 || substr($line, $i - 1, 1) =~ /[\s;&|()<>`]/)
+      # `a\ #b`, `$(:)#b`, `` `:`#b ``: the `#` is inside a word, no comment (rc.12 red team, F16).
+      if ($char eq "#" && ($i == 0 || ($in_word_at != $i - 1 && substr($line, $i - 1, 1) =~ /[\s;&|()<>`]/))
           && !grep { !$_->{comsub} && !$_->{array} } @$expansions) {
         $shift_in_expansion = 1 if index($line, "<<", $i) >= 0;
         last unless $in_bq;
@@ -694,7 +749,8 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
           push @$expansions, { close => ")", skip => 2, depth => 0, arith => 1 };
         }
         elsif ($char eq "[" && !($top && $top->{close} eq "]")
-               && substr($line, $i > 64 ? $i - 64 : 0, $i > 64 ? 64 : $i) =~ /(?:(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*|[A-Za-z0-9_]\+?=\()$/) {
+               && substr($line, $i > 64 ? $i - 64 : 0, $i > 64 ? 64 : $i) =~ /(?:(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*|[A-Za-z0-9_]\+?=\()$/
+               && substr($line, $i, 260) =~ /^\[[^\]]{0,256}\]\+?=/) {
           push @$expansions, { close => "]", skip => 1, depth => 0 };
         }
         elsif ($char eq "(" && !($top && $top->{skip})
@@ -714,6 +770,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
             }
             else {
               pop @$expansions;
+              $in_word_at = $i if $top->{comsub};
               $swallow_at = $i + 1 if $top->{arith} && substr($line, $i + 1, 1) eq ")";
               if ($top->{requote}) { $quote = $top->{requote}; next; }
             }
@@ -751,9 +808,11 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       # backquote it may close before its body, and shells disagree (rc.10 red team, F10).
       if (@$expansions || $in_bq) { $shift_in_expansion = 1; next; }
       my $tail = substr($line, $i);
-      next unless $tail =~ /^<<(-?)\s*(?!<)(?:([\x27"])([A-Za-z_][A-Za-z0-9_]*)\2|([A-Za-z_][A-Za-z0-9_]*))/;
+      # A CR after the delimiter word is part of it, as for bash: `<<W` + CR ends only at a `W` + CR
+      # line (rc.12 red team, F16).
+      next unless $tail =~ /^<<(-?)[ \t]*(?!<)(?:([\x27"])([A-Za-z_][A-Za-z0-9_]*)\2|\\?([A-Za-z_][A-Za-z0-9_]*))(\r*)/;
       my $match_length = length($&);
-      my ($indent, $delim) = ($1 eq q{-}, defined $3 ? $3 : $4);
+      my ($indent, $delim) = ($1 eq q{-}, (defined $3 ? $3 : $4) . $5);
       my $recipient = substr($line, $start, $i - $start);
       my $prefix_is_data = data_command_before_heredoc($recipient);
       my @right_stages = right_command_stages(substr($line, $i + $match_length));
@@ -814,11 +873,20 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       my $body = $pending[0];
       my $probe = $line;
       $probe =~ s/^\t+// if $body->{indent};
-      if ($probe eq $body->{delim}) { $empty_body = 1 unless $body->{text}; shift @pending; push @out, q{}; next; }
+      if ($probe eq $body->{delim}) {
+        $empty_body = 1 unless $body->{text};
+        # A kept body is a script of its own: a quote it leaves open must not swallow the lines of
+        # the call after it (rc.12 red team, F16: `bash <<W` + `echo \x27a` + `W` + a command).
+        push @out, ($body->{quote} eq "a" ? chr(39) : $body->{quote}) if $body->{keep} && defined $body->{quote};
+        shift @pending; push @out, q{}; next;
+      }
       $body->{text} = 1 if $line =~ /\S/;
       # An interpreter drops a lone backslash ending its script line (`bash <<\x27EOF\x27`, rc.8 F6).
       (my $kept = $line) =~ s/(?<!\\)((?:\\\\)*)\\$/$1/;
-      push @out, $kept if $body->{keep};
+      if ($body->{keep}) {
+        push @out, $kept;
+        ($body->{quote}) = scan_quote_state($kept, $body->{quote});
+      }
       next;
     }
     # Сегменты накапливаются списком и склеиваются один раз; состояние
