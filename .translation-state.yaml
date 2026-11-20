@@ -1,5 +1,170 @@
-files_translated: []
-last_run_utc: '2026-11-20T14:17:57Z'
-last_synced_sha: d9a3f5d852b359149b57cff01eec1e3414c533c6
+files_translated:
+- docs/release-audit-log.md
+last_run_utc: '2026-11-20T16:31:04Z'
+last_synced_sha: 54cdf6a2150dd05b599ba8704164753a2d12f3a4
 schema_version: 1
-unapproved_terms: []
+unapproved_terms:
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Artifact
+  term_ru: Артефакт
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Audit
+  term_ru: Аудит
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Closing
+  term_ru: Закрытие
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: pipeline
+  term_ru: Конвейер
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Manifest
+  term_ru: Манифест
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Method
+  term_ru: Метод
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Migration
+  term_ru: Миграция
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Opening
+  term_ru: Открытие
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Assessment
+  term_ru: Оценка
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Persona
+  term_ru: Персона
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Protocol
+  term_ru: Протокол
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Registry
+  term_ru: Реестр
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Session
+  term_ru: Сессия
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Skill
+  term_ru: Скилл
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Script
+  term_ru: Скрипт
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Hook
+  term_ru: Хук
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Template
+  term_ru: Шаблон
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Step
+  term_ru: Шаг
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Change
+  term_ru: Изменение
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Fix
+  term_ru: Исправление
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Release
+  term_ru: Релиз
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Verification
+  term_ru: Проверка
+- file: docs/release-audit-log.md
+  source: model
+  term_en: adversarial audit
+  term_ru: состязательный аудит
+- file: docs/release-audit-log.md
+  source: model
+  term_en: post-release audit
+  term_ru: пострелизный аудит
+- file: docs/release-audit-log.md
+  source: model
+  term_en: receipt
+  term_ru: квитанция
+- file: docs/release-audit-log.md
+  source: model
+  term_en: exception (accepted waiver)
+  term_ru: оговорка
+- file: docs/release-audit-log.md
+  source: model
+  term_en: unresolved material finding
+  term_ru: нерешённая существенная находка
+- file: docs/release-audit-log.md
+  source: model
+  term_en: red control / green control
+  term_ru: красный контроль / зелёный контроль
+- file: docs/release-audit-log.md
+  source: model
+  term_en: false green
+  term_ru: ложный зелёный
+- file: docs/release-audit-log.md
+  source: model
+  term_en: false alarm
+  term_ru: ложная тревога
+- file: docs/release-audit-log.md
+  source: model
+  term_en: migrated issues
+  term_ru: мигрированные задачи
+- file: docs/release-audit-log.md
+  source: model
+  term_en: peer session
+  term_ru: пир-сессия
+- file: docs/release-audit-log.md
+  source: model
+  term_en: smoldering class
+  term_ru: тлеющий класс
+- file: docs/release-audit-log.md
+  source: model
+  term_en: single-use install
+  term_ru: одноразовая установка
+- file: docs/release-audit-log.md
+  source: model
+  term_en: synthetic personalizations
+  term_ru: синтетические персонализации
+- file: docs/release-audit-log.md
+  source: model
+  term_en: annotated tag
+  term_ru: аннотированный тег
+- file: docs/release-audit-log.md
+  source: model
+  term_en: template tree
+  term_ru: дерево шаблона
+- file: docs/release-audit-log.md
+  source: model
+  term_en: accepted exception
+  term_ru: принятая оговорка
+- file: docs/release-audit-log.md
+  source: model
+  term_en: product owner
+  term_ru: владелец продукта
+- file: docs/release-audit-log.md
+  source: model
+  term_en: audit boundary
+  term_ru: граница аудита
+- file: docs/release-audit-log.md
+  source: model
+  term_en: Layer 5 / Layer 6
+  term_ru: Слой 5 / Слой 6
