@@ -388,7 +388,16 @@ def _find_repo_root(start: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 
-def _build_system_prompt(style_path: Path, glossary: dict, manifest: dict) -> str:
+def _glossary_line(ru: str, en: str, only_as: str) -> str:
+    """One glossary line; a term that is also an ordinary word carries where it applies."""
+    if not only_as:
+        return f"  {ru} → {en}"
+    return f"  {ru} → {en} (only as {only_as}; elsewhere translate the word as an ordinary word)"
+
+
+def _build_system_prompt(
+    style_path: Path, glossary: dict, manifest: dict, scopes: dict[str, str] | None = None
+) -> str:
     """Assemble three-layer system prompt: style + glossary + exclusions."""
     style_text = style_path.read_text(encoding="utf-8") if style_path.exists() else ""
 
@@ -396,7 +405,8 @@ def _build_system_prompt(style_path: Path, glossary: dict, manifest: dict) -> st
     id_patterns = exclusions.get("id_patterns", [])
     proper_names = exclusions.get("proper_names", [])
 
-    glossary_lines = "\n".join(f"  {ru} → {en}" for ru, en in glossary.items())
+    scopes = scopes or {}
+    glossary_lines = "\n".join(_glossary_line(ru, en, scopes.get(ru, "")) for ru, en in glossary.items())
     id_pattern_lines = "\n".join(f"  - {p}" for p in id_patterns)
     proper_name_lines = "\n".join(f"  - {n}" for n in proper_names)
 
@@ -632,6 +642,7 @@ def run_translate(
     glossary: dict,
     unapproved: dict[str, str] | None = None,
     report: list[dict[str, str]] | None = None,
+    scopes: dict[str, str] | None = None,
 ) -> int:
     """Translate files and write output to --output-dir.
 
@@ -648,7 +659,7 @@ def run_translate(
     translate_keys: list[str] = manifest.get("frontmatter_translate_keys", [])
 
     client = _make_client()
-    system_prompt = _build_system_prompt(style_path, glossary, manifest)
+    system_prompt = _build_system_prompt(style_path, glossary, manifest, scopes)
     model: str = args.model
 
     repo_root = _find_repo_root(Path.cwd())
@@ -776,6 +787,7 @@ def run_delta(
     manifest: dict,
     glossary: dict,
     unapproved: dict[str, str] | None = None,
+    scopes: dict[str, str] | None = None,
 ) -> int:
     """Translate only category-D files changed since `.translation-state.yaml`.
 
@@ -813,7 +825,7 @@ def run_delta(
 
     args.files = [str(f) for f in targets]
     report: list[dict[str, str]] = []
-    exit_code = run_translate(args, manifest, glossary, unapproved, report)
+    exit_code = run_translate(args, manifest, glossary, unapproved, report, scopes)
 
     rel_targets = [str(f.relative_to(repo_root)) for f in targets]
     _write_state_file(output_dir / ".translation-state.yaml", head_sha, rel_targets, report)
@@ -891,12 +903,13 @@ def main() -> int:
         print(f"GLOSSARY NOTE: {note}", file=sys.stderr)
     glossary = loaded.as_mapping()
     unapproved = loaded.unapproved_mapping()
+    scopes = loaded.scope_mapping()
 
     if args.mode == "discover":
         return run_discover(args, manifest, glossary)
     if args.mode == "delta":
-        return run_delta(args, manifest, glossary, unapproved)
-    return run_translate(args, manifest, glossary, unapproved)
+        return run_delta(args, manifest, glossary, unapproved, scopes)
+    return run_translate(args, manifest, glossary, unapproved, scopes=scopes)
 
 
 if __name__ == "__main__":
