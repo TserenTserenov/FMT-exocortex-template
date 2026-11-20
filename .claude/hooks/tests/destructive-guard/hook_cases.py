@@ -529,13 +529,15 @@ def main():
             code, err = run(hook, command)
             check(code != 0 or named in doc, f"{command!r} -> {code}: a pass-through the guide names as {named}")
         # Known limits remain observable until an executable detector replaces them (#1002).
+        # A substitution in an unquoted here-doc body is checked since the rc.14 red team (F19).
+        code, err = run(hook, 'cat <<EOF\n$(rm -rf /important)\nEOF')
+        check(code == 2, f"a substitution in an unquoted here-doc body -> {code}: checked")
         # A literal here-string read by a shell is checked since the rc.8 red team (F6).
         for command in ("bash <<< 'rm -rf /important'", "sh -s <<< 'rm -rf /important'"):
             code, err = run(hook, command)
             check(code == 2, f"{command!r} -> {code}: a literal here-string fed to a shell is checked")
         for command, named in (('echo "$(rm -rf /important)"', "`$(...)`"),
                                ('echo "`rm -rf /important`"', "обратных кавычках"),
-                               ('cat <<EOF\n$(rm -rf /important)\nEOF', "`cat <<EOF`"),
                                ('cat <<EOF > >(bash)\nrm -rf /important\nEOF', "> >(bash)")):
             code, err = run(hook, command)
             check(code == 0 and named in doc, f"{command!r} -> {code}: unresolved pass-through named as {named}")

@@ -223,19 +223,36 @@ PYEOF
 )
   if [ "$verdict" = "ok" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: $desc ($verdict)"; fi
 }
-finishes "semicolon then redirect" 1.0 '"ls ;> params.yaml"'
-finishes "pipe then redirect" 1.0 '"ls |> params.yaml"'
-finishes "chained odd operators" 1.0 '"ls ;>;>;> |>|> >|>| params.yaml"'
-finishes "odd operators in a comment" 1.0 '"ls # ;> |> << \x27 \"\nls ;> |> x"'
+# Short commands: the limit is the time of a plain `ls` on this machine plus 1 s (rc.14 red team,
+# F20: a hook call alone takes close to a second on a slow runner, so an absolute 1 s limit fired
+# without any slow parsing).
+BASELINE=$(python3 - "$HOOK" "$WORKSPACE_ROOT" <<'PYEOF'
+import json, subprocess, sys, time
+hook, root = sys.argv[1], sys.argv[2]
+best = None
+for _ in range(2):
+    started = time.monotonic()
+    subprocess.run(["bash", hook], input=json.dumps({"tool_input": {"command": "ls"}, "cwd": root}), capture_output=True, text=True)
+    took = time.monotonic() - started
+    best = took if best is None else min(best, took)
+print(f"{best:.2f}")
+PYEOF
+)
+SHORT_LIMIT=$(awk -v b="$BASELINE" 'BEGIN { printf "%.2f", b + 1.0 }')
+BRACE_LIMIT=$(awk -v b="$BASELINE" 'BEGIN { printf "%.2f", b + 2.0 }')
+finishes "semicolon then redirect" "$SHORT_LIMIT" '"ls ;> params.yaml"'
+finishes "pipe then redirect" "$SHORT_LIMIT" '"ls |> params.yaml"'
+finishes "chained odd operators" "$SHORT_LIMIT" '"ls ;>;>;> |>|> >|>| params.yaml"'
+finishes "odd operators in a comment" "$SHORT_LIMIT" '"ls # ;> |> << \x27 \"\nls ;> |> x"'
 # 200 KB: the hook as a whole is not linear in every older pass (main takes a few seconds on
 # such text), so the limit here is a termination bound, not the 1.0 s budget of perf_cases.py.
 finishes "200 KB here-doc body with quotes and >" 30 '"cat > notes.md <<\x27EOF\x27\n" + ("a > b it\x27s # c\n" * 13000)[:200000] + "\nEOF"'
 finishes "200 KB of ;> |> after a quoted comment" 30 '"ls # don\x27t\n" + ("x ;> |> # a\x27 <<E " * 12000)[:200000]'
 
 # === WP-529 F275, rc.1 red team F1: 2^40 brace words — the cap answers at once ===
-finishes "40 brace groups after a protected write" 2.0 '"cat README.md > .claude/hooks/destructive-guard.sh || ls > x" + "{a,b}" * 40'
-finishes "40 brace groups into /tmp" 2.0 '"ls > /tmp/x" + "{a,b}" * 40'
-finishes "40 brace groups after tee" 2.0 '"echo a | tee x" + "{a,b}" * 40'
+finishes "40 brace groups after a protected write" "$BRACE_LIMIT" '"cat README.md > .claude/hooks/destructive-guard.sh || ls > x" + "{a,b}" * 40'
+finishes "40 brace groups into /tmp" "$BRACE_LIMIT" '"ls > /tmp/x" + "{a,b}" * 40'
+finishes "40 brace groups after tee" "$BRACE_LIMIT" '"echo a | tee x" + "{a,b}" * 40'
 B40=$(printf '{a,b}%.0s' $(seq 40))
 expect "40 brace groups into /tmp ask (unresolvable)" ask "ls > /tmp/x$B40"
 expect "40 brace groups after tee ask (unresolvable)" ask "echo a | tee x$B40"
