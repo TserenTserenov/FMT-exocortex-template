@@ -25,7 +25,7 @@ Refs: WP-NNN
 
 ### Added
 
-- [optional] `scripts/iwe-notify --direct`: one direct send to Telegram without looking up the notification gateway at all (row `direct-requested` in `direct-send-log.tsv`, outcome `direct-sent` / `direct-failed` / `not-sent`). For a sender whose message is about the governance repository itself being stale or stuck, so that repository's gateway and sender list cannot decide whether the message arrives. Without the flag nothing changes. Test: `scripts/tests/test_iwe_notify_direct.sh`.
+- [optional] `scripts/iwe-notify --direct`: one direct send to Telegram without looking up the notification gateway at all (row `direct-requested` in `direct-send-log.tsv`, outcome `direct-sent` / `direct-failed` / `not-sent`). For a sender whose message is about the governance repository itself being stale or stuck, so that repository's gateway and sender list cannot decide whether the message arrives. Without the flag nothing changes. Test: `scripts/tests/test_iwe_notify_direct.sh`. (#1630)
 
 ### Changed
 
