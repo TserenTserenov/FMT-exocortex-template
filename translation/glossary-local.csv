@@ -1,4 +1,4 @@
-term_ru,term_en,context,notes,tier
+term_ru,term_en,context,notes,tier,only_as
 Dual-mode setup script,Dual-mode setup script,Environment configuration,SETUP_CI flag support; pending_review=true,3
 Headless-адаптер,Headless adapter,Agent inbox runtime,IWE dispatcher implementation; pending_review=true,3
 bearer-заголовок как третий auth-mode,Bearer Header Authentication Mode,authentication protocol extension,backward-compatible multi-channel auth; pending_review=true,3
@@ -18,7 +18,7 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Дисциплина,Discipline,Engineering methodology / IWE,Standard methodology term,2
 Дорожная карта,Roadmap,strategic planning timeline document,compound noun; no hyphen preferred,2
 Заинтересованная сторона,Stakeholder,requirements and systems engineering,Standard SE/BABOK term,2
-Закрытие,Closing,ORZ Closing phase,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),1
+Закрытие,Closing,ORZ Closing phase,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),1,the ORZ Closing phase or the name of the IWE development pipeline station
 Замена терминологии,Multi-pass terminology replacement,Semantic consistency,IWE-specific peer verification; pending_review=true,3
 Знание,Knowledge,learning and knowledge management,cognitive domain; approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
 Интеграция,Integration,system or service integration,straightforward,2
@@ -54,7 +54,7 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Онтология,Ontology,formal knowledge representation model,Used in semantic/conceptual modeling,2
 Операция,Operation,unit of work or system action,"context-dependent; also ""procedure""",2
 Опыт,Experience,practitioner background and expertise,also can mean experiment in sci context,2
-Открытие,Opening,ORZ Opening phase,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),1
+Открытие,Opening,ORZ Opening phase,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),1,the ORZ Opening phase or the name of the IWE development pipeline station
 Оценка,Assessment,evaluating system or process state,"also ""estimation"" in planning contexts",2
 Пак,Pack,Knowledge pack,,1
 Память,Memory,Event sourcing pattern,Observed events + derived aggregates; pending_review=true,3
@@ -133,5 +133,6 @@ IWE у разработчика,Developer IWE,change accounting (WP-611),approve
 Ведущий встречи,meeting facilitator,IWE team practice,approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
 Кворум,quorum,IWE team practice,approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
 Асинхронное решение,Async decision,IWE team practice,approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
-Проектирование,Design,IWE development pipeline station,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),2
-Работа,Work,IWE development pipeline station,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),2
+Проектирование,Design,IWE development pipeline station,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),2,the name of the IWE development pipeline station
+Работа,Work,IWE development pipeline station,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),2,the name of the IWE development pipeline station
+Проверка,Verification,IWE development pipeline station and project board column,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),2,the name of the IWE development pipeline station or of the project board column

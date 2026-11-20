@@ -100,13 +100,18 @@ def local_conflicts(included: list[dict], local_rows: list[dict[str, str]]) -> l
 
 
 def local_rows_to_drop(snapshot_rows: list[dict], local_rows: list[dict[str, str]], tier_by_level: dict) -> list[str]:
-    """Russian names of local rows the snapshot now serves with the same English name and no stricter tier."""
+    """Russian names of local rows the snapshot now serves with the same English name and no stricter tier.
+
+    A row with ``only_as`` stays: it is the only place that says where a homonym's name applies (WP-620 Ф6).
+    """
     graph, _conflicted = _graph_terms(snapshot_rows, tier_by_level, notes=[])
     drop = []
     for row in local_rows:
         ru = (row.get("term_ru") or "").strip()
         graph_term = graph.get(_key(ru))
         if graph_term is None or graph_term.term_en != (row.get("term_en") or "").strip():
+            continue
+        if (row.get("only_as") or "").strip():
             continue
         tier_raw = (row.get("tier") or "").strip()
         tier = int(tier_raw) if tier_raw.isdigit() else LOCAL_DEFAULT_TIER
