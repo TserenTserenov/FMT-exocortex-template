@@ -125,7 +125,7 @@
     },
     {
       "path": ".claude/hooks/memory-write-permission.sh",
-      "sha256": "5f14f83f453782854f6ef0ce5db176c873c3452ae48be589c4967bfcf2ed33d9"
+      "sha256": "a76ce8d65852cff3122a5bdbca1069691f86a0d6a779022aecddec585339bd8d"
     },
     {
       "path": ".claude/hooks/pack-creator-spf-guard.sh",
@@ -301,7 +301,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-memory-write-permission.sh",
-      "sha256": "5e983e7fa3b01f40dce7a397344b73f2319f127177a0b5e5361c04a79bdcc1c3"
+      "sha256": "fb0e1fb6bf99116c2fcf6e0b6479518cf2b739200c16f22fd5669ef12587d35e"
     },
     {
       "path": ".claude/hooks/tests/test-protocol-artifact-validate-mandatory-fail-closed.sh",
@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "5bfc199a3a1e3891f927ec36aec019675781a14db22af9c00b9a53782ade2a9d"
+      "sha256": "d15f0ebb5504dbefd65846bbf69b385abb898984ba1fdfafae5ec783b6518257"
     },
     {
       "path": "CLAUDE.md",
