@@ -23,6 +23,10 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+### Added
+
+- [optional] `scripts/iwe-notify --direct`: one direct send to Telegram without looking up the notification gateway at all (row `direct-requested` in `direct-send-log.tsv`, outcome `direct-sent` / `direct-failed` / `not-sent`). For a sender whose message is about the governance repository itself being stale or stuck, so that repository's gateway and sender list cannot decide whether the message arrives. Without the flag nothing changes. Test: `scripts/tests/test_iwe_notify_direct.sh`.
+
 ### Changed
 
 - [behavior] (#1633) Рабочий продукт (РП) нельзя перенести в архив, пока в его ящике входящих (`inbox/WP-N/INBOX.md`) есть записи «новое». Перед архивом владелец разбирает каждую запись: переносит её в «Осталось» карточки или с согласия пользователя отмечает «учтено» (`wp-inbox.sh mark`). Обхода нет, флаг `ALLOW_FORCE_PUSH` его тоже не даёт. Хуки репозитория управления (`seed/strategy/.githooks/pre-commit`, `pre-push`) зовут проверку `scripts/wp-inbox-close-gate.sh`. Она ловит ручной перенос и удаление ящика, а также запись «новое», которую слияние или rebase устаревшей ветки занесли в архивную копию уже закрытого РП. Если проверки в установке нет, хуки отклоняют любое закрытие РП с ящиком. Проверку доставляет синхронизация из авторской установки: `wp-inbox.sh check-text`, `archive-done-wp.sh`, шаг 5b.1–5b.2 протокола закрытия. Правило отправителя в протоколе работы (§2в): знание для чужого РП пишут в его ящик, а не в его карточку (WP-503 Ф110).
