@@ -52,7 +52,7 @@ bash .claude/scripts/load-extensions.sh verify before
 | `archgate` | Проверка реализации АрхГейта | Код соответствует ЭМОГССБ-оценке, принципы воплощены |
 | `capture` | Проверка capture-candidate | UL, полнота, непротиворечивость с Pack |
 | `pack` | Проверка Package-адекватности | Проверяет 11 координат E.4.DPF.DA seed-пакета (Ф1-Ф3 артефакты): SoTA, decision-record, seed-маркер, их достаточность. Используется из `/verify pack` или `pack-creator` Шаг 4 |
-| `wp` | Приёмка рабочего продукта | Критерии done из WP context file |
+| `wp` | Проверка рабочего продукта | Критерии done из WP context file |
 | `chain` | Data flow check | Прочитаны ли downstream consumers? Контракты совпадают? (CoVe stage 3) |
 | `adversarial` | Scope & bias check | Scope определён анализом или выводом? Что НЕ прочитано? (Pre-mortem) |
 | `subsection` | Проверка подраздела руководства (SS) | 🔴 v4-lint + 🟡 нарратив/дуга/практика/аналогия (G-L) по CHECKLIST-subsection-v1.md |
