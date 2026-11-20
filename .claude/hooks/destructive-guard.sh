@@ -12,6 +12,9 @@ if [ -n "${BASH_ENV-}${ENV-}" ]; then exec env -u BASH_ENV -u ENV bash "${BASH_S
 # past DG_BUDGET seconds the group is stopped and the answer is a block. The marker is an argument,
 # which the caller's environment cannot set.
 if [ "${1:-}" != --dg-budget ]; then
+  dg_proof=$(mktemp "${TMPDIR:-/tmp}/dg-proof.XXXXXX") \
+    || { echo "BLOCKED: ошибка проверки destructive-guard (mktemp) — команда не пропущена." >&2; exit 2; }
+  dg_nonce="$$.$RANDOM.$RANDOM.$RANDOM"
   perl -e '
     use strict; use warnings; use POSIX ();
     my $budget = shift;
@@ -32,18 +35,42 @@ if [ "${1:-}" != --dg-budget ]; then
       }
       select(undef, undef, undef, 0.005);
     }
-  ' -- 40 bash "${BASH_SOURCE[0]}" --dg-budget <&0 &
+  ' -- 40 bash "${BASH_SOURCE[0]}" --dg-budget "$dg_proof" "$dg_nonce" <&0 &
   dg_budget_pid=$!
-  # Killed while waiting: the timer stops the hook's group; the answer is a block.
-  trap 'kill -TERM "$dg_budget_pid" 2>/dev/null; wait "$dg_budget_pid" 2>/dev/null; exit 2' TERM INT HUP QUIT
+  # A second clock, independent of the timer (rc.14 red team, F22: a stopped timer left the hook
+  # waiting): at 45 s it signals this shell, which stops the timer and the hook and blocks.
+  dg_outer=$$
+  ( trap 'kill "$dg_sleep" 2>/dev/null; exit 0' TERM; sleep 45 & dg_sleep=$!; wait "$dg_sleep"; kill -TERM "$dg_outer" ) \
+    </dev/null >/dev/null 2>&1 &
+  dg_watch_pid=$!
+  dg_outer_stop() {
+    local inner
+    kill -KILL "$dg_budget_pid" 2>/dev/null || true
+    inner=$(sed -n 's/^pid //p' "$dg_proof" 2>/dev/null || true)
+    [ -n "$inner" ] && kill -KILL -- "-$inner" 2>/dev/null
+    kill -TERM "$dg_watch_pid" 2>/dev/null
+    rm -f "$dg_proof"
+  }
+  # Killed while waiting, or the second clock ran out: the answer is a block.
+  trap 'dg_outer_stop; echo "BLOCKED: проверка destructive-guard прервана или не уложилась во время — команда не пропущена." >&2; exit 2' TERM INT HUP QUIT
   dg_budget_rc=0
   wait "$dg_budget_pid" || dg_budget_rc=$?
-  # Only an allow (0) or a block (2) passes through: a broken or missing perl blocks.
+  kill -TERM "$dg_watch_pid" 2>/dev/null || true
+  # An allow counts only with the proof the hook itself writes at its end: a perl that exits 0
+  # without running it blocks (rc.14 red team, F21). A broken or missing perl blocks too.
+  dg_proof_text=$(cat "$dg_proof" 2>/dev/null || true)
+  rm -f "$dg_proof"
   case "$dg_budget_rc" in
-    0 | 2) exit "$dg_budget_rc" ;;
+    0) [ "$dg_proof_text" = "ok $dg_nonce" ] && exit 0
+       echo "BLOCKED: ошибка проверки destructive-guard (нет подтверждения проверки) — команда не пропущена." >&2; exit 2 ;;
+    2) exit 2 ;;
     *) echo "BLOCKED: ошибка проверки destructive-guard (счётчик времени, код $dg_budget_rc) — команда не пропущена. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота." >&2; exit 2 ;;
   esac
 fi
+DG_PROOF=${2:-}
+DG_NONCE=${3:-}
+# The process group of this run, for the outer shell to stop if its timer cannot.
+[ -n "$DG_PROOF" ] && printf 'pid %s\n' "$$" >"$DG_PROOF" 2>/dev/null
 set -euo pipefail
 
 block() {
@@ -124,7 +151,10 @@ on_exit() {
     dg_legacy_cleanup
     fail_check "неожиданный выход, код $rc"
   fi
-  if [ "$rc" -eq 0 ]; then dg_legacy_verdict; fi
+  if [ "$rc" -eq 0 ]; then
+    dg_legacy_verdict
+    [ -n "${DG_PROOF:-}" ] && printf 'ok %s' "$DG_NONCE" >"$DG_PROOF"
+  fi
   dg_legacy_cleanup
 }
 trap on_exit EXIT
@@ -809,11 +839,38 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       # backquote it may close before its body, and shells disagree (rc.10 red team, F10).
       if (@$expansions || $in_bq) { $shift_in_expansion = 1; next; }
       my $tail = substr($line, $i);
-      # A CR after the delimiter word is part of it, as for bash: `<<W` + CR ends only at a `W` + CR
-      # line (rc.12 red team, F16).
-      next unless $tail =~ /^<<(-?)[ \t]*(?!<)(?:([\x27"])([A-Za-z_][A-Za-z0-9_]*)\2|\\?([A-Za-z_][A-Za-z0-9_]*))(\r*)/;
-      my $match_length = length($&);
-      my ($indent, $delim) = ($1 eq q{-}, (defined $3 ? $3 : $4) . $5);
+      # The delimiter is the whole word after `<<`/`<<-`, as bash reads it: up to an unquoted blank or
+      # metacharacter, with quotes and backslashes removed; any quoting makes the body literal. A CR
+      # is part of the word (rc.12 red team, F16); `END-MSG`, `W.x`, `E"O"F` are words too (rc.14, F18).
+      next unless $tail =~ /^<<(-?)[ \t]*(?!<)/;
+      my ($indent, $j) = ($1 eq q{-}, length($&));
+      my ($delim, $quoted, $open) = (q{}, 0, 0);
+      while ($j < length($tail)) {
+        my $c = substr($tail, $j, 1);
+        last if $c =~ /[ \t;&|()<>]/;
+        if ($c eq "\\") { $quoted = 1; $delim .= substr($tail, $j + 1, 1); $j += 2; next; }
+        if ($c eq chr(39) || ($c eq "\$" && substr($tail, $j + 1, 1) eq chr(39))) {
+          my $from = $c eq chr(39) ? $j + 1 : $j + 2;
+          my $e = index($tail, chr(39), $from);
+          if ($c ne chr(39)) { $e = $from; $e += substr($tail, $e, 1) eq "\\" ? 2 : 1 while $e < length($tail) && substr($tail, $e, 1) ne chr(39); $e = -1 if $e >= length($tail); }
+          if ($e < 0) { $open = 1; last; }
+          $quoted = 1; $delim .= substr($tail, $from, $e - $from); $j = $e + 1; next;
+        }
+        if ($c eq q{"}) {
+          my $e = $j + 1;
+          my $word = q{};
+          while ($e < length($tail) && substr($tail, $e, 1) ne q{"}) {
+            if (substr($tail, $e, 1) eq "\\" && substr($tail, $e + 1, 1) =~ /[\\"\$`]/) { $e++; }
+            $word .= substr($tail, $e, 1); $e++;
+          }
+          if ($e >= length($tail)) { $open = 1; last; }
+          $quoted = 1; $delim .= $word; $j = $e + 1; next;
+        }
+        $delim .= $c; $j++;
+      }
+      # A quote that runs past the line or an empty word: not read here, so no body is dropped.
+      if ($open || !length $delim) { $shift_in_expansion = 1; next; }
+      my $match_length = $j;
       my $recipient = substr($line, $start, $i - $start);
       my $prefix_is_data = data_command_before_heredoc($recipient);
       my @right_stages = right_command_stages(substr($line, $i + $match_length));
@@ -842,7 +899,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       for my $stage (@right_stages[1 .. $#right_stages]) {
         $keep ||= heredoc_recipient($stage);
       }
-      push @specs, { indent => $indent, delim => $delim, keep => $keep };
+      push @specs, { indent => $indent, delim => $delim, keep => $keep, quoted => $quoted };
       $last_heredoc_end = $i + $match_length;
       $i += $match_length - 1;
     }
@@ -862,8 +919,45 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
     return (\@specs, $quote, $group_depth);
   }
 
+  # The command substitutions $(…) and `…` of an unquoted here-doc body: bash runs them when it
+  # reads the body, whatever command gets the text (rc.14 red team, F19; issue #1002). Each inner
+  # command is returned as its own text, with a quote it leaves open closed after it.
+  sub body_substitutions {
+    my ($t) = @_;
+    my @found;
+    my $n = length $t;
+    for (my $i = 0; $i < $n; $i++) {
+      my $c = substr($t, $i, 1);
+      if ($c eq "\\") { $i++; next; }
+      my ($from, $end);
+      if ($c eq "\$" && substr($t, $i + 1, 1) eq "(" && substr($t, $i + 2, 1) ne "(") {
+        my ($depth, $q) = (0, undef);
+        for (my $k = $i + 2; $k < $n; $k++) {
+          my $d = substr($t, $k, 1);
+          if (defined $q) { $k++ if $d eq "\\" && $q ne chr(39); undef $q if $d eq $q; next; }
+          if ($d eq "\\") { $k++; next; }
+          if ($d eq chr(39) || $d eq q{"}) { $q = $d; next; }
+          if ($d eq "(") { $depth++; next; }
+          if ($d eq ")") { if ($depth) { $depth--; next; } $end = $k; last; }
+        }
+        ($from, $end) = ($i + 2, defined $end ? $end : $n);
+      } elsif ($c eq "`") {
+        $end = $i + 1;
+        $end += substr($t, $end, 1) eq "\\" ? 2 : 1 while $end < $n && substr($t, $end, 1) ne "`";
+        ($from, $end) = ($i + 1, $end < $n ? $end : $n);
+      } else { next; }
+      my $inner = substr($t, $from, $end - $from);
+      push @found, $inner;
+      my ($q) = scan_quote_state($inner, undef);
+      push @found, ($q eq "a" ? chr(39) : $q) if defined $q;
+      push @found, q{};
+      $i = $end;
+    }
+    return @found;
+  }
+
   sub reduce {
-  my (@out, @pending);
+  my (@out, @pending, @substituted);
   my ($header_quote, $header_group_depth, $group_source, @compound_frames) = (undef, 0, q{});
   my @expansions;
   my $in_bq_state = 0;
@@ -878,6 +972,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       $probe =~ s/^\t+// if $body->{indent};
       if ($probe eq $body->{delim}) {
         $empty_body = 1 unless $body->{text};
+        push @substituted, body_substitutions($body->{source}) if defined $body->{source};
         # A kept body is a script of its own: a quote it leaves open must not swallow the lines of
         # the call after it (rc.12 red team, F16: `bash <<W` + `echo \x27a` + `W` + a command).
         push @out, ($body->{quote} eq "a" ? chr(39) : $body->{quote}) if $body->{keep} && defined $body->{quote};
@@ -889,6 +984,8 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       if ($body->{keep}) {
         push @out, $kept;
         ($body->{quote}) = scan_quote_state($kept, $body->{quote});
+      } elsif (!$body->{quoted} && ($line =~ /\$\(|`/ || defined $body->{source})) {
+        $body->{source} = (defined $body->{source} ? $body->{source} . "\n" : q{}) . $line;
       }
       next;
     }
@@ -914,7 +1011,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
     $group_source = $after_depth ? $group_source . $line . "\n" : q{};
     $header_group_depth = $after_depth;
   }
-  return (scalar @pending, $empty_body, \@out);
+  return (scalar @pending, $empty_body, [@out, @substituted]);
   }
   # One reading only: the released guards in destructive-guard.d/ read the text their own way, and
   # the strictest verdict wins (rc.10 red team, F8: two readings joined into one text let the open

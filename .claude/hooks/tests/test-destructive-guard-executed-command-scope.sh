@@ -869,5 +869,177 @@ $'bash <<W\r\necho \'a\nW\r\nfind . -delete'
 expect 'F16 контроль: here-doc с CR в данных остаётся данными' pass \
 $'cat > /tmp/n <<\'EOF\'\r\ndon\'t\r\nEOF\r\n'
 
+# === WP-529 F275, rc.14 red team F18/F19: the here-doc delimiter is the whole word, as bash reads it ===
+# One row per delimiter word of the shell-truth search that rc.14 let through (bash, sh or zsh run the
+# last line), the realistic rows of the red team, and substitutions in an unquoted body (F19).
+expect 'F18 dl0: ограничитель bash,sh,zsh' block \
+$'cat <<!W\necho \'a\n!W\nfind . -delete'
+expect 'F18 dl8: ограничитель bash,sh,zsh' block \
+$'cat <<W!x\necho \'a\nW!x\nfind . -delete'
+expect 'F18 dl16: ограничитель bash,sh,zsh' block \
+$'cat <<W!\necho \'a\nW!\nfind . -delete'
+expect 'F18 dl56: ограничитель bash,sh,zsh' block \
+$'cat <<W#x\necho \'a\nW#x\nfind . -delete'
+expect 'F18 dl64: ограничитель bash,sh,zsh' block \
+$'cat <<W#\necho \'a\nW#\nfind . -delete'
+expect 'F18 dl72: ограничитель bash,sh,zsh' block \
+$'cat <<$W\necho \'a\n$W\nfind . -delete'
+expect 'F18 dl80: ограничитель bash,sh,zsh' block \
+$'cat <<W$x\necho \'a\nW$x\nfind . -delete'
+expect 'F18 dl88: ограничитель bash,sh,zsh' block \
+$'cat <<W$\necho \'a\nW$\nfind . -delete'
+expect 'F18 dl96: ограничитель bash,sh,zsh' block \
+$'cat <<%W\necho \'a\n%W\nfind . -delete'
+expect 'F18 dl104: ограничитель bash,sh,zsh' block \
+$'cat <<W%x\necho \'a\nW%x\nfind . -delete'
+expect 'F18 dl112: ограничитель bash,sh,zsh' block \
+$'cat <<W%\necho \'a\nW%\nfind . -delete'
+expect 'F18 dl216: ограничитель bash,sh,zsh' block \
+$'cat <<*W\necho \'a\n*W\nfind . -delete'
+expect 'F18 dl224: ограничитель bash,sh,zsh' block \
+$'cat <<W*x\necho \'a\nW*x\nfind . -delete'
+expect 'F18 dl232: ограничитель bash,sh,zsh' block \
+$'cat <<W*\necho \'a\nW*\nfind . -delete'
+expect 'F18 dl240: ограничитель bash,sh,zsh' block \
+$'cat <<+W\necho \'a\n+W\nfind . -delete'
+expect 'F18 dl248: ограничитель bash,sh,zsh' block \
+$'cat <<W+x\necho \'a\nW+x\nfind . -delete'
+expect 'F18 dl256: ограничитель bash,sh,zsh' block \
+$'cat <<W+\necho \'a\nW+\nfind . -delete'
+expect 'F18 dl264: ограничитель bash,sh,zsh' block \
+$'cat <<,W\necho \'a\n,W\nfind . -delete'
+expect 'F18 dl272: ограничитель bash,sh,zsh' block \
+$'cat <<W,x\necho \'a\nW,x\nfind . -delete'
+expect 'F18 dl280: ограничитель bash,sh,zsh' block \
+$'cat <<W,\necho \'a\nW,\nfind . -delete'
+expect 'F18 dl292: ограничитель bash,sh,zsh' block \
+$'cat <<--W\n\techo \'a\n\t-W\nfind . -delete'
+expect 'F18 dl296: ограничитель bash,sh,zsh' block \
+$'cat <<W-x\necho \'a\nW-x\nfind . -delete'
+expect 'F18 dl304: ограничитель bash,sh,zsh' block \
+$'cat <<W-\necho \'a\nW-\nfind . -delete'
+expect 'F18 dl312: ограничитель bash,sh,zsh' block \
+$'cat <<.W\necho \'a\n.W\nfind . -delete'
+expect 'F18 dl320: ограничитель bash,sh,zsh' block \
+$'cat <<W.x\necho \'a\nW.x\nfind . -delete'
+expect 'F18 dl328: ограничитель bash,sh,zsh' block \
+$'cat <<W.\necho \'a\nW.\nfind . -delete'
+expect 'F18 dl336: ограничитель bash,sh,zsh' block \
+$'cat <</W\necho \'a\n/W\nfind . -delete'
+expect 'F18 dl344: ограничитель bash,sh,zsh' block \
+$'cat <<W/x\necho \'a\nW/x\nfind . -delete'
+expect 'F18 dl352: ограничитель bash,sh,zsh' block \
+$'cat <<W/\necho \'a\nW/\nfind . -delete'
+expect 'F18 dl360: ограничитель bash,sh,zsh' block \
+$'cat <<:W\necho \'a\n:W\nfind . -delete'
+expect 'F18 dl368: ограничитель bash,sh,zsh' block \
+$'cat <<W:x\necho \'a\nW:x\nfind . -delete'
+expect 'F18 dl376: ограничитель bash,sh,zsh' block \
+$'cat <<W:\necho \'a\nW:\nfind . -delete'
+expect 'F18 dl432: ограничитель bash,sh,zsh' block \
+$'cat <<=W\necho \'a\n=W\nfind . -delete'
+expect 'F18 dl440: ограничитель bash,sh,zsh' block \
+$'cat <<W=x\necho \'a\nW=x\nfind . -delete'
+expect 'F18 dl448: ограничитель bash,sh,zsh' block \
+$'cat <<W=\necho \'a\nW=\nfind . -delete'
+expect 'F18 dl480: ограничитель bash,sh,zsh' block \
+$'cat <<?W\necho \'a\n?W\nfind . -delete'
+expect 'F18 dl488: ограничитель bash,sh,zsh' block \
+$'cat <<W?x\necho \'a\nW?x\nfind . -delete'
+expect 'F18 dl496: ограничитель bash,sh,zsh' block \
+$'cat <<W?\necho \'a\nW?\nfind . -delete'
+expect 'F18 dl504: ограничитель bash,sh,zsh' block \
+$'cat <<@W\necho \'a\n@W\nfind . -delete'
+expect 'F18 dl512: ограничитель bash,sh,zsh' block \
+$'cat <<W@x\necho \'a\nW@x\nfind . -delete'
+expect 'F18 dl520: ограничитель bash,sh,zsh' block \
+$'cat <<W@\necho \'a\nW@\nfind . -delete'
+expect 'F18 dl528: ограничитель bash,sh,zsh' block \
+$'cat <<[W\necho \'a\n[W\nfind . -delete'
+expect 'F18 dl536: ограничитель bash,sh,zsh' block \
+$'cat <<W[x\necho \'a\nW[x\nfind . -delete'
+expect 'F18 dl544: ограничитель bash,sh,zsh' block \
+$'cat <<W[\necho \'a\nW[\nfind . -delete'
+expect 'F18 dl576: ограничитель bash,sh,zsh' block \
+$'cat <<]W\necho \'a\n]W\nfind . -delete'
+expect 'F18 dl584: ограничитель bash,sh,zsh' block \
+$'cat <<W]x\necho \'a\nW]x\nfind . -delete'
+expect 'F18 dl592: ограничитель bash,sh,zsh' block \
+$'cat <<W]\necho \'a\nW]\nfind . -delete'
+expect 'F18 dl600: ограничитель bash,sh,zsh' block \
+$'cat <<^W\necho \'a\n^W\nfind . -delete'
+expect 'F18 dl608: ограничитель bash,sh,zsh' block \
+$'cat <<W^x\necho \'a\nW^x\nfind . -delete'
+expect 'F18 dl616: ограничитель bash,sh,zsh' block \
+$'cat <<W^\necho \'a\nW^\nfind . -delete'
+expect 'F18 dl672: ограничитель bash,sh,zsh' block \
+$'cat <<{W\necho \'a\n{W\nfind . -delete'
+expect 'F18 dl680: ограничитель bash,sh,zsh' block \
+$'cat <<W{x\necho \'a\nW{x\nfind . -delete'
+expect 'F18 dl688: ограничитель bash,sh,zsh' block \
+$'cat <<W{\necho \'a\nW{\nfind . -delete'
+expect 'F18 dl720: ограничитель bash,sh,zsh' block \
+$'cat <<}W\necho \'a\n}W\nfind . -delete'
+expect 'F18 dl728: ограничитель bash,sh,zsh' block \
+$'cat <<W}x\necho \'a\nW}x\nfind . -delete'
+expect 'F18 dl736: ограничитель bash,sh' block \
+$'cat <<W}\necho \'a\nW}\nfind . -delete'
+expect 'F18 dl744: ограничитель bash,sh,zsh' block \
+$'cat <<~W\necho \'a\n~W\nfind . -delete'
+expect 'F18 dl752: ограничитель bash,sh,zsh' block \
+$'cat <<W~x\necho \'a\nW~x\nfind . -delete'
+expect 'F18 dl760: ограничитель bash,sh,zsh' block \
+$'cat <<W~\necho \'a\nW~\nfind . -delete'
+expect 'F18 dl768: ограничитель bash,sh,zsh' block \
+$'cat <<\'W.x\'\necho \'a\nW.x\nfind . -delete'
+expect 'F18 dl784: ограничитель bash,sh,zsh' block \
+$'cat <<"W.x"\necho \'a\nW.x\nfind . -delete'
+expect 'F18 dl800: ограничитель bash,sh,zsh' block \
+$'cat <<W\\.x\necho \'a\nW.x\nfind . -delete'
+expect 'F18 dl816: ограничитель bash,sh,zsh' block \
+$'cat <<E"O"F\necho \'a\nEOF\nfind . -delete'
+expect 'F18 dl832: ограничитель bash,sh,zsh' block \
+$'cat <<\'E\'O"F"\necho \'a\nEOF\nfind . -delete'
+expect 'F18 dl848: ограничитель bash,sh,zsh' block \
+$'cat <<$\'W\'\necho \'a\nW\nfind . -delete'
+expect 'F18 dl880: ограничитель bash,sh,zsh' block \
+$'cat <<\'END-MSG\'\necho \'a\nEND-MSG\nfind . -delete'
+expect 'F18 dl896: ограничитель bash,sh,zsh' block \
+$'cat <<END-MSG\necho \'a\nEND-MSG\nfind . -delete'
+expect 'F18 dl904: ограничитель bash,sh,zsh' block \
+$'cat <<"W x"\necho \'a\nW x\nfind . -delete'
+expect 'F18 dl920: ограничитель bash,sh,zsh' block \
+$'cat <<\'W;x\'\necho \'a\nW;x\nfind . -delete'
+expect 'F18 dl936: ограничитель bash,sh,zsh' block \
+$'cat <<W\\ x\necho \'a\nW x\nfind . -delete'
+expect 'F18 real-0' block \
+$'cat > /tmp/n.md <<END-NOTE\nDon\'t forget\nEND-NOTE\ngit reset --hard'
+expect 'F18 real-1' block \
+$'cat <<END-NOTE\nDon\'t forget\nEND-NOTE\ngit reset --hard'
+expect 'F18 real-2' block \
+$'cat <<END-NOTE\nit\'s\nEND-NOTE\ngit reset --hard'
+expect 'F18 real-3' block \
+$'cat <<W.x\nit\'s\nW.x\ngit reset --hard'
+expect 'F18 real-4' block \
+$'cat <<W.x\nit\'s\nW.x\nfind . -delete'
+expect 'F18 real-5' block \
+$'cat <<W.x\nit\'s a\nW.x\nfind . -delete'
+expect 'F18 real-6' block \
+$'git commit -F - <<END-MSG\nfix: don\'t crash\nEND-MSG\ngit push --force origin main'
+expect 'F18 real-7' block \
+$'python3 - <<PY.EOF\nprint("it\'s")\nPY.EOF\ngit clean -fdx'
+expect 'F18 real-8' block \
+$'cat <<EOF-1\nsay "hi\nEOF-1\nrm -rf ~/work'
+expect 'F18 real-9' block \
+$'cat <<EOF\nDon\'t forget\nEOF\ngit reset --hard'
+expect 'F19: перенос в теле без кавычек склеивает строку с ограничителем' block \
+$': <<W\na \\\nW\n$(find . -delete)\nW'
+expect 'F19: обратные кавычки в теле без кавычек выполняются' block \
+$'git commit -F - <<EOF\nfix: `git push --force origin main`\nEOF'
+expect 'F19 контроль: в теле с кавычками ограничителя подстановки не выполняются' pass \
+$'git commit -F - <<\'EOF\'\nrun `rm -rf build` to clean\nEOF'
+expect 'F19 контроль: безобидные обратные кавычки в сообщении коммита' pass \
+$'git commit -F - <<EOF\nfix: use `git status` before `ls`\nEOF'
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

@@ -135,7 +135,7 @@ for sig in (signal.SIGKILL, signal.SIGQUIT):
 
 # The total time budget: past it the hook's process group is stopped and the answer is a block.
 src_wrap = open(hooks + "/destructive-guard.sh").read()
-w0 = src_wrap.index("--dg-budget ]; then\n  perl -e '") + len("--dg-budget ]; then\n  perl -e '")
+w0 = src_wrap.index("\n  perl -e '", src_wrap.index("--dg-budget ]; then")) + len("\n  perl -e '")
 wrapper = src_wrap[w0:src_wrap.index("' -- 40 bash", w0)]
 mark2 = "DGBUDGETMARK%d" % os.getpid()
 t0 = time.time()
@@ -146,6 +146,38 @@ if q.returncode != 2 or b"BLOCKED" not in q.stderr or took > 10:
 time.sleep(0.3)
 if [x for x in subprocess.run(["pgrep", "-f", mark2], capture_output=True).stdout.split() if x]:
     fails.append("budget: the stopped hook is still running")
+
+# rc.14 red team F21: a perl that exits 0 without running anything does not make an allow.
+fakeperl = work + "/fakeperl"
+os.makedirs(fakeperl)
+open(fakeperl + "/perl", "w").write("#!/bin/sh\nexit 0\n")
+os.chmod(fakeperl + "/perl", 0o755)
+expect("perl exits 0 without running, ls", verdict(base, "ls -la", env=dict(ENV, PATH=fakeperl + ":" + ENV["PATH"])))
+
+# rc.14 red team F22: a stopped timer does not leave the hook waiting; a second clock blocks.
+p = subprocess.Popen(["bash", base + "/.claude/hooks/destructive-guard.sh"], stdin=subprocess.PIPE,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=ENV, cwd=base)
+p.stdin.write(json.dumps({"tool_input": {"command": "ls -la"}, "cwd": base}).encode()); p.stdin.close()
+time.sleep(0.2)
+stopped = []
+for k in subprocess.run(["pgrep", "-P", str(p.pid)], capture_output=True, text=True).stdout.split():
+    if "perl" in subprocess.run(["ps", "-o", "comm=", "-p", k], capture_output=True, text=True).stdout:
+        os.kill(int(k), signal.SIGSTOP); stopped.append(int(k))
+t0 = time.time()
+try:
+    p.wait(70)
+    if p.returncode != 2:
+        fails.append("stopped timer: exit %d, want a block" % p.returncode)
+except subprocess.TimeoutExpired:
+    fails.append("stopped timer: the hook still waits after 70 s")
+    p.kill()
+for k in stopped:
+    try:
+        os.kill(k, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+if not stopped:
+    fails.append("stopped timer: no timer process found")
 
 # The runner of one released guard, taken from the hook: time limit, kill, gone hook.
 src = open(hooks + "/destructive-guard.sh").read()

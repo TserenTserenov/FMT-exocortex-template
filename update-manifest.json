@@ -81,7 +81,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "741a0fcea81ef347e12a477246b709d0ecd5d8d66e7edf54bfccc1340ba808c5"
+      "sha256": "f944b60b53f181773a64dff8cf91b091e7bf787bb29b44d4dfb850eacb57ef8c"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -221,7 +221,7 @@
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/hook_cases.py",
-      "sha256": "8b6368fcb8d6c639a5c64b52caa0d83f7844c693c2531f595fdb0f013f475d93"
+      "sha256": "2c133c6636cd3bb50d6151179ae9d50e06b5e28c1c1249ab480b74ade0490f42"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/long_cases.py",
@@ -233,7 +233,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
-      "sha256": "722e479a4b36d745460f2a8296b61454a01aefb92dfe894f52f6b296594252f2"
+      "sha256": "3a654e30e5b62d17eb0f405e69c60139eb7f966a636b4dce4552a579f8576a47"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-file-writers.sh",
@@ -261,7 +261,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-legacy-floor.sh",
-      "sha256": "a7cbc941b962d6640f3b197e539f6c08c717eb8e73280bb19ea531d06f589b76"
+      "sha256": "272e3a92e6545db11042f2754e87ce7f9841da3b81f009358a833a65e2088ef4"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-malformed-json.sh",
@@ -277,7 +277,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-reader-overwrite.sh",
-      "sha256": "c5e8361b2e024be9a1f40f78536b05895e8858acc76cb8ddfff0f6e93e75c778"
+      "sha256": "fddc29f4ea0ab14279e4cbff5428ca4f27db5a0a4f25a739f627c2ccb25134d2"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-windows-smoke.sh",
@@ -993,7 +993,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "b99321f8435bf64e2a4df8ee01e375731ef50813fad8a029f21d4abb4559b271"
+      "sha256": "3f0cd2f39ba997dcf2eb0ca5c20c30f3cbdc525207c49b1107e3406cc318a588"
     },
     {
       "path": "CLAUDE.md",
@@ -1049,7 +1049,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "8da1c8f61f146868e139236a4b228710927b9d43795944b455a09f0c7bb154b8"
+      "sha256": "231f3ba99e74361c91d28f6d956ef085b25ec84a163709d92a0d7f0d4da59234"
     },
     {
       "path": "docs/IWE-HELP.md",
