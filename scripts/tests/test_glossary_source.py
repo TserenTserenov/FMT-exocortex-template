@@ -105,6 +105,52 @@ def test_duplicate_local_row_is_an_error(tmp_path):
         _load(tmp_path, [], ["Пак,Pack,,,1\n", "пак,Pack,,,1\n"])
 
 
+def _load_with_scope(tmp_path: Path, snapshot_rows: list[str], local_rows: list[str]):
+    (tmp_path / "snap.csv").write_text(SNAPSHOT_HEADER + "".join(snapshot_rows), encoding="utf-8")
+    header = LOCAL_HEADER.rstrip("\n") + ",only_as\n"
+    (tmp_path / "local.csv").write_text(header + "".join(local_rows), encoding="utf-8")
+    manifest = {"glossary": {"snapshot": "snap.csv", "local": "local.csv", "tier_by_level": TIERS}}
+    return load_glossary(manifest, tmp_path)
+
+
+def test_local_only_as_limits_where_a_homonym_applies(tmp_path):
+    # WP-620 Ф6: «Проверка» is a pipeline station in one text and a plain "check" in the next.
+    g = _load_with_scope(
+        tmp_path,
+        [],
+        ["Проверка,Verification,,,2,the pipeline station\n", "Пак,Pack,,,1\n", "Скилл,Skill,,,1,\n"],
+    )
+    assert g.scope_mapping() == {"Проверка": "the pipeline station"}
+    assert _by_ru(g)["Пак"].only_as == ""
+
+
+def test_local_only_as_survives_a_stricter_tier_over_a_graph_term(tmp_path):
+    g = _load_with_scope(
+        tmp_path, ["DP.X.1,Работа,Work,pack,DP,ok,r/1\n"], ["работа,Work,,,1,the pipeline station\n"]
+    )
+    term = _by_ru(g)["Работа"]
+    assert (term.tier, term.only_as) == (1, "the pipeline station")
+    assert g.scope_mapping() == {"Работа": "the pipeline station"}
+
+
+def test_local_only_as_row_may_sit_on_a_graph_term_of_the_same_tier(tmp_path):
+    # Once the graph names the term, the local row is kept only for its scope.
+    g = _load_with_scope(
+        tmp_path, ["DP.X.1,Проверка,Verification,pack,DP,ok,r/1\n"], ["Проверка,Verification,,,2,the station\n"]
+    )
+    term = _by_ru(g)["Проверка"]
+    assert (term.tier, term.only_as, term.source) == (2, "the station", "graph")
+    assert g.unapproved_mapping() == {}
+    assert g.notes == []
+
+
+def test_local_only_as_row_with_other_english_is_still_an_error(tmp_path):
+    with pytest.raises(GlossaryError, match="differs from graph"):
+        _load_with_scope(
+            tmp_path, ["DP.X.1,Проверка,Check,pack,DP,ok,r/1\n"], ["Проверка,Verification,,,2,the station\n"]
+        )
+
+
 def test_missing_manifest_block_and_missing_file_fail(tmp_path):
     with pytest.raises(GlossaryError, match="required"):
         load_glossary({}, tmp_path)
@@ -125,6 +171,9 @@ def test_template_glossary_loads_and_keeps_strict_local_terms():
             term = terms[row["term_ru"].strip()]
             if row["tier"].strip().isdigit():
                 assert term.tier <= int(row["tier"])
+            assert term.only_as == (row.get("only_as") or "").strip()
+    # WP-620 Ф6: the station name must not turn every ordinary «проверка» into Verification.
+    assert glossary.scope_mapping()["Проверка"]
 
 
 # Contract for the live graph lookup (decision D', WP-617 Ф4): translation never reaches the graph.

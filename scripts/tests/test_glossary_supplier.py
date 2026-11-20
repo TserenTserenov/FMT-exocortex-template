@@ -115,6 +115,18 @@ def test_local_row_now_served_by_graph_is_removed_other_lines_kept_byte_for_byte
     load_glossary(yaml.safe_load((root / "translation-manifest.yaml").read_text(encoding="utf-8")), root)
 
 
+def test_local_row_with_only_as_stays_when_graph_serves_the_same_name(root):
+    # WP-620 Ф6: the row is the only place that says where the homonym's name applies.
+    local = root / "translation" / "glossary-local.csv"
+    text = local.read_text(encoding="utf-8").replace(LOCAL_HEADER, LOCAL_HEADER.rstrip("\n") + ",only_as\n", 1)
+    local.write_text(text + "Роль,Role,,,3,the station name\n", encoding="utf-8")
+    result = run(root, *BASE_ROWS, concept("DP.MAP.3", "Роль", "Role"))
+    assert "Роль,Role,,,3,the station name" in local.read_text(encoding="utf-8")
+    assert "Убрано из ручного словаря" not in result.body
+    manifest = yaml.safe_load((root / "translation-manifest.yaml").read_text(encoding="utf-8"))
+    assert load_glossary(manifest, root).scope_mapping() == {"Роль": "the station name"}
+
+
 def test_stricter_local_row_with_same_name_stays(root):
     result = run(root, *BASE_ROWS, concept("DP.MAP.4", "Пак", "Pack"))
     assert "Пак,Pack" in (root / "translation" / "glossary-local.csv").read_text(encoding="utf-8")

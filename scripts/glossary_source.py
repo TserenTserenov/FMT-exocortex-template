@@ -44,6 +44,10 @@ class Term:
     term_en: str
     tier: int
     source: str = SOURCE_GRAPH
+    # Where the English name applies, for a term that is also an ordinary word
+    # (WP-620 Ф6: «Проверка» is a pipeline station here and a plain "check"
+    # elsewhere). Empty = everywhere. Read from the local glossary's ``only_as``.
+    only_as: str = ""
 
 
 @dataclass
@@ -57,6 +61,10 @@ class Glossary:
     def unapproved_mapping(self) -> dict[str, str]:
         """Local-glossary candidates (not approved in the graph): RU → EN."""
         return {t.term_ru: t.term_en for t in self.terms if t.source == SOURCE_LOCAL}
+
+    def scope_mapping(self) -> dict[str, str]:
+        """Terms whose English name applies only in one sense: RU → where it applies."""
+        return {t.term_ru: t.only_as for t in self.terms if t.only_as}
 
 
 def _key(term_ru: str) -> str:
@@ -123,7 +131,8 @@ def _local_terms(rows: list[dict[str, str]]) -> dict[str, Term]:
         tier = int(tier_raw) if tier_raw.isdigit() else LOCAL_DEFAULT_TIER
         if _key(ru) in terms:
             raise GlossaryError(f"local glossary lists «{ru}» twice")
-        terms[_key(ru)] = Term(ru, en, tier, SOURCE_LOCAL)
+        only_as = (row.get("only_as") or "").strip()
+        terms[_key(ru)] = Term(ru, en, tier, SOURCE_LOCAL, only_as)
     return terms
 
 
@@ -140,7 +149,9 @@ def merge(graph: dict[str, Term], conflicted: set[str], local: dict[str, Term], 
         if g is None:
             merged[key] = term
             continue
-        if term.tier >= g.tier:
+        # A row that only says where a graph name applies (only_as) is not a duplicate:
+        # the graph has no column for it yet (WP-620 Ф6).
+        if term.tier >= g.tier and not term.only_as:
             raise GlossaryError(
                 f"«{term.term_ru}» is already in the graph snapshot; remove it from the local glossary"
             )
@@ -149,8 +160,10 @@ def merge(graph: dict[str, Term], conflicted: set[str], local: dict[str, Term], 
                 f"«{term.term_ru}»: local English name {term.term_en!r} differs from graph {g.term_en!r}; "
                 "fix the name in the graph, not in the local glossary"
             )
-        merged[key] = Term(g.term_ru, g.term_en, term.tier)
-        notes.append(f"tier map gap: «{g.term_ru}» kept at tier {term.tier} by the local glossary")
+        tier = min(term.tier, g.tier)
+        merged[key] = Term(g.term_ru, g.term_en, tier, only_as=term.only_as)
+        if term.tier < g.tier:
+            notes.append(f"tier map gap: «{g.term_ru}» kept at tier {term.tier} by the local glossary")
     return list(merged.values())
 
 
