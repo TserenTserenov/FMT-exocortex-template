@@ -11,14 +11,14 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Атрофия мышления при ежедневной работе с ИИ,Cognitive Atrophy With Daily AI Use,professional development risk,IWE-specific cognitive concern; pending_review=true,3
 Аудит,Audit,Audit process,,1
 Блокирующее правило,Blocking rule,Mandatory rule,,1
-Бэклог,Backlog,agile product/sprint planning,straightforward,2
+Бэклог,Backlog,agile product/sprint planning,straightforward; approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),2
 Верификация,Verification,QA and requirements validation,distinct from Validation,2
 Веха,Milestone,marking key project checkpoint,standard PM term,2
 Диагностика устаревания ЦД,Digital twin staleness diagnosis,State verification,IWE-specific freshness check; pending_review=true,3
 Дисциплина,Discipline,Engineering methodology / IWE,Standard methodology term,2
 Дорожная карта,Roadmap,strategic planning timeline document,compound noun; no hyphen preferred,2
 Заинтересованная сторона,Stakeholder,requirements and systems engineering,Standard SE/BABOK term,2
-Закрытие,Closing,ORZ Closing phase,,1
+Закрытие,Closing,ORZ Closing phase,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),1
 Замена терминологии,Multi-pass terminology replacement,Semantic consistency,IWE-specific peer verification; pending_review=true,3
 Знание,Knowledge,learning and knowledge management,cognitive domain; approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
 Интеграция,Integration,system or service integration,straightforward,2
@@ -30,7 +30,7 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Карта контекстов,Context Map,DDD strategic design,Core DDD term,2
 Компетенция,Competency,HR and capability frameworks,broader than Skill,2
 Компонент,Component,system decomposition and design,Standard SysML/UML term,2
-Конвейер,Pipeline,Automated pipeline,,1
+Конвейер,pipeline,Automated pipeline,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),1
 Контракт хоста для IWE,Host contract,Platform requirements layer,IWE-specific interface spec; pending_review=true,3
 Контур IWE,IWE perimeter,Pilot control boundary,IWE-specific control zone; pending_review=true,3
 Конфигурация,Configuration,system or application settings,straightforward,2
@@ -46,7 +46,7 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Наблюдаемость,Observability,measuring system internal state externally,SRE term; logs+metrics+traces,2
 Навык,Skill,individual capability or ability,narrower than Competency,2
 Надсистема,Supersystem,Systems engineering / IWE,Also Wider System; uncertain mapping,2
-Напарник,Peer partner,Peer agent in DP.SC.154,,1
+Напарник,Peer partner,Peer agent in DP.SC.154,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),1
 Область знаний,Knowledge Domain,DDD bounded context and ontology design,"Also ""Body of Knowledge"" in standards",2
 Общий язык,Ubiquitous Language,DDD strategic design,Not Universal Language,2
 Ограничение,Constraint,design and requirements engineering,"Also ""limitation"" in some contexts",2
@@ -54,7 +54,7 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Онтология,Ontology,formal knowledge representation model,Used in semantic/conceptual modeling,2
 Операция,Operation,unit of work or system action,"context-dependent; also ""procedure""",2
 Опыт,Experience,practitioner background and expertise,also can mean experiment in sci context,2
-Открытие,Opening,ORZ Opening phase,,1
+Открытие,Opening,ORZ Opening phase,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),1
 Оценка,Assessment,evaluating system or process state,"also ""estimation"" in planning contexts",2
 Пак,Pack,Knowledge pack,,1
 Память,Memory,Event sourcing pattern,Observed events + derived aggregates; pending_review=true,3
@@ -107,7 +107,7 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Форматирование,Formatting,Document formatting,,1
 Функциональное место,Functional Position,IWE / organizational design,uncertain,2
 Хук,Hook,event-driven or lifecycle callbacks,e.g. Git hooks or framework hooks,2
-Шаблон,Template,document or code generation patterns,also means Pattern in some contexts,2
+Шаблон,Template,document or code generation patterns,also means Pattern in some contexts; approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),2
 Шаг,Step,process workflow and procedure design,"Also ""stage"" depending on context",2
 Шифрование,Encryption,Data protection method,Standard security technique; pending_review=true,3
 Обещание платформы и IWE,Platform and IWE Promise,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
@@ -133,3 +133,5 @@ IWE у разработчика,Developer IWE,change accounting (WP-611),approve
 Ведущий встречи,meeting facilitator,IWE team practice,approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
 Кворум,quorum,IWE team practice,approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
 Асинхронное решение,Async decision,IWE team practice,approved by pilot 2026-11-19 (WP-620); move to the graph (WP-617 Phase 5),2
+Проектирование,Design,IWE development pipeline station,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),2
+Работа,Work,IWE development pipeline station,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),2
