@@ -75,8 +75,12 @@ jobs:
           # almost always, so the first urgent notice used that key up and every later one was skipped silently.
           # A label per pushed commit keeps each notice deliverable; a re-run of the same push still deduplicates.
           VERSION="security ${GITHUB_SHA::12}"
-          MESSAGE="🔒 СРОЧНО — обнаружены security-изменения:
-          $SECURITY_LINES"
+          # WP-529 F275: the raw developer entries (17 000 characters on the 0.42.1 merge) were cut by
+          # Telegram's limit mid-sentence. The builder groups them into a short reader-facing notice.
+          if ! MESSAGE=$(printf '%s\n' "$SECURITY_LINES" | python3 scripts/security-notice-build.py); then
+            echo "::error file=scripts/security-notice-build.py::Не удалось собрать текст срочного уведомления; уведомление не отправлено."
+            exit 1
+          fi
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${BOT_WEBHOOK_URL}/api/template-update" \
             -H "Content-Type: application/json" \

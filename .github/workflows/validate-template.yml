@@ -1108,6 +1108,7 @@ jobs:
             scripts/tests/test_day_close_prepare.py \
             scripts/tests/test_dispatcher_dsh_executor.py \
             scripts/tests/test_create_wp_number_padding.py \
+            scripts/tests/test_security_notice_build.py \
             scripts/tests/test_create_wp_weekplan_writer.py \
             scripts/tests/test_install_hooks.py \
             scripts/tests/test_skill_promote.py \

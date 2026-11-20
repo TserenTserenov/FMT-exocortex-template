@@ -953,7 +953,7 @@
     },
     {
       "path": ".github/workflows/notify-security.yml",
-      "sha256": "70c71202c50426dad69190818fd8744b14c9dfbbdf9d913d3f2b803ec028cf55"
+      "sha256": "b195e6a69b005acd307c23096b664f91d3f1bbaf9ec78d31f3dd395eec24e4bd"
     },
     {
       "path": ".github/workflows/notify-update.yml",
@@ -965,7 +965,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "c763f9eeca1052bda31e66d3dbf4d44052140eef36938d9492b79978072836fb"
+      "sha256": "669d68ef150e90d3bf5f54fc69d2fc1d761d717e84b0581540ef596712001545"
     },
     {
       "path": ".gitignore",
@@ -993,7 +993,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "5bfc199a3a1e3891f927ec36aec019675781a14db22af9c00b9a53782ade2a9d"
+      "sha256": "67cd13a3de6da8cb46552edf5153aa8ee4aa3ee1ae0d0c3efa5dcbbf31162efe"
     },
     {
       "path": "CLAUDE.md",
@@ -2940,6 +2940,10 @@
       "sha256": "24842638ea5952d2e30ef68cf468c83b3a39ae41f77136a2db24f1fdbb5126f4"
     },
     {
+      "path": "scripts/security-notice-build.py",
+      "sha256": "cc127ab08893468afbdb2822ac937f498cdf8814a7908d962bd450080dc52c36"
+    },
+    {
       "path": "scripts/server-calendar.sh",
       "sha256": "59bd57f22d32553205a34fbc414854b97cea28943f8a4ac4da1db2b253140ccf"
     },
@@ -3836,6 +3840,7 @@
     "scripts/tests/test_release_notice_build.py",
     "scripts/tests/test_release_receipt.sh",
     "scripts/tests/test_residency_gate_skill_adapter.py",
+    "scripts/tests/test_security_notice_build.py",
     "scripts/tests/test_session_guard_gitbash.sh",
     "scripts/tests/test_session_guard_open_log_path.sh",
     "scripts/tests/test_session_guard_unknown_flag.sh",
