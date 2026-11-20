@@ -1,14 +1,14 @@
 # IWE — Intellectual Work Environment
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.42.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.42.1-blue.svg)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows%20(partial)-lightgrey.svg)]()
 
 <img src="docs/assets/orz-cycle.svg" alt="Open, Work, Close — the same cycle at every scale: session, day, week" width="100%">
 
 > The operating system for intellectual work. Your knowledge. Your experience. Your environment — runs on top of any AI platform.
 >
-> **Repository type:** `Base/Formats` (FMT) — distribution template. After forking it becomes your personal environment with AI agents.
+> **Repository type:** `Base/Formats` (FMT) — a template distribution. After forking it becomes your personal environment with AI agents.
 
 ---
 
@@ -18,7 +18,7 @@ AI assistants can generate text, code, and answers. But most users face the same
 
 - **Work context is scattered.** AI services may store conversations and project materials, but decisions and plans from other tools are not always available in the next session or to another agent.
 - **Knowledge stays in your head.** You finish a course, read a book, solve a problem — but a month later you cannot reconstruct your line of thinking.
-- **AI replaces thinking instead of augmenting it.** You get an answer, but you do not become more competent. Without AI — you are back to zero.
+- **AI replaces thinking instead of augmenting it.** You get an answer but do not become more competent. Without AI — you are back to zero.
 - **No system.** Plans live in notes, tasks live in your head, knowledge lives in chats. Everything is disconnected.
 - **Time disappears.** It is unclear what you worked on, what you accomplished, or where you are heading.
 
@@ -38,31 +38,31 @@ Just as an IDE combines an editor, compiler, and debugger into one environment f
 | Linter → improves quality | ArchGate → evaluates architectural decisions |
 | Git → change history | Strategist → work history and planning |
 
-> **Core principle: exoskeleton, not prosthetic.** IWE augments your thinking; it does not replace it. After each session you become more competent — you do not simply receive a result. Details: [principles-vs-skills.md](docs/principles-vs-skills.md).
+> **Core principle: exoskeleton, not prosthesis.** IWE augments your thinking; it does not replace it. After every session you become more competent, not merely receive a result. Details: [principles-vs-skills.md](docs/principles-vs-skills.md).
 
 ## Key IWE Terms
 
 | Term | What it is |
-|------|-----------|
-| **Exocortex** | Your external memory — files containing plans, context, and conclusions that Claude reads at the start of every session |
+|--------|---------|
+| **Exocortex** | Your external memory — files containing plans, context, and conclusions that Claude reads in every session |
 | **Pack** | A formalised knowledge base for your domain — the single source of truth for domain knowledge |
-| **ORZ** | Opening → Work → Closing — a ritual for every session and every day that prevents context loss |
-| **ArchGate** | Structured evaluation of architectural decisions across 7 characteristics (instead of "I think this is good") |
+| **ORZ** | Opening → Work → Closing — a ritual for every session and every day that prevents loss of context |
+| **ArchGate** | Structured evaluation of architectural decisions across 7 characteristics (instead of "I think this is fine") |
 | **Strategist** | An AI agent that automatically drafts day/week plans and tracks progress |
 | **5 repository families** | The recommended structure for separating code, knowledge, and data — see below |
 
 
 ### 5 Repository Families
 
-The Exocortex is not a single repository. It is a set of repositories with clear boundaries: code, domain knowledge, and personal data do not mix. `setup.sh` creates the minimal starting point (your own strategic repository plus 3 base principles repositories); everything else is added as needed.
+The Exocortex is not a single repository but a set with clear boundaries: code, domain knowledge, and personal data do not mix. `setup.sh` creates a minimal starting point (your own strategic repository + 3 base principles repositories); everything else is added as needed.
 
 | Family | What it stores | Example name |
-|--------|---------------|-------------|
-| Base (`ZP`/`FPF`/`SPF`/`FMT-*`) | Platform principles and formats — delivered ready-made | `ZP`, `FPF` |
+|---|---|---|
+| Base (`ZP`/`FPF`/`SPF`/`FMT-*`) | Platform principles and formats — delivered ready to use | `ZP`, `FPF` |
 | `PACK-*` | Formalised domain knowledge (source of truth) | `PACK-my-domain` |
 | `DS-*` | Code, plans, courses — derived from Pack | `DS-strategy` |
 | `PD-*` | Personal data of one type (no code) | `PD-persona`, `PD-metrics` |
-| `MC-*` | Agent data (conversations, service logs) — not read by humans day-to-day | `MC-sessions` |
+| `MC-*` | Data for agents (dialogues, service logs) — not read by humans day to day | `MC-sessions` |
 
 Detailed data-domain map and rationale: [ADR-004](docs/adr/ADR-004-data-domain-map.md).
 
@@ -71,36 +71,36 @@ Detailed data-domain map and rationale: [ADR-004](docs/adr/ADR-004-data-domain-m
 ## Work Culture — a New Style of AI Interaction
 
 
-### The ORZ Protocol (Opening → Work → Closing)
+### Work Rhythm (ORZ) Protocol (Opening → Work → Closing)
 
 Every session and every day passes through three stages:
 
-- **Opening** — Claude reviews the plan, identifies the task, and aligns on the approach. You do not start work from a blank slate — the AI knows the context.
+- **Opening** — Claude reviews the plan, identifies the task, and aligns on the approach. You do not start work "from scratch" — the AI knows the context.
 - **Work** — as work proceeds, Claude captures valuable knowledge (Capture-to-Pack). Insights are not lost.
 - **Closing** — the result is recorded, the plan is updated, and the next session starts from where you left off.
 
-Skipping Opening = unplanned work. Skipping Closing = lost result.
+Skipping Opening means unplanned work. Skipping Closing means a lost result.
 
 ### Exocortex — External Memory
 
-Your knowledge, principles, distinctions, plans, and context are stored in files that Claude reads at the start of every session. This is not a "prompt" — it is an **accumulated base** that grows with you.
+Your knowledge, principles, distinctions, plans, and context are stored in files that Claude reads in every session. This is not a "prompt" — it is an **accumulated base** that grows with you.
 
 ### Knowledge Formalization (Pack)
 
-What you learn does not stay in your head. Valuable knowledge is formalised into a Pack — the passport of a domain. A Pack is the single source of truth for domain knowledge. Details: [LEARNING-PATH.md](docs/LEARNING-PATH.md).
+What you learn does not stay in your head. Valuable knowledge is formalised into a Pack — the passport of a domain. Pack is the single source of truth for domain knowledge. Details: [LEARNING-PATH.md](docs/LEARNING-PATH.md).
 
 ---
 
 ## Who It Is For
 
-Every professional drowns in information: 12+ tools (Notion, Google Docs, Slack, ChatGPT, courses…), knowledge is spread thin, nothing is connected. AI can account for the project materials available to it, but keeping decisions from different tools in one current working context is difficult.
+Every professional drowns in information: 12+ tools (Notion, Google Docs, Slack, ChatGPT, courses…), knowledge is spread thin, nothing is connected. AI can account for the project materials available to it, but keeping decisions from different tools in one current work context is difficult.
 
 IWE is for those who want to change that:
 
-- **Entrepreneurs and executives** — you strategize, make decisions, manage projects. IWE provides a system: from weekly planning to formalising domain knowledge.
+- **Entrepreneurs and executives** — you strategise, make decisions, manage projects. IWE provides a system: from weekly planning to formalising domain knowledge.
 - **Engineers and developers** — you work with code and architecture. IWE preserves context between sessions; the AI knows your codebase, technical debt, and roadmap.
 - **Researchers and analysts** — you study, synthesise, and publish. IWE turns scattered notes into a structured knowledge base that grows with you.
-- **Anyone doing intellectual work** — and wanting **symbiosis with AI**, not dependence on it. An exoskeleton for thinking, not a prosthetic.
+- **Anyone doing intellectual work** — and wanting **symbiosis with AI**, not dependence on it. An exoskeleton for thinking, not a prosthesis.
 
 ---
 
@@ -109,48 +109,48 @@ IWE is for those who want to change that:
 ### Work Projects
 
 | Scenario | What happens | Details |
-|----------|-------------|---------|
-| **Product development** | Claude knows the architecture, technical debt, and roadmap. Every session is a continuation, not a restart from scratch. | [SC.013](docs/use-cases/USE-CASES.md#sc013-work-session-with-claude-code), [SC.015](docs/use-cases/USE-CASES.md#sc015-system-development-ds) |
+|----------|---------------|-----------|
+| **Product development** | Claude knows the architecture, technical debt, and roadmap. Every session is a continuation, not a restart from zero. | [SC.013](docs/use-cases/USE-CASES.md#sc013-work-session-with-claude-code), [SC.015](docs/use-cases/USE-CASES.md#sc015-system-development-ds) |
 | **Documentation** | Knowledge is captured in Pack during work. No need to "write docs later" — they are written during work. | [SC.004](docs/use-cases/USE-CASES.md#sc004-knowledge-capture-and-extraction), [SC.014](docs/use-cases/USE-CASES.md#sc014-knowledge-formalization-pack) |
-| **Project coordination** | WeekPlan, DayPlan, work product registry — the Strategist helps plan and track progress. | [SC.001](docs/use-cases/USE-CASES.md#sc001-day-planning), [SC.002](docs/use-cases/USE-CASES.md#sc002-week-planning-and-review) |
-| **Review and refactoring** | ArchGate evaluates decisions across 7 characteristics. Not "I think this is good" — structured evaluation. | [SC.015](docs/use-cases/USE-CASES.md#sc015-system-development-ds) |
+| **Project coordination** | WeekPlan, DayPlan, Work Product registry — the Strategist helps plan and track progress. | [SC.001](docs/use-cases/USE-CASES.md#sc001-day-planning), [SC.002](docs/use-cases/USE-CASES.md#sc002-week-planning-and-review) |
+| **Review and refactoring** | ArchGate evaluates decisions across 7 characteristics. Not "I think this is fine" but a structured assessment. | [SC.015](docs/use-cases/USE-CASES.md#sc015-system-development-ds) |
 
 ### Personal Development
 
 | Scenario | What happens | Details |
-|----------|-------------|---------|
-| **Taking a course** | Claude helps capture key ideas, asks questions to check understanding, and connects new material to what you already know. | [SC.003](docs/use-cases/USE-CASES.md#sc003-learning-and-development) |
+|----------|---------------|-----------|
+| **Taking a course** | Claude helps capture key ideas, asks comprehension questions, and connects new material to what you already know. | [SC.003](docs/use-cases/USE-CASES.md#sc003-learning-and-development) |
 | **Writing articles** | Creative Pipeline: fleeting note → draft → Draft → publication. Every artifact is tracked. | [SC.005](docs/use-cases/USE-CASES.md#sc005-content-publishing) |
-| **Strategizing** | Weekly session: review the past week, plan the new one, check against goals. The Strategist prepares the draft — you make the decisions. | [SC.011](docs/use-cases/USE-CASES.md#sc011-strategizing) |
+| **Strategizing** | Weekly session: review the past week, plan the next one, check against goals. The Strategist prepares a draft — you make the decisions. | [SC.011](docs/use-cases/USE-CASES.md#sc011-strategizing) |
 | **Building a knowledge base** | Your Pack grows. After six months you have a formalised domain knowledge base, not a collection of notes. | [SC.014](docs/use-cases/USE-CASES.md#sc014-knowledge-formalization-pack) |
 
-> Full catalog of 15 use cases: **[USE-CASES.md](docs/use-cases/USE-CASES.md)**
+> Full catalogue of 15 scenarios: **[USE-CASES.md](docs/use-cases/USE-CASES.md)**
 
 ---
 
-## What It Looks Like in Practice
+## What This Looks Like in Practice
 
-- In the morning — the Strategist has drafted the plan: a Telegram notification plus a DayPlan file in the repository.
+- In the morning — the Strategist has drafted a plan: a notification in Telegram + a DayPlan file in the repository.
 - You open VS Code → `claude` → Claude knows what is in the plan and suggests starting with the top priority.
 - You work — Claude captures knowledge along the way (Capture-to-Pack).
-- You close the session — the result is recorded and the plan is updated.
-- On Monday — the Strategist prepares a draft weekly plan; you discuss it in the Strategizing session.
+- You close the session — the result is recorded, the plan is updated.
+- On Monday — the Strategist prepares a draft weekly plan; you discuss it in a Strategizing session.
 
 ---
 
 ## Machine Requirements
 
-A minimum of **4 GiB of free RAM** is required while Claude Code (or another agent) runs on top of IWE. With less RAM — especially on shared servers with multiple users — file read/write tools may intermittently fail with a message such as `PreToolUse hook did not respond before its timeout`. This message indicates insufficient memory in the host process, not a broken template hook (issue [#461](https://github.com/iwesys/IWE/issues/461)) — `bash scripts/iwe-audit.sh` shows the current available memory level in the "Available memory" section.
+A minimum of **4 GiB of free RAM** is required while Claude Code (or another agent) runs on top of IWE. With less memory — especially on shared servers with multiple users — file read/write tools may intermittently fail with a message such as `PreToolUse hook did not respond before its timeout`. This message indicates insufficient host-process memory, not a broken template hook (issue [#461](https://github.com/iwesys/IWE/issues/461)) — `bash scripts/iwe-audit.sh` shows the current available memory level in the "Available memory" section.
 
-## Getting Started
+## Get Started
 
 **Quick start** (Git, Node.js, Claude Code already installed): **[QUICK-START.md](docs/QUICK-START.md)** — 15 minutes to your first session.
 
 **Full installation** from a clean machine: **[SETUP-GUIDE.md](docs/SETUP-GUIDE.md)** — 30–60 minutes including all dependencies.
 
-**Not on macOS or not using Claude Code?** See **[PORTABILITY.md](docs/PORTABILITY.md)** — instructions for Kimi Code, Hermes Agent, and others.
+**Not on macOS or not using Claude Code?** Read **[PORTABILITY.md](docs/PORTABILITY.md)** — instructions for Kimi Code, Hermes Agent, and others.
 
-**Different agent or LLM?** IWE is not tied to Claude. If your agent can see files in the repository folder and edit files — it will work. How to connect → [PORTABILITY.md](docs/PORTABILITY.md).
+**Different agent or LLM?** IWE is not tied to Claude. If your agent can see files in the repository folder and edit files, it will work. How to connect → [PORTABILITY.md](docs/PORTABILITY.md).
 
 ```bash
 mkdir -p ~/IWE && cd ~/IWE
@@ -166,11 +166,11 @@ cd ~/IWE
 claude
 ```
 
-Tell Claude: **"Let's run the first strategic session"** — and it will walk you through defining goals, creating the first plan, and configuring the environment.
+Tell Claude: **"Let's run the first strategic session"** — and it will walk you through defining goals, creating your first plan, and configuring the environment.
 
 ---
 
-## Customization
+## Customisation
 
 IWE updates like a distribution — you receive platform updates without losing your settings.
 
@@ -200,13 +200,13 @@ multiplier_enabled: true    # IWE Multiplier
 ## Documentation
 
 | Document | Contents |
-|----------|---------|
-| **[Beginner's guide](docs/onboarding/onboarding-guide.md)** | Start here if you are hearing about IWE for the first time. What it is, why it exists, what it consists of — no technical jargon. |
+|----------|-----------|
+| **[Beginner's guide](docs/onboarding/onboarding-guide.md)** | Start here if you are new to IWE. What it is, why it exists, what it consists of — no technical jargon. |
 | **[Quick start](docs/QUICK-START.md)** | 15 minutes from `git clone` to your first session. For those who already have Git and Claude Code. |
 | **[SETUP-GUIDE.md](docs/SETUP-GUIDE.md)** | Step-by-step installation from a clean machine. Requirements, modes (core/full), verification. |
 | **[LEARNING-PATH.md](docs/LEARNING-PATH.md)** | The IWE learning path: architecture, principles, protocols, Pack, roles. |
 | **[DATA-POLICY.md](docs/DATA-POLICY.md)** | IWE Data Policy: what is collected, where it is stored, how to delete it. |
-| **[DATA-RESIDENCY.md](docs/DATA-RESIDENCY.md)** | Data residency principle: data you bring into IWE from outside (health, calendar, work hours) — where it may and may not go. |
+| **[DATA-RESIDENCY.md](docs/DATA-RESIDENCY.md)** | Residency principle: data you bring into IWE from outside (health, calendar, work hours) — where it may and may not go. |
 | **[IWE-HELP.md](docs/IWE-HELP.md)** | Quick reference and FAQ. |
 | **[principles-vs-skills.md](docs/principles-vs-skills.md)** | Why principles matter more than skills: the generative hierarchy. |
 | **[CHANGELOG.md](CHANGELOG.md)** | Template change history. |
@@ -218,43 +218,43 @@ multiplier_enabled: true    # IWE Multiplier
 ## FAQ
 
 **Q: Is an Anthropic subscription required?**
-A: For the full installation (Claude Code) — Claude Pro ($20/month) is recommended. If needed, you can switch to Claude Max (~$100/month) for unrestricted work. For the minimal installation (`setup.sh --core`) — works with any AI CLI. Details: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
+A: For the full installation (Claude Code) — Claude Pro ($20/month) is recommended. If needed, you can upgrade to Claude Max (~$100/month) for unrestricted work. For the minimal install (`setup.sh --core`) — works with any AI CLI. Details: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
 
 **Q: Does it work with other AI systems (not Claude)?**
 A: Yes, three agents are supported out of the box:
 - **Claude Code** — full support: reads `CLAUDE.md`, all skills and hooks work.
-- **Kimi Code** (VS Code) — reads `AGENTS.md` automatically when the repository is opened. Customization: `extensions/` or `AGENTS-agent-blocks.md`. Skills (`/day-open` etc.) via Claude Code.
+- **Kimi Code** (VS Code) — reads `AGENTS.md` automatically when the repository is opened. Customisation: `extensions/` or `AGENTS-agent-blocks.md`. Skills (`/day-open` etc.) via Claude Code.
 - **Hermes Agent** — connect the Aisystant MCP through Hermes settings and it will receive instructions automatically.
 
 Other agents (Cursor, Copilot, Gemini) require adaptation. Details: [PORTABILITY.md](docs/PORTABILITY.md).
-The minimal installation (`setup.sh --core`) works without binding to a specific agent.
+The minimal install (`setup.sh --core`) works without being tied to any specific agent.
 
 **Q: Does it work on Linux/Windows?**
-A: On macOS and Linux the standard scenarios work; Strategist automation uses launchd and systemd respectively, the cloud variant uses GitHub Actions. On Windows, individual parts have been verified via Git Bash with native Python (Strategist lock, #1030), but `session-guard.sh` and session opening require WSL2: in native Git Bash they fail upfront due to the Unix `fcntl` lock (#1032). Full IWE installation and updates on Windows remain untested — details: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md) § Windows.
+A: On macOS and Linux the standard scenarios work; Strategist automation uses launchd and systemd respectively, and the cloud variant uses GitHub Actions. On Windows, individual parts have been verified via Git Bash with native Python (Strategist lock, #1030), but `session-guard.sh` and session opening require WSL2: in native Git Bash they fail early due to the Unix `fcntl` lock (#1032). Full installation and IWE updates on Windows remain untested — details: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md) § Windows.
 
 **Q: What if the computer is off or sleeping — will automation stop?**
-A: Cloud Scheduler (GitHub Actions) runs in the cloud even when the computer is off. For local agents: scripts automatically prevent sleep during operation (macOS: `caffeinate`, Linux: `systemd-inhibit`). For laptops, configuring automatic wake and disabling idle sleep is recommended — see [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
+A: Cloud Scheduler (GitHub Actions) runs in the cloud even when the computer is off. For local agents: scripts automatically prevent sleep during operation (macOS: `caffeinate`, Linux: `systemd-inhibit`). For laptops, it is recommended to configure automatic wake and disable idle sleep — see [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
 
 **Q: What is a Pack?**
 A: A formalised knowledge domain — the single source of truth for domain knowledge. Details: [LEARNING-PATH.md](docs/LEARNING-PATH.md).
 
-**Q: Is my data safe?**
-A: Three protection zones: local, GitHub (private repositories), platform (per-user isolation). Details: [DATA-POLICY.md](docs/DATA-POLICY.md).
+**Q: Is my data secure?**
+A: Three protection zones: local, GitHub (private repositories), and platform (per-user isolation). Details: [DATA-POLICY.md](docs/DATA-POLICY.md).
 
 **Q: How is IWE different from Obsidian / Notion / Logseq?**
-A: Obsidian is a note store. IWE is a **work environment** with protocols, AI agents, and knowledge formalization. For notes, you can open the governance repository (`DS-strategy`) in Obsidian — specifically that folder as a vault. Using the IWE root (`~/IWE`) as an Obsidian vault is not supported: it may contain very large Markdown files (for example, `FPF/FPF-Spec.md`) that cause Obsidian to show a white screen. The entire workspace is safe to browse in VS Code.
+A: Obsidian is a note store. IWE is a **work environment** with protocols, AI agents, and knowledge formalisation. For notes, you can open a separate governance repository (`DS-strategy`) in Obsidian — that specific folder as a vault. The IWE root (`~/IWE`) as an Obsidian vault is not supported: it may contain very large Markdown files (for example, `FPF/FPF-Spec.md`) that cause Obsidian to show a white screen. The entire workspace is safe to browse in VS Code.
 
 **Q: Is programming required?**
 A: No. The template is a ready-made configuration. Installation via setup.sh. Work via Claude Code in natural language.
 
-**Q: Can it be used without the Strategist?**
-A: Yes. Claude Code + CLAUDE.md + memory/ work fully. The Strategist is planning automation. Without it, you plan manually.
+**Q: Is the Strategist required?**
+A: No. Claude Code + CLAUDE.md + memory/ work fully without it. The Strategist automates planning. Without it, you plan manually.
 
 **Q: How do I configure the strategizing day?**
-A: In `memory/day-rhythm-config.yaml` change `strategy_day: sunday` to the desired day. Details: [LEARNING-PATH.md](docs/LEARNING-PATH.md).
+A: In `memory/day-rhythm-config.yaml`, change `strategy_day: sunday` to the desired day. Details: [LEARNING-PATH.md](docs/LEARNING-PATH.md).
 
 **Q: The clone landed in `~` instead of `~/IWE`?**
-A: All installation commands must be run in the same terminal. Opening a new terminal starts it from `~`. Delete the folder from `~` and repeat starting with `cd ~/IWE`. Details: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
+A: All installation commands must be run in the same terminal. If you open a new terminal it starts from `~`. Delete the folder from `~` and repeat starting with `cd ~/IWE`. Details: [SETUP-GUIDE.md](docs/SETUP-GUIDE.md).
 
 
 ---
@@ -263,20 +263,20 @@ A: All installation commands must be run in the same terminal. Opening a new ter
 
 IWE is an environment you build alone. But you develop it together.
 
-The **IWE Community** is a closed chat for practitioners working with the same system: ORZ, Pack, Exocortex. A place where the conversation is not about "how to prompt better" but about building intellectual work seriously.
+**The IWE community** is a closed chat for practitioners working with the same system: ORZ, Pack, Exocortex. A place where the conversation is not about "how to prompt better" but about building intellectual work seriously.
 
 ### What Happens There
 
-- **Work product reviews** — participants share real Packs, plans, and retrospectives. They receive feedback from people who understand what "closing without capturing the result" means.
-- **IWE installation and customization experience** — what broke, how it was fixed, which extensions proved useful.
+- **Work Product reviews** — participants share real Packs, plans, and retrospectives. They receive feedback from people who understand what "closing without capturing the result" means.
+- **IWE installation and customisation experience** — what broke, how it was fixed, which extensions proved useful.
 - **Method discussions** — the ORZ fractal, ArchGate, Capture-to-Pack in practice: what works, where theory diverges from reality.
 - **Links and findings** — tools, patterns, SOTA that fit the IWE philosophy.
 
-### Why It Matters
+### Why This Matters
 
-Studying the system alone is possible. But most questions arise at the application stage: "How do I formalise this knowledge domain?", "Am I using ORZ correctly?", "Who has experience with this tool?"
+You can study the system alone. But most questions arise at the application stage: "How do I formalise this knowledge domain?", "Am I using ORZ correctly?", "Who has experience with this tool?"
 
-In the community, those questions get answers from people who have already been through it.
+In the community, those questions are answered by people who have already been through it.
 
 ### Free Channels
 
@@ -285,15 +285,15 @@ In the community, those questions get answers from people who have already been 
 
 ### Closed Community (Telegram)
 
-Deep practice, work product reviews, direct support. Entry is through the seminar **"IWE for Practitioners"** (5000₽) via the bot [@aist_me_bot](https://t.me/aist_me_bot).
+Deep practice, Work Product reviews, direct support. Entry is through the **"IWE for Practitioners"** seminar (5000₽) via the bot [@aist_me_bot](https://t.me/aist_me_bot).
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) — how to contribute to the project.
+See [CONTRIBUTING.md](CONTRIBUTING.md) — how to help the project.
 
-**IWE team developers (level T4+):** the single entry point is [Getting started for developers](docs/developer/). In 10 minutes you will understand the development pipeline (6 stations, dual output) and complete your first task.
+**IWE team developers (level T4+):** the single entry point is [Where to start as a developer](docs/developer/). In 10 minutes you will understand the development pipeline (6 stations, double output) and complete your first task.
 
 ---
 

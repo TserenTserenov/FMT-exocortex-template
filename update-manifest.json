@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "version": "0.42.0",
+  "version": "0.42.1",
   "description": "Manifest of files in the standalone English IWE distribution. Used by update.sh.",
   "files": [
     {
@@ -797,7 +797,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9216f8ccb916cdddecde3fcf58677fd6d0b7c8a2ebaa70b5e4b6225674cda86d"
+      "sha256": "bd1a5a11a8161f49899a1a0e837ec7499ecd852c03eae19678166bd89638caa3"
     },
     {
       "path": "CITATION.cff",
@@ -829,7 +829,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "3fd68707d02f90b4ee7a0d88a08bf40496b6e4f1e5d8bb59f9c6eb986f3eb839"
+      "sha256": "f24bd29b92063fb8639bb676fe0339ea7c45b939cace5eb9f671ab4f5c5407fc"
     },
     {
       "path": "REPO-TYPE.md",
@@ -877,7 +877,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "a749a78ee359686f85f0159bd28c42d9caaf3ab23ff8b5073efe55abfbbea86a"
+      "sha256": "a7205ef8fd379ec4db31fbd357507391e0f1db347da2393013032ee08d569d2f"
     },
     {
       "path": "docs/IWE-HELP.md",
