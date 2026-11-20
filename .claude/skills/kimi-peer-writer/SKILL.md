@@ -1232,7 +1232,8 @@ fi
 # WP-526 Ф2: коммит и push сессии идут в MC-sessions ($SESSIONS_DIR), не
 # в governance-репо. session-manifest-write.sh живёт в DS-strategy
 # (обычный скрипт), но работает НАД MC-sessions ($WORKTREE = первый аргумент).
-cd "$SESSIONS_DIR"
+# The whole block runs in a subshell with the journal folder as cwd (no top-level cd, #1006).
+(cd "$SESSIONS_DIR" || exit 1
 
 # Pre-commit guard
 test ! -f "$SESSION_DIR/report-draft.md" \
@@ -1297,7 +1298,7 @@ done < <(
 )
 [ "$SESSION_FILES" -gt 0 ] || { echo "FAIL: в папке сессии $REL нет файлов для сохранения" >&2; exit 1; }
 # A modified tracked .err (re-closing an old session) keeps the journal copy
-# dirty: save it outside $HOME/IWE for analysis, then
+# dirty: save it outside the IWE workspace for analysis, then
 # `git restore --source=HEAD --staged --worktree -- <path>`.
 [ "${#SKIPPED_ERR[@]}" -eq 0 ] || printf 'WARN: .err в сохранение не идёт: %s\n' "${SKIPPED_ERR[@]}" >&2
 for P in "${PATHS[@]}"; do
@@ -1321,7 +1322,7 @@ OUR_SHAS=("$(git rev-parse HEAD)")   # публикуем ровно свои к
 # remote» и падает в ручной обход. Отказ манифеста (грязное дерево канона и
 # т.п.) не блокирует закрытие — WARN и дальше без него (legacy-путь
 # confirmed_clean_repos остаётся).
-MANIFEST_WRITER="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/session-manifest-write.sh"
+MANIFEST_WRITER="${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-manifest-write.sh"
 [ -f "$MANIFEST_WRITER" ] || MANIFEST_WRITER="${IWE_TEMPLATE:-${IWE_WORKSPACE:-$HOME/IWE}/FMT-exocortex-template}/scripts/session-manifest-write.sh"
 bash "$MANIFEST_WRITER" "$(git rev-parse --show-toplevel)" "$SESSION_ID" \
   || echo "WARN: attest-манифест не создан — догоняющее закрытие этой сессии пойдёт legacy-путём"
@@ -1359,6 +1360,7 @@ for SHA in "${OUR_SHAS[@]}"; do
     --from-commit "$SHA" --exact-commit "$SHA" --reason "peer-session $SESSION_ID close" \
     || { echo "ds-publish --exact-commit не удался для $SHA — см. вывод шлюза" >&2; exit 1; }
 done
+)
 ```
 
 > **Семафор Kimi-standalone (`.iwe-runtime/sessions/kimi-*.open`) этот скилл НЕ закрывает** (найдено 2026-09-04, пир-сессия 2026-09-04-23-wp561-peer-session-closed-ledger-gap с Claude). Он открывается снаружи, `~/.kimi-code/skills/session-open/SKILL.md`, без `--close-path peer-session` — этот флаг задаётся только при `open` и не может быть передан отдельно при `close`, а слепое добавление `--close-path peer-session` в общий `session-open` неверно для НЕ-пир сессий Kimi (обошло бы типизированный раннер и там). Семафор сейчас закрывается только через `session-guard.sh`-хаусхолдинг (auto-orphan, TTL 30 мин) — событие `session_closed_direct` в дневном журнале для Kimi-writer сессий не пишется. Полноценный фикс требует координации между `~/.kimi-code/skills/session-open/SKILL.md` (вне IWE-репозитория) и этим файлом — вынесен в отдельную сессию (РП-561, follow-up фаза).
@@ -1376,8 +1378,8 @@ done
 3. Обновить индекс-черновик (WP-537 Ф4, `session_index_draft_write`, см. Шаг 4.3): статус → `interrupted`, report → `—`.
 4. Commit + push внутри `$SESSIONS_DIR` (без `00-index.md`, без папки и без `.err`, РП-524 Ф7):
    ```bash
-   # SESSIONS_DIR: the same journal-folder lines as step 1.
-   cd "$SESSIONS_DIR" || exit 1
+   # SESSIONS_DIR: the same journal-folder lines as step 1; subshell, no top-level cd (#1006).
+   (cd "$SESSIONS_DIR" || exit 1
    SESSION_ID="$session_id"
    REL="$MONTH/$DAY/$SESSION_ID"
    PATHS=()
@@ -1398,7 +1400,8 @@ done
      fi
    done
    git commit -m "feat(peer): $SESSION_ID (kimi-writer) — <режим>" -- "${PATHS[@]}" || exit 1
-   OUR_SHAS=("$(git rev-parse HEAD)")
+   git rev-parse HEAD
+   )   # prints the commit to publish (OUR_SHAS for the step 4.5 publication loop)
    ```
    Публикация — тем же циклом `ds-publish.sh --exact-commit`, что в Шаге 4.5 (`REPO_ROOT`, `GUARD_SESSION_ID` — так же, как там). Проверки над блоком 4.5 (`report.md`, закрывающий файл, `status: completed`) в этом режиме не применяются.
 
@@ -1415,8 +1418,8 @@ done
 5. Обновить индекс-черновик (WP-537 Ф4, `session_index_draft_write`, см. Шаг 4.3): статус → `completed`, report → ссылка.
 6. Commit + push внутри `$SESSIONS_DIR` (без `00-index.md`, без папки и без `.err`, РП-524 Ф7):
    ```bash
-   # SESSIONS_DIR: the same journal-folder lines as step 1.
-   cd "$SESSIONS_DIR" || exit 1
+   # SESSIONS_DIR: the same journal-folder lines as step 1; subshell, no top-level cd (#1006).
+   (cd "$SESSIONS_DIR" || exit 1
    SESSION_ID="$session_id"
    REL="$MONTH/$DAY/$SESSION_ID"
    PATHS=()
@@ -1437,7 +1440,8 @@ done
      fi
    done
    git commit -m "feat(peer): $SESSION_ID (kimi-writer) — <режим>" -- "${PATHS[@]}" || exit 1
-   OUR_SHAS=("$(git rev-parse HEAD)")
+   git rev-parse HEAD
+   )   # prints the commit to publish (OUR_SHAS for the step 4.5 publication loop)
    ```
    Публикация — тем же циклом `ds-publish.sh --exact-commit`, что в Шаге 4.5 (`REPO_ROOT`, `GUARD_SESSION_ID` — так же, как там). Проверки над блоком 4.5 (`report.md`, закрывающий файл, `status: completed`) в этом режиме не применяются.
 
