@@ -307,7 +307,7 @@ session_index_draft_write "$SESSION_ID" "$TODAY" "<задача ≤50 симв>"
   "kimi / <PEER_AGENT_ID>" "0" "0" "started" "—"
 ```
 
-Установка без переносчика черновиков в индекс (`scripts/session-index-snapshot.sh` в репозитории управления; так у пользователей шаблона) — черновик никто не перенесёт, поэтому ещё и вести `00-index.md` напрямую, как до WP-537 (файла нет → создать, issue #568; строку сессии заменить по `SESSION_ID` или вставить первой в таблицу):
+Установка без переносчика черновиков в индекс (программы session-index-snapshot.sh в папке программ репозитория управления; так у пользователей шаблона) — черновик никто не перенесёт, поэтому ещё и вести `00-index.md` напрямую, как до WP-537 (файла нет → создать, issue #568; строку сессии заменить по `SESSION_ID` или вставить первой в таблицу):
 ```bash
 if [ ! -f "${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/session-index-snapshot.sh" ]; then
   IDX="$SESSIONS_DIR/00-index.md"
@@ -1141,7 +1141,7 @@ session_index_draft_write "$SESSION_ID" "$TODAY" "<задача ≤50>" \
   "completed" "[report.md](<MONTH>/<DAY>/<SESSION_ID>/report.md)"
 ```
 
-Установка без переносчика черновиков в индекс (`scripts/session-index-snapshot.sh` в репозитории управления; так у пользователей шаблона) — черновик никто не перенесёт, поэтому ещё и вести `00-index.md` напрямую, как до WP-537 (файла нет → создать, issue #568; строку сессии заменить по `SESSION_ID` или вставить первой в таблицу):
+Установка без переносчика черновиков в индекс (программы session-index-snapshot.sh в папке программ репозитория управления; так у пользователей шаблона) — черновик никто не перенесёт, поэтому ещё и вести `00-index.md` напрямую, как до WP-537 (файла нет → создать, issue #568; строку сессии заменить по `SESSION_ID` или вставить первой в таблицу):
 ```bash
 if [ ! -f "${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/session-index-snapshot.sh" ]; then
   IDX="$SESSIONS_DIR/00-index.md"
