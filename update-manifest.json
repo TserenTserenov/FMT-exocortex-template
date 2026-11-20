@@ -709,7 +709,7 @@
     },
     {
       "path": ".claude/skills/kimi-peer-writer/SKILL.md",
-      "sha256": "f13211718a94d61b25cbb90ee5cf9fec1b6d44bab7e72d5f1fa2a859a93cc3df"
+      "sha256": "15694f19fc7390a1d9002045e593bb7264aa8ca3206fb20d00c5081fedc81e62"
     },
     {
       "path": ".claude/skills/local-llm/SKILL.md",
@@ -749,7 +749,7 @@
     },
     {
       "path": ".claude/skills/peer-conversation/SKILL.md",
-      "sha256": "06c536399abb6597620484c85d1f4b933e48eba4a945e8ea26e027e4088288f1"
+      "sha256": "093471d4769616cb45484eb836e07492c45c44155673ff5ca267d269bbd959cc"
     },
     {
       "path": ".claude/skills/personal-guide-render/SKILL.md",

@@ -1521,7 +1521,7 @@ fi
 ```bash
 SNAPSHOT_WRITER="${IWE_WORKSPACE:-$HOME/IWE}/scripts/wp-phase-snapshot-write.py"
 if [ -f "$SNAPSHOT_WRITER" ]; then
-  python3 "$SNAPSHOT_WRITER" "<WP-NNN>" --governance-repo "$GOV_REPO_ROOT"
+  "$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" --stdlib-only)" "$SNAPSHOT_WRITER" "<WP-NNN>" --governance-repo "$GOV_REPO_ROOT"
 else
   echo "записи снимка фаз на этой установке нет — пропущена" >&2
 fi
@@ -1676,7 +1676,7 @@ fi
 ```bash
 CLOSE_OBLIGATION="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/close_obligation.py"
 if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && [ -f "$CLOSE_OBLIGATION" ]; then
-  python3 "$CLOSE_OBLIGATION" cancel \
+  "$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh")" "$CLOSE_OBLIGATION" cancel \
     --session-id "$CLAUDE_CODE_SESSION_ID" --action peer-session-close --actor peer-session-close \
     --reason "peer-session $SESSION_ID closed via direct commit (Шаг 4.5.1), no runner obligation applies" \
     2>&1 || echo "close_obligation cancel не прошёл — не блокирует пилота, следующий Quick Close покажет это явно, если проблема повторится"

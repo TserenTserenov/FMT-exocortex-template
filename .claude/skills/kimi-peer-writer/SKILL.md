@@ -148,7 +148,7 @@ fi
 
 ```bash
 [ ! -f "${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/resolve-personality-by-host.py" ] || \
-python3 "${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/resolve-personality-by-host.py" \
+"$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" --stdlib-only)" "${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/resolve-personality-by-host.py" \
   --registry "${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/current/AI Personalities Registry.md" \
   --hostname "$(hostname)" --runtime-id kimi-code-local
 ```
@@ -637,7 +637,7 @@ Kimi-writer не имеет Skill tool, а напарник в этом вызо
 
 ```bash
 [ -f "${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/verify/falsification_lint.py" ] || echo "программы проверки условий на этой установке нет — условие сверить по правилам /verify самому" >&2
-[ ! -f "${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/verify/falsification_lint.py" ] || python3 "${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/verify/falsification_lint.py" condition \
+[ ! -f "${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/verify/falsification_lint.py" ] || "$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" --stdlib-only)" "${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/verify/falsification_lint.py" condition \
   < "${IWE_WORKSPACE:-$HOME/IWE}/.iwe-runtime/peer-prompts/<SESSION_ID>-verify.condition.txt"
 ```
 
@@ -692,7 +692,7 @@ grep '^INTEGRITY-WARNING:' "${VERIFY_FILE%.md}.err" >&2 2>/dev/null || :
 [ "$VERIFY_RC" -eq 0 ] && [ -s "$VERIFY_FILE" ] \
   || { echo "NOT_VERIFIABLE: проверка не получена (код адаптера $VERIFY_RC)" >&2; exit 1; }
 [ -f "${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/verify/falsification_lint.py" ] || echo "программы проверки вердикта на этой установке нет — исход прочитать из $VERIFY_FILE по правилам выше" >&2
-[ ! -f "${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/verify/falsification_lint.py" ] || python3 "${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/verify/falsification_lint.py" verdict \
+[ ! -f "${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/verify/falsification_lint.py" ] || "$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" --stdlib-only)" "${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/verify/falsification_lint.py" verdict \
   --condition-file "${IWE_WORKSPACE:-$HOME/IWE}/.iwe-runtime/peer-prompts/<SESSION_ID>-verify.condition.txt" \
   < "$VERIFY_FILE"
 ```
@@ -1220,7 +1220,7 @@ HANDOFF_RC=$?
 ```bash
 SNAPSHOT_WRITER="${IWE_WORKSPACE:-$HOME/IWE}/scripts/wp-phase-snapshot-write.py"
 if [ -f "$SNAPSHOT_WRITER" ]; then
-  python3 "$SNAPSHOT_WRITER" "$PEER_WP" --governance-repo "<каталог карточки>"
+  "$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" --stdlib-only)" "$SNAPSHOT_WRITER" "$PEER_WP" --governance-repo "<каталог карточки>"
 else
   echo "записи снимка фаз на этой установке нет — пропущена" >&2
 fi
