@@ -198,6 +198,24 @@ def test_system_prompt_asks_for_unlisted_terms(tmp_path):
     assert "<unlisted_terms>" in prompt
 
 
+def test_system_prompt_limits_a_scoped_term_and_leaves_others_plain(tmp_path):
+    style = tmp_path / "style.md"
+    style.write_text("Plain English.\n", encoding="utf-8")
+
+    prompt = translate._build_system_prompt(
+        style,
+        glossary={"Проверка": "Verification", "Пак": "Pack"},
+        manifest={"exclusions": {}},
+        scopes={"Проверка": "the pipeline station"},
+    )
+
+    assert (
+        "  Проверка → Verification (only as the pipeline station; "
+        "elsewhere translate the word as an ordinary word)"
+    ) in prompt
+    assert "  Пак → Pack\n" in prompt
+
+
 def _git(cwd: Path, *args: str) -> str:
     return subprocess.run(
         ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
