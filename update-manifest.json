@@ -881,7 +881,7 @@
     },
     {
       "path": ".claude/skills/verify/SKILL.md",
-      "sha256": "ad807eba45ef43f8e9c83d1fd256b58d9ccca454cb2818cd6f5eb72ca773de95"
+      "sha256": "f2781395d7c738b138c513bcc3533886de5043cd8cc6019cfa5295cfd111d527"
     },
     {
       "path": ".claude/skills/verify/verify-fpf-subsection.md",
@@ -993,7 +993,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "6b754fc5ca08c73924ee8d0216e62fe2b79cbd89fa9a2128fa3ded76570e8bc0"
+      "sha256": "5405e50c87696de667af2513344a16c650e363b4aeca28924218247132e3b0c2"
     },
     {
       "path": "CLAUDE.md",
@@ -2245,7 +2245,7 @@
     },
     {
       "path": "roles/verifier/prompts/verify-wp-acceptance.md",
-      "sha256": "2567c4c75df3369a307a1a8376ade661a7cd89689b30a22a67f96eef5f857ed5"
+      "sha256": "3fadd0ef5ae1863884fc3ee07c03cd837444c714dcb641a13a557f22a32f88b7"
     },
     {
       "path": "roles/verifier/role.yaml",
