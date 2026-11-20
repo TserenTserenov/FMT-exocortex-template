@@ -277,6 +277,17 @@
         ]
       }
     ],
+    "PermissionRequest": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/memory-write-permission.sh"
+          }
+        ]
+      }
+    ],
     "PreCompact": [
       {
         "hooks": [

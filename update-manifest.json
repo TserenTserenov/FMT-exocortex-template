@@ -124,6 +124,10 @@
       "sha256": "a51e041bd7e4286b4b0cf3f0a8bed6d9a28c2a66ecce1f1d96a4d862fc776369"
     },
     {
+      "path": ".claude/hooks/memory-write-permission.sh",
+      "sha256": "5f14f83f453782854f6ef0ce5db176c873c3452ae48be589c4967bfcf2ed33d9"
+    },
+    {
       "path": ".claude/hooks/pack-creator-spf-guard.sh",
       "sha256": "77d0c4af768ed2558b0dedb68816514f2f7da9fe1ebfa2458bad72cda2b4a482"
     },
@@ -294,6 +298,10 @@
     {
       "path": ".claude/hooks/tests/test-issue-1411-stop-gate-blocked-skill.sh",
       "sha256": "44c48bd637afb690d0a2e75c9be8882e65ba5ac42fccb8ba23edb7b81419166b"
+    },
+    {
+      "path": ".claude/hooks/tests/test-memory-write-permission.sh",
+      "sha256": "5e983e7fa3b01f40dce7a397344b73f2319f127177a0b5e5361c04a79bdcc1c3"
     },
     {
       "path": ".claude/hooks/tests/test-protocol-artifact-validate-mandatory-fail-closed.sh",
@@ -489,7 +497,7 @@
     },
     {
       "path": ".claude/settings.json",
-      "sha256": "175e65b41c6bd11ecf7590b14cc8cebf18847a7567bf7b1c10111954b6677c50"
+      "sha256": "ce73c1fdc2eaa4fba0f9ba2522431f15e81ab1ae5c748d5e6b3b1be90d980db4"
     },
     {
       "path": ".claude/skills-catalog.yaml",
@@ -965,7 +973,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "c763f9eeca1052bda31e66d3dbf4d44052140eef36938d9492b79978072836fb"
+      "sha256": "9d8c199e2465982ebd5646d7a4f0c75e6ef96d307f8ab7edd529ae364f00cd0c"
     },
     {
       "path": ".gitignore",
