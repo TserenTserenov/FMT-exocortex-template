@@ -67,7 +67,7 @@ fi
 
 ```bash
 WEEK=$(date +%Y-W%V)
-WC_REPO="${WC_REPO:-{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}}"
+WC_REPO="${WC_REPO:-${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 export IWE_LEDGER_DIR="$WC_REPO/machine/ledger"
 bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/ledger-append.sh" week "$WEEK" pilot_answer "$RETRO_JSON" week-close
 LEDGER_WEEK_REL="machine/ledger/$(. "${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/ledger-path.sh" && ledger_path_rel week "$WEEK")"
@@ -81,9 +81,9 @@ LEDGER_WEEK_REL="machine/ledger/$(. "${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/ledge
 
 **Коммиты:**
 ```bash
-for repo in $(ls {{WORKSPACE_DIR}}/); do
-  if [ -d {{WORKSPACE_DIR}}/$repo/.git ]; then
-    commits=$(git -C {{WORKSPACE_DIR}}/$repo log --since="last monday 00:00" --until="today 00:00" --oneline --no-merges 2>/dev/null)
+for repo in $(ls ${IWE_WORKSPACE:-$HOME/IWE}/); do
+  if [ -d ${IWE_WORKSPACE:-$HOME/IWE}/$repo/.git ]; then
+    commits=$(git -C ${IWE_WORKSPACE:-$HOME/IWE}/$repo log --since="last monday 00:00" --until="today 00:00" --oneline --no-merges 2>/dev/null)
     [ -n "$commits" ] && echo "=== $repo ===" && echo "$commits"
   fi
 done
@@ -91,7 +91,7 @@ done
 
 **Календарь недели:**
 ```bash
-bash {{WORKSPACE_DIR}}/scripts/server-calendar.sh --week $(date -v-mon +%Y-%m-%d 2>/dev/null || date -d "last monday" +%Y-%m-%d)
+bash ${IWE_WORKSPACE:-$HOME/IWE}/scripts/server-calendar.sh --week $(date -v-mon +%Y-%m-%d 2>/dev/null || date -d "last monday" +%Y-%m-%d)
 ```
 Сверить запланированные встречи/задачи с фактом: что состоялось, что перенеслось, что отменилось. Для задач с отчётами (🔧 backup stress-test и т.п.) — проверить наличие артефакта.
 
@@ -129,7 +129,7 @@ bash {{WORKSPACE_DIR}}/scripts/server-calendar.sh --week $(date -v-mon +%Y-%m-%d
 bash ${IWE_SCRIPTS}/pending-phases-sweep.sh
 ```
 
-Скрипт обходит все `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/WP-*.md` со `status: in_progress` (или без явного status), извлекает строки Ф-таблицы со статусом `⏳ pending` / `pending`, выводит сводку формата:
+Скрипт обходит все `${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/WP-*.md` со `status: in_progress` (или без явного status), извлекает строки Ф-таблицы со статусом `⏳ pending` / `pending`, выводит сводку формата:
 
 ```
 WP-NNN: pending-фазы (M):
@@ -139,7 +139,7 @@ WP-NNN: pending-фазы (M):
 
 Для каждой pending-фазы решить: **(a)** делать на этой неделе → добавить в W{N+1} как явный пункт; **(b)** переоценить (блокер? устарела?); **(c)** оставить как есть (если ожидание внешнего события — записать ожидаемый триггер).
 
-Если скрипта нет — fallback: `grep -l "status: in_progress" {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/WP-*.md` → для каждого `grep -E "⏳.*pending|Ф[0-9]+.*pending"`.
+Если скрипта нет — fallback: `grep -l "status: in_progress" ${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/WP-*.md` → для каждого `grep -E "⏳.*pending|Ф[0-9]+.*pending"`.
 
 ### 6. Captures и уроки
 
@@ -150,7 +150,7 @@ WP-NNN: pending-фазы (M):
 
 ### 6a. Сверка журнала гипотез (LPF, WP-496)
 
-> Регламент: `memory/lpf-hypothesis-log.md`. Журнал: `{{GOVERNANCE_REPO}}/current/hypotheses-log.md`.
+> Регламент: `memory/lpf-hypothesis-log.md`. Журнал: `${IWE_GOVERNANCE_REPO:-DS-strategy}/current/hypotheses-log.md`.
 
 1. Прочитать `hypotheses-log.md` — отфильтровать записи со статусом «на сверке» И датой сверки ≤ сегодня. Записи со статусом «черновик» (не подтверждённые пилотом Note-Review) — пропустить, они не в цикле сверки.
 2. Для каждой найденной записи: сверить критерий фальсификации с доступной фактурой (коммиты недели, `domain_event`, инфраструктурные логи, факты из ретро §3-4 этого протокола).
@@ -227,7 +227,7 @@ bash ${IWE_SCRIPTS}/memory-bleed.sh
 ```bash
 IWE_ROOT="${IWE_ROOT:-$HOME/IWE}"
 MEMORY_DIR="$IWE_ROOT/memory"
-echo "=== distinctions.md ===" && wc -l {{WORKSPACE_DIR}}/.claude/rules/distinctions.md
+echo "=== distinctions.md ===" && wc -l ${IWE_WORKSPACE:-$HOME/IWE}/.claude/rules/distinctions.md
 echo "=== MEMORY.md ===" && wc -l "$MEMORY_DIR/MEMORY.md"
 echo "=== memory/ файлы (mtime >14д) ===" && find "$MEMORY_DIR" -name "*.md" -mtime +14 -not -name "MEMORY.md" -not -path "*/archive/*" | sort
 ```
@@ -300,7 +300,7 @@ fi
 
 ```bash
 WEEK=$(date +%Y-W%V)  # shell variables of step 0б do not survive between calls: recompute
-WC_REPO="${WC_REPO:-{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}}"
+WC_REPO="${WC_REPO:-${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 LEDGER_WEEK_REL="machine/ledger/$(. "${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/ledger-path.sh" && ledger_path_rel week "$WEEK")"
 (cd "$WC_REPO"
 git status --short

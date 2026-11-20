@@ -127,6 +127,21 @@ expect "tee writes its non-empty here-doc" pass "tee notes.md <<'EOF' >/dev/null
 a line
 EOF"
 
+# === WP-529 F275, rc.1 red team F2: only the last stdin redirection, on fd 0, may be the here-doc ===
+expect "here-doc on fd 3 is not cat's input" ask "cat > params.yaml 3<<EOF
+x
+EOF"
+expect "here-string on fd 3 is not cat's input" ask 'cat 3<<< x > params.yaml'
+expect "stdin closed after the here-doc" ask "cat <<EOF > params.yaml <&-
+x
+EOF"
+expect "stdin from /dev/null after the here-string" ask 'cat <<< x > params.yaml < /dev/null'
+expect "stdin from a file after the here-string" ask 'cat <<< x > params.yaml 0< README.md'
+expect "empty here-string after a here-doc" ask "cat <<EOF <<< '' > params.yaml
+x
+EOF"
+expect "here-string on fd 0 explicitly" pass 'cat 0<<< x > notes.md'
+
 # === WP-529 F275: a quote or << inside a # comment must not hide the next lines ===
 expect "apostrophe in a comment, then a write" ask "ls # don't
 grep zzz README.md > params.yaml"
@@ -140,6 +155,53 @@ expect "markdown heading with a quote inside a here-doc body" pass "cat > notes.
 # Don't panic
 > a quote
 EOF"
+
+# === WP-529 F275, rc.1 red team F3: readers after a comment with a quote, all redirection forms ===
+expect "comment, then reader >" ask "ls # don't
+grep zzzqqq README.md > params.yaml"
+expect "comment, then reader &>" ask "ls # don't
+grep zzzqqq README.md &> params.yaml"
+expect "comment, then reader >&" ask "ls # don't
+grep zzzqqq README.md >& params.yaml"
+expect "quote nested in a substitution, then a workspace file" ask 'cat README.md "$(echo "'"'"'")" > params.yaml'
+expect "substitution without quotes stays quiet" pass 'echo "$(date)" > /tmp/x'
+expect "pr body from a cat here-doc with markdown quotes" pass "gh pr create --title t --body \"\$(cat <<'EOF'
+> a quote
+> another -> one
+EOF
+)\""
+
+# === WP-529 F275, rc.2 red team A: line continuations are joined before any pass ===
+expect "comment quote, reader target after a continuation" ask "ls # don't
+grep zz README.md > \\
+params.yaml"
+expect "comment opener after the continued target" ask "grep zz README.md > \\
+params.yaml # <<EOF"
+expect "continuation before the operator" ask "ls # don't
+grep zz README.md \\
+> params.yaml"
+expect "continuation in a comment ends with the line" pass "ls # note \\
+git log --oneline -3"
+expect "multi-line git log with continuations" pass "git log \\
+  --oneline \\
+  -5 2>/dev/null"
+expect "continuation inside a quoted here-doc body stays data" pass "cat > /tmp/notes.md <<'EOF'
+line one \\
+> quoted
+EOF"
+
+# === WP-529 F275, rc.2 red team C: a later fd 0 redirection or an empty delimiter cancels the exemption ===
+expect "here-string, then fd 0 closed" ask 'cat <<< x > params.yaml 0>&-'
+expect "here-string, then fd 0 onto /dev/null" ask 'cat <<< x > params.yaml 0>/dev/null'
+expect "here-string, then fd 0 moved away" ask 'cat <<< x > params.yaml 3<&0-'
+expect "here-doc, then fd 0 moved by >&" ask "cat <<EOF > params.yaml 4>&0-
+text
+EOF"
+expect "empty delimiter here-doc" ask "cat <<'' > params.yaml
+
+"
+expect "fd 0 closed before the here-string keeps the exemption" pass 'cat 0>&- <<< x > params.yaml'
+expect "here-string with stderr to /dev/null keeps the exemption" pass 'cat <<< x > notes.md 2>/dev/null'
 
 # === every input terminates: the new passes walk each line once ===
 # finishes $1=desc $2=seconds $3=python expression building the command: the hook must answer
@@ -161,14 +223,48 @@ PYEOF
 )
   if [ "$verdict" = "ok" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: $desc ($verdict)"; fi
 }
-finishes "semicolon then redirect" 1.0 '"ls ;> params.yaml"'
-finishes "pipe then redirect" 1.0 '"ls |> params.yaml"'
-finishes "chained odd operators" 1.0 '"ls ;>;>;> |>|> >|>| params.yaml"'
-finishes "odd operators in a comment" 1.0 '"ls # ;> |> << \x27 \"\nls ;> |> x"'
+# Short commands: the limit is the time of a plain `ls` on this machine plus 1 s (rc.14 red team,
+# F20: a hook call alone takes close to a second on a slow runner, so an absolute 1 s limit fired
+# without any slow parsing).
+BASELINE=$(python3 - "$HOOK" "$WORKSPACE_ROOT" <<'PYEOF'
+import json, subprocess, sys, time
+hook, root = sys.argv[1], sys.argv[2]
+best = None
+for _ in range(2):
+    started = time.monotonic()
+    subprocess.run(["bash", hook], input=json.dumps({"tool_input": {"command": "ls"}, "cwd": root}), capture_output=True, text=True)
+    took = time.monotonic() - started
+    best = took if best is None else min(best, took)
+print(f"{best:.2f}")
+PYEOF
+)
+SHORT_LIMIT=$(awk -v b="$BASELINE" 'BEGIN { printf "%.2f", b + 1.0 }')
+BRACE_LIMIT=$(awk -v b="$BASELINE" 'BEGIN { printf "%.2f", b + 2.0 }')
+finishes "semicolon then redirect" "$SHORT_LIMIT" '"ls ;> params.yaml"'
+finishes "pipe then redirect" "$SHORT_LIMIT" '"ls |> params.yaml"'
+finishes "chained odd operators" "$SHORT_LIMIT" '"ls ;>;>;> |>|> >|>| params.yaml"'
+finishes "odd operators in a comment" "$SHORT_LIMIT" '"ls # ;> |> << \x27 \"\nls ;> |> x"'
 # 200 KB: the hook as a whole is not linear in every older pass (main takes a few seconds on
 # such text), so the limit here is a termination bound, not the 1.0 s budget of perf_cases.py.
 finishes "200 KB here-doc body with quotes and >" 30 '"cat > notes.md <<\x27EOF\x27\n" + ("a > b it\x27s # c\n" * 13000)[:200000] + "\nEOF"'
 finishes "200 KB of ;> |> after a quoted comment" 30 '"ls # don\x27t\n" + ("x ;> |> # a\x27 <<E " * 12000)[:200000]'
+
+# === WP-529 F275, rc.1 red team F1: 2^40 brace words — the cap answers at once ===
+finishes "40 brace groups after a protected write" "$BRACE_LIMIT" '"cat README.md > .claude/hooks/destructive-guard.sh || ls > x" + "{a,b}" * 40'
+finishes "40 brace groups into /tmp" "$BRACE_LIMIT" '"ls > /tmp/x" + "{a,b}" * 40'
+finishes "40 brace groups after tee" "$BRACE_LIMIT" '"echo a | tee x" + "{a,b}" * 40'
+B40=$(printf '{a,b}%.0s' $(seq 40))
+expect "40 brace groups into /tmp ask (unresolvable)" ask "ls > /tmp/x$B40"
+expect "40 brace groups after tee ask (unresolvable)" ask "echo a | tee x$B40"
+expect "bad bracket class asks, not a raw perl error" ask 'cat README.md > a[[:alpha:]]/b'
+
+# === WP-529 F275, rc.6 red team F4: `<<` inside an expansion is not a here-doc ===
+expect "shift inside \$((…)) does not hide the next line" ask 'ls $((1<<ls))
+grep zzzqqq README.md > params.yaml
+ls'
+expect "<< inside \${…} gives cat no here-doc input" ask 'cat ${x:-<<ls} > params.yaml
+x
+ls'
 
 echo "reader-overwrite: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

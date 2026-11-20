@@ -63,9 +63,10 @@ extract_update_retry_and_classify() {
     # Two sibling top-level constructs, not one nested block: the retry
     # `if [ ${#DOWNLOAD_QUEUE[@]} -gt 0 ]; then...fi`, immediately followed
     # by the classification `for _dq_i in ...; do...done`. Tracks
-    # block-open (line ends in "then"/"do" — including elif, deliberately:
-    # an elif shares its if's single closing fi, so counting elif as an
-    # opener too keeps the running depth correct) vs block-close (trimmed
+    # block-open (line ends in "then"/"do"; an `elif ...; then` line is NOT an
+    # opener: it shares its if's single closing fi, so counting it would leave
+    # the depth one too high and the scan would run to EOF — WP-529 F275,
+    # update.sh gained its first elif in this block with #1594) vs block-close (trimmed
     # line is "fi"/"done", trailing whitespace tolerated) depth, and stops
     # the SECOND time depth unwinds back to 0 — once per construct.
     #
@@ -94,6 +95,7 @@ extract_update_retry_and_classify() {
             sub(/[ \t]+$/, "", line)
             is_closer = 0
             if (line == "fi" || line == "done") { depth--; is_closer = 1 }
+            else if (line ~ /^elif[ \t]/) { }
             else if (line ~ /then$/ || line ~ /do$/) depth++
             # Only a fi/done that itself brings depth to 0 counts as a close
             # — depth otherwise SITS at 0 across blank/comment lines between

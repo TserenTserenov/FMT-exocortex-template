@@ -213,6 +213,10 @@ jobs:
         run: bash setup/test-strategist-isolated-scenarios.sh
       - name: Run WP-529 changelog gate tests
         run: bash setup/test-check-changelog-entry.sh
+      - name: Run WP-529 Ф276 build-runtime author-sourced files tests
+        run: bash setup/test-build-runtime-author-sourced.sh
+      - name: Run 0.42 rc.9 Н4 delivered exec-bit consistency test
+        run: bash scripts/tests/test-delivered-exec-bit-matches-update.sh
 
   # #1030/#1005: exercise lock publication and both timeout process trees
   # under Git for Windows Bash with native Windows Python. POSIX signal probes
@@ -873,6 +877,8 @@ jobs:
           bash .claude/hooks/tests/test-destructive-guard-find-chain.sh
           bash .claude/hooks/tests/test-destructive-guard-path-spellings.sh
           bash .claude/hooks/tests/test-destructive-guard-reader-overwrite.sh
+          bash .claude/hooks/tests/test-destructive-guard-monotone.sh
+          bash .claude/hooks/tests/test-destructive-guard-legacy-floor.sh
           bash scripts/tests/test_issue_1010_memory_limit.sh
 
       # WP-529 F7 follow-up (pilot decision 2026-08-21): update.sh delivers the
@@ -1166,6 +1172,11 @@ jobs:
           export GRM_BASH
           python -c 'import os, subprocess; subprocess.run([os.environ["GRM_BASH"], "-c", "command -v cygpath"], check=True)'
           python .claude/hooks/tests/destructive-guard/guarded_rm_cases.py .claude/bin/guarded-rm
+      # rc.11 red team F12: the released-guard floor (perl Digest::SHA, Cwd, process groups,
+      # time limit) must work on Git Bash, or the hook blocks every command there.
+      - name: destructive-guard and its released-guard floor on Git Bash
+        shell: bash
+        run: bash .claude/hooks/tests/test-destructive-guard-windows-smoke.sh
 
   # WP-529 Phase 3: single fail-closed receipt for this commit, built from the
   # results of THIS workflow run (needs.<job>.result — same trigger, same

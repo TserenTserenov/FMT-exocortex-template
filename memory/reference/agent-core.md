@@ -59,7 +59,7 @@ git diff --cached --name-only
 
 Пример:
 ```
-agent_status_update(agent="claude-code", status=working, task="WP-X фаза", files=["src/marathon.py"], repo="your-org/{{GOVERNANCE_REPO}}")
+agent_status_update(agent="claude-code", status=working, task="WP-X фаза", files=["src/marathon.py"], repo="your-org/${IWE_GOVERNANCE_REPO:-DS-strategy}")
 ```
 
 **Fail-safe:** если статус не обновлён вручную — детерминированно пишет `scripts/agent-status-report.sh <agent> <status> [task] [files-csv]` (Claude — из Stop-хука, Kimi — из `kimi-peer-adapter.sh`). Не отменяет primary-путь через MCP-инструмент.
