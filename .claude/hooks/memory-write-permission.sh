@@ -9,16 +9,26 @@
 # This hook answers ONLY that request, and only when ALL of these hold:
 #   - permission_mode is auto or acceptEdits (a user in default mode keeps the prompt);
 #   - the tool is Write/Edit/MultiEdit/NotebookEdit with an absolute path;
-#   - <workspace>/memory is a symlink named "memory" whose real target is inside the
-#     Claude config folder's projects/ directory (a cloned repository that ships its own
-#     memory -> ~/.ssh symlink is NOT approved);
-#   - the REAL path of the written file (symlinks resolved) is inside that target.
+#   - <workspace>/memory resolves to THIS project's auto-memory folder:
+#     <claude config>/projects/<project slug>/memory (a cloned repository that ships its
+#     own memory -> ~/.ssh, or -> another project's memory, is NOT approved);
+#   - the path as written goes through <workspace>/memory/ (a direct real path is already
+#     approved by Claude Code itself), its parent folder exists, and the REAL path of the
+#     file (symlinks resolved) is still inside the memory folder.
 # Anything else: no output and exit 0, so the permission flow stays unchanged.
 # Opt out: IWE_MEMORY_WRITE_AUTO_APPROVE=0.
 #
-# Not verified against Claude Code's own symlink check order: the documentation does not
-# say whether PermissionRequest hooks see this prompt (see issue #1487); confirm on the
-# affected version.
+# Known limits (all fail safe: the hook stays silent and the prompt remains as before):
+#   - the request carries no reason, so the hook cannot tell the symlink prompt from any
+#     other prompt for the same path; the documentation does not say whether
+#     PermissionRequest hooks see the symlink prompt at all (issue #1487) - confirm on the
+#     affected version;
+#   - check and write are not atomic: a process that swaps the memory/ symlink between
+#     them defeats any hook. The hook is not a boundary against an attacker who can
+#     already change files in your workspace;
+#   - it needs python3; the project slug rule (every non-alphanumeric character becomes
+#     "-", override CLAUDE_CODE_PROJECT_DIR_NAME) and case-sensitive path comparison may
+#     not match on every platform (case-insensitive macOS volumes, Git Bash drive paths).
 set -uo pipefail
 
 [ "${IWE_MEMORY_WRITE_AUTO_APPROVE:-1}" = "0" ] && exit 0
@@ -29,6 +39,7 @@ command -v python3 >/dev/null 2>&1 || exit 0
 MEMORY_PROJECT_DIR="$PROJECT_DIR" python3 -I -c '
 import json
 import os
+import re
 import sys
 
 APPROVE_MODES = {"auto", "acceptEdits"}
@@ -65,17 +76,22 @@ def main():
     if not isinstance(target, str) or not os.path.isabs(target):
         return
 
-    link = os.path.join(os.environ["MEMORY_PROJECT_DIR"], "memory")
-    if not os.path.islink(link):
-        return
-    memory = os.path.realpath(link)
+    project = os.environ["MEMORY_PROJECT_DIR"]
+    link = os.path.join(project, "memory")
+    # The auto-memory folder of this very project, not any projects/<name>/memory.
+    slug = os.environ.get("CLAUDE_CODE_PROJECT_DIR_NAME") or re.sub(
+        r"[^A-Za-z0-9]", "-", os.path.realpath(project)
+    )
     config = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
-    projects = os.path.realpath(os.path.join(config, "projects"))
-    if os.path.basename(memory) != "memory" or not os.path.isdir(memory):
+    expected = os.path.realpath(os.path.join(config, "projects", slug, "memory"))
+    memory = os.path.realpath(link)
+    if memory != expected or not os.path.isdir(memory):
         return
-    if not inside(memory, projects):
+    # The path as written must go through <workspace>/memory/ before symlinks are resolved.
+    if not inside(os.path.normpath(target), os.path.normpath(link)):
         return
-    if inside(os.path.realpath(target), memory):
+    real = os.path.realpath(target)
+    if inside(real, memory) and os.path.isdir(os.path.dirname(real)):
         json.dump(ALLOW, sys.stdout)
 
 
