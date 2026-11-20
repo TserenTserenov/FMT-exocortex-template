@@ -229,7 +229,7 @@
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/perf_cases.py",
-      "sha256": "9f7eb8caa5b0377db5ba4b980695eb4a3723b03325fa15385b661d35a82d7e9f"
+      "sha256": "361afee4f84c5cb5a11615631e8187693813054c6f9175d9c436f686320628d3"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
