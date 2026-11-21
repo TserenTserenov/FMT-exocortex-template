@@ -1886,12 +1886,41 @@ echo "=== 4.3. Ledger render ==="
   --date "$DATE" 2>&1 || true
 
 # ============================================
+# 4.45. Week sync patch (deterministic — template release 0.43, vote option 1:
+# the day plan is built from the week plan). Rebuilds the task table after the
+# LLM fill: today's priorities and yesterday's carry-over take hours and marks
+# from the week plan; other rows stay (mandatory daily WPs unmarked, the rest
+# marked). Never blocks: an unreadable week plan or a crash is a red line in
+# «Срочное», a week plan without a readable pool table is a line in «Требует
+# внимания». Prints `hours-scope=week|day` for step 4.5. Skipped under
+# --scaffold-only like 4.59: the draft has no model table to rebuild yet.
+# ============================================
+BUDGET_HOURS_SCOPE=day
+if [ "$SCAFFOLD_ONLY" = "true" ]; then
+  echo "=== 4.45. Week sync patch — SKIPPED (scaffold-only) ==="
+else
+  echo "=== 4.45. Week sync patch ==="
+  WEEK_SYNC_OUT=$("$_PATCH_PY" "$SCRIPT_HOME/day-open-week-sync-patch.py" \
+    --dayplan "$DAYPLAN_PATH" \
+    --priorities "$DS_STRATEGY/current/priorities.yaml" \
+    --weekplan "${WEEKPLAN_PATH:-}" \
+    --inbox "$DS_STRATEGY/inbox" \
+    --day-rhythm-config "$IWE/memory/day-rhythm-config.yaml") || true
+  case "$WEEK_SYNC_OUT" in
+    *hours-scope=week*) BUDGET_HOURS_SCOPE=week ;;
+  esac
+fi
+
+# ============================================
 # 4.5. Budget patch (deterministic: sum h column, no LLM hallucination)
+# After 4.45 the «h» column holds week-plan hours: --hours-scope week compares
+# them with a week of phys_hours instead of one day.
 # ============================================
 echo "=== 4.5. Budget patch ==="
 python3 "$SCRIPT_HOME/day-open-budget-patch.py" \
   --dayplan "$DAYPLAN_PATH" \
-  --priorities "$DS_STRATEGY/current/priorities.yaml" 2>&1 || true
+  --priorities "$DS_STRATEGY/current/priorities.yaml" \
+  --hours-scope "$BUDGET_HOURS_SCOPE" 2>&1 || true
 
 # ============================================
 # 4.55. Priorities patch (deterministic — WP-484, pilot instruction 16.08: Day
