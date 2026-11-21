@@ -89,11 +89,11 @@
     },
     {
       "path": ".claude/hooks/dry-run-cmd-parse.pl",
-      "sha256": "2830ad863d0d2b8010823debf9ad443081080896af23e6e65014b907ce2287e9"
+      "sha256": "9809692e6540c6e9d03fae1d2e326efecc988c1600f846f4c05de8a996c5519d"
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "104cc36c01578a04fc384ce1b4b9a18cdf70a928edcfc6887838d2ebc38243a6"
+      "sha256": "9e647f7eaff9e53341dc23366d540f52559988ad1611d4532f41473c7af6d360"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -913,7 +913,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "f92e57263153a86b92c64e7ea806bd4730992662b278df532f99cc70de88a1bc"
+      "sha256": "372ffadba1d0bdbfb293e705cafededd8832043c33d112d37d5168d4a5be6689"
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2c8efdd9139c45a8a3dc2b91be27903995dd8ec8a59d5d5cd48735f7261e57ec"
+      "sha256": "da8cf2256d0468649046111687f9a6f3afbd0c933538f7594f88b1c62406cdb1"
     },
     {
       "path": "CLAUDE.md",
