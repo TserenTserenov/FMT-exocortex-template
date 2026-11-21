@@ -126,6 +126,7 @@ fi
 | `verify_quick_close` | Quick Close | Верификация чеклиста Haiku (шаг 7) |
 | `telegram_notifications` | Все роли | Telegram уведомления от ролей |
 | `extensions_dir` | Все протоколы | Директория расширений (default: `extensions`) |
+| `pack_catalog_url` | `/pack-subscribe` | Свой каталог паков других авторов (https-адрес или путь); список подписок скилл ведёт в `extensions/protocol-open.after.pack-subscriptions.md` |
 
 Подробности: [params.yaml](../params.yaml).
 

@@ -2,7 +2,7 @@
 # see DP.SC.153
 # НЕ редактировать вручную — перегенерировать через generate-skills-catalog.sh
 #
-generated: 2026-11-21T11:05:24Z
+generated: 2026-11-21T17:17:34Z
 skills_dir: .claude/skills
 
 skills:
@@ -100,7 +100,6 @@ skills:
         - /author-mode
     depends_on: []
     invoked_by:
-    - CLAUDE.md
     - author-mode
   - id: bottleneck-pick
     name: "bottleneck-pick"
@@ -244,6 +243,7 @@ skills:
     depends_on: []
     invoked_by:
     - find-method
+    - pack-subscribe
   - id: fpf
     name: "fpf"
     description: "Загрузка применимых принципов для задачи из иерархии Pack → SPF → FPF. Используй когда нужно найти релевантные принципы перед принятием решения."
@@ -258,6 +258,7 @@ skills:
     - CLAUDE.md
     - find-method
     - pack-new
+    - pack-subscribe
     - onboarding
     - fpf
   - id: integration-gate
@@ -413,6 +414,7 @@ skills:
         - /onboarding
     depends_on: []
     invoked_by:
+    - CLAUDE.md
     - diagnose
     - onboarding
   - id: org-dev
@@ -455,6 +457,19 @@ skills:
     - skill-creator
     - pack-creator
     - repo-new
+    - pack-subscribe
+  - id: pack-subscribe
+    name: "pack-subscribe"
+    description: "Подключение базы знаний другого автора (пака) только для чтения: витрина из каталога → проверка доступа → копия только для чтения → запись в ваш файл расширения → область поиска → реестр. Используй когда пользователь говорит «подключи пак», «какие паки есть», «подпиши меня на пак X», «отключи пак X», «/pack-subscribe»."
+    version: 0.3.0
+    layer: L1
+    status: experimental
+    triggers:
+      slash:
+        - /pack-subscribe
+    depends_on: []
+    invoked_by:
+    - pack-subscribe
   - id: peer-conversation
     name: "peer-conversation"
     description: "Многотуровый диалог писателя (Claude) с одним или несколькими напарниками (любой набор из kimi/codex/hermes/claude-headless/grok) по задаче пилота (DP.SC.154). Ведёт turn-loop (2 участника) или round-loop (3+, WP-509), обнаруживает CONSENSUS/ESCALATE, после консенсуса — Decision Gate (зафиксировать vs реализовать → ревью → проверить → задеплоить), синтезирует report.md через Agent tool."
@@ -720,6 +735,7 @@ skills:
         - /wp-new
     depends_on: []
     invoked_by:
+    - CLAUDE.md
     - strategy-session
     - artifactor
     - wp-new

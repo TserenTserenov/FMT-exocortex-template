@@ -71,6 +71,11 @@ skills:
     keywords: ["найди метод", "есть ли метод", "как подойти", "find method", "method", "метод"]
     description: "Find a way of acting for the person's difficulty in local FPF/DPFs, SPF and own packs, and guide through it; say honestly when there is no method or no steps."
 
+  - name: pack-subscribe
+    browser: false
+    keywords: ["подключи пак", "какие паки есть", "подписка на пак", "отключи пак", "pack subscribe"]
+    description: "Experimental: connect another author's Pack read-only from the catalog, keep it updated and in search. Requires local FS and git."
+
   - name: think
     browser: true
     keywords: ["think", "подумаем", "adi", "abduction", "reasoning", "рассуждение"]
