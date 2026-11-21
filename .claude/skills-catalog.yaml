@@ -2,7 +2,7 @@
 # see DP.SC.153
 # НЕ редактировать вручную — перегенерировать через generate-skills-catalog.sh
 #
-generated: 2026-11-21T11:05:24Z
+generated: 2026-11-21T17:29:30Z
 skills_dir: .claude/skills
 
 skills:
@@ -467,7 +467,20 @@ skills:
     depends_on: []
     invoked_by:
     - peer-conversation
+    - peer-fanout
     - kimi-peer-writer
+  - id: peer-fanout
+    name: "peer-fanout"
+    description: "Раздать несколько независимых подзадач нескольким ИИ-агентам одновременно (fan-out) и собрать общий отчёт. Агенты не ждут друг друга; можно всем дать claude, отдельные Kimi или Codex не нужны. Каждая подзадача тратит токены подписки."
+    version: 0.1.0
+    layer: L1
+    status: experimental
+    triggers:
+      slash:
+        - /peer-fanout
+    depends_on: []
+    invoked_by:
+    - peer-fanout
   - id: personal-guide-render
     name: "personal-guide-render"
     description: "Проверяет доступность персонального руководства и табло за выбранный период. Отдельно сообщает подтверждённые сведения о генерации; не обещает ручную пересборку без опубликованного инструмента."

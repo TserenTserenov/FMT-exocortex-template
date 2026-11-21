@@ -402,6 +402,11 @@ jobs:
           /bin/bash scripts/tests/test-wp529-f270-core-mode-feeders.sh
           /bin/bash scripts/tests/test-wp529-f270-clone-memory-backup.sh
 
+      # Fan-out of independent subtasks (0.43, vote option 4): the script promises
+      # macOS bash 3.2 compatibility, so run its stub-adapter smoke under /bin/bash.
+      - name: Run peer fan-out smoke on system /bin/bash (3.2)
+        run: /bin/bash scripts/tests/peer-fanout-smoke.sh
+
   # Upgrade-flow regression test (0.29.18).
   # Root of the bug (0.29.13): template-sync overwrote FMT files -- the fresh
   # build smoke test does not catch this, because build-runtime creates `.iwe-runtime` from scratch,

@@ -501,7 +501,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "b527ef96d81ed4f9db215cfcc84a822312a23b19335663c3ab5055c11854225d"
+      "sha256": "82cbead8348888681b9d4da284ca044b7326460b447e39523f8763c46e3f4330"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -752,6 +752,10 @@
       "sha256": "bf1a419231b854e190fc72479511bd0f3c93786eb61f926ac3d8528b22bd8b47"
     },
     {
+      "path": ".claude/skills/peer-fanout/SKILL.md",
+      "sha256": "65c93aea18441ed1704501c442e5991a53b88d68a554fb2ef24cab20b3fa0b1f"
+    },
+    {
       "path": ".claude/skills/personal-guide-render/SKILL.md",
       "sha256": "8eec1d0cdb85a5d4fee140b068b04f248e75d6ecfc08e66d01aef2c26acc810e"
     },
@@ -973,7 +977,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "077b2642d5479cf608cceffcd04c90c8c4cfdc1ddd3284fb9e9640a56753b36f"
+      "sha256": "5484348b4d2886a6463576254fe04ec3f42e791a96fa697832a2d0feff2a583b"
     },
     {
       "path": ".gitignore",
@@ -1078,6 +1082,10 @@
     {
       "path": "docs/PACK-CREATION.md",
       "sha256": "63418eae5d6713abfe367d9ca4cf283852b66ce69baaa567c8898b0cebe0e440"
+    },
+    {
+      "path": "docs/PEER-FANOUT-LIVE-CHECK.md",
+      "sha256": "646d0132177cd5934e4d88261bdc6c6559e440e9ce2799db179e891b8e9919ff"
     },
     {
       "path": "docs/PLATFORM-COMPAT.md",
@@ -2916,6 +2924,10 @@
       "sha256": "bdbd68e19c8ad197e177ecc4f4817f7f4d0376c5f9e7f1610060c40a7fa54e75"
     },
     {
+      "path": "scripts/peer-fanout.sh",
+      "sha256": "a83bc78d9292c31a4732eb5b1b173a8422f3c0ac72abdedfcdbf866f2e92796c"
+    },
+    {
       "path": "scripts/peer-session-finalize.sh",
       "sha256": "c6c5170a604c103ed730b7a40f15c4a04c729e6b6cfe3fe0e4dcb84a5f083839"
     },
@@ -3085,7 +3097,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "e46fbd6e75d7d8b55c6d15ffbd4f9dd4fa15fbe8b617c46f537a72175e27c7d3"
+      "sha256": "47e698bae1d42894cc3b0cae9b1d97aa57d5af657a3fa7b87b7645d255b67477"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3620,6 +3632,7 @@
     "scripts/tests/git-sync-status-smoke.sh",
     "scripts/tests/iwe-paths-scripts-resolution-smoke.sh",
     "scripts/tests/lib/extract-update-download-batch.sh",
+    "scripts/tests/peer-fanout-smoke.sh",
     "scripts/tests/pull-on-touch-ff-only-smoke.sh",
     "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
     "scripts/tests/session-guard-isolate-minimal-smoke.sh",
