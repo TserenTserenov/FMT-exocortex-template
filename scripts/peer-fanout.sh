@@ -80,7 +80,8 @@ while IFS= read -r line || [ -n "$line" ]; do
     *[!A-Za-z0-9._-]*|.*|*/*) fail_preflight "line $LINE_NO: bad id '$id' (allowed: [A-Za-z0-9][A-Za-z0-9._-]*)" ;;
   esac
   case "$id" in [A-Za-z0-9]*) ;; *) fail_preflight "line $LINE_NO: id must start with alphanumeric: '$id'" ;; esac
-  if grep -qx "$id" "$SEEN_IDS_FILE" 2>/dev/null; then
+  # Fixed-string match: as a regex, «a.b» would collide with «axb».
+  if grep -qxF -- "$id" "$SEEN_IDS_FILE" 2>/dev/null; then
     fail_preflight "line $LINE_NO: duplicate id '$id'"
   fi
   echo "$id" >> "$SEEN_IDS_FILE"

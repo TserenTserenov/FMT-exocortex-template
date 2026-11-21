@@ -2925,7 +2925,7 @@
     },
     {
       "path": "scripts/peer-fanout.sh",
-      "sha256": "a83bc78d9292c31a4732eb5b1b173a8422f3c0ac72abdedfcdbf866f2e92796c"
+      "sha256": "287093199187888c3c7b1740f47f994d8331731259146826c2fa343205044e7c"
     },
     {
       "path": "scripts/peer-session-finalize.sh",

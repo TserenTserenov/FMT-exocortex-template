@@ -157,6 +157,13 @@ bash "$FANOUT" --tasks "$WORK/t9.tsv" --out-dir "$WORK/r9" >/dev/null 2>&1; rc=$
 [ "$rc" -eq 2 ]; check "empty answer -> exit 2" "$?"
 [ "$(cat "$WORK/r9/t9-empty.status" 2>/dev/null)" = "error:empty" ]; check "status error:empty" "$?"
 
+# 10. ids that differ only where a regex dot would match -> not duplicates, both run
+printf 'axb\tcodex\tMOCK:fast first\na.b\tclaude\tMOCK:fast second\n' > "$WORK/t10.tsv"
+out=$(bash "$FANOUT" --tasks "$WORK/t10.tsv" --out-dir "$WORK/r10" 2>/dev/null); rc=$?
+check "ids axb and a.b are distinct, exit 0" "$rc"
+[ -s "$WORK/r10/axb.md" ] && [ -s "$WORK/r10/a.b.md" ] && echo "$out" | grep -q "^ok=2 total=2 "
+check "both axb and a.b produced results" "$?"
+
 echo ""
 echo "=== peer-fanout smoke: PASS=$PASS FAIL=$FAIL ==="
 [ "$FAIL" -eq 0 ]
