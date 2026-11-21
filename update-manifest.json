@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "bbf400aedcae305cc6f5f0074318cf7871e94564587476d4797b34ab577746f6"
+      "sha256": "c782aafd2ba3388efc59f930f1a8f4d928162117464f8d794acf5a49b75d8375"
     },
     {
       "path": "CLAUDE.md",
@@ -2452,6 +2452,10 @@
       "sha256": "8467c60856b3ee1c1d688757f418fc0049fa394451241631813be213254a53ff"
     },
     {
+      "path": "scripts/concept-kind.py",
+      "sha256": "293786adb3a9c46260917b98e387a44162fc7de80008e8f8646d8959e649e958"
+    },
+    {
       "path": "scripts/config/pipeline-security-whitelist.yaml",
       "sha256": "f9be277aa1602fd50d014f33d98e362e2bc2c774a4f9b161bebf0c6098e83573"
     },
@@ -2477,7 +2481,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "1e53be55f1b61c919e96202f02162eee9dd887f8139736be8b0387a387af49b7"
+      "sha256": "15dc257309a87a7a8465bdf8ff1bae1cea80c4293ac92886a2e871ecc41c08d1"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -3748,6 +3752,7 @@
     "scripts/tests/test_issue_1555.sh",
     "scripts/tests/test_issue_1558.sh",
     "scripts/tests/test_issue_1577_1578_isolate_root.sh",
+    "scripts/tests/test_issue_1606_name_registry.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
