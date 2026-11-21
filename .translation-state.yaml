@@ -1,5 +1,152 @@
-files_translated: []
-last_run_utc: '2026-11-21T09:45:57Z'
-last_synced_sha: d81aa66b024cd059d54fd6218ca9d278d889951c
+files_translated:
+- docs/RELEASE-PROCESS.md
+last_run_utc: '2026-11-21T10:41:50Z'
+last_synced_sha: dc8ac5153b82eb13b51b5156b259c3f2d57c2d38
 schema_version: 1
-unapproved_terms: []
+unapproved_terms:
+- file: docs/RELEASE-PROCESS.md
+  source: local-glossary
+  term_en: Configuration
+  term_ru: Конфигурация
+- file: docs/RELEASE-PROCESS.md
+  source: local-glossary
+  term_en: Manifest
+  term_ru: Манифест
+- file: docs/RELEASE-PROCESS.md
+  source: local-glossary
+  term_en: Method
+  term_ru: Метод
+- file: docs/RELEASE-PROCESS.md
+  source: local-glossary
+  term_en: Skill
+  term_ru: Навык
+- file: docs/RELEASE-PROCESS.md
+  source: local-glossary
+  term_en: Protocol
+  term_ru: Протокол
+- file: docs/RELEASE-PROCESS.md
+  source: local-glossary
+  term_en: Skill
+  term_ru: Скилл
+- file: docs/RELEASE-PROCESS.md
+  source: local-glossary
+  term_en: Script
+  term_ru: Скрипт
+- file: docs/RELEASE-PROCESS.md
+  source: local-glossary
+  term_en: Hook
+  term_ru: Хук
+- file: docs/RELEASE-PROCESS.md
+  source: local-glossary
+  term_en: Template
+  term_ru: Шаблон
+- file: docs/RELEASE-PROCESS.md
+  source: local-glossary
+  term_en: Step
+  term_ru: Шаг
+- file: docs/RELEASE-PROCESS.md
+  source: local-glossary
+  term_en: Fix
+  term_ru: Исправление
+- file: docs/RELEASE-PROCESS.md
+  source: local-glossary
+  term_en: Release
+  term_ru: Релиз
+- file: docs/RELEASE-PROCESS.md
+  source: local-glossary
+  term_en: Work
+  term_ru: Работа
+- file: docs/RELEASE-PROCESS.md
+  source: local-glossary
+  term_en: Verification
+  term_ru: Проверка
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: Developer
+  term_ru: Разработчик
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: Testers
+  term_ru: Тестировщики
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: bump
+  term_ru: бамп (версии)
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: cut
+  term_ru: нарезка
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: release branch
+  term_ru: ветка выпуска
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: Release by Release Owner decision
+  term_ru: Выпуск по решению Выпускающего
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: Version
+  term_ru: Версия
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: Cut.
+  term_ru: Режем.
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: the current tip of
+  term_ru: вершина  сейчас
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: Fields and selection.
+  term_ru: Поля и отбор.
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: Candidate.
+  term_ru: Кандидат.
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: Verification.
+  term_ru: Проверка.
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: "independent red-team\n   attack"
+  term_ru: "независимая атака\n   (red team)"
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: "outside the release\n   branch tree"
+  term_ru: вне дерева ветки выпуска
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: after
+  term_ru: после
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: Merge and release.
+  term_ru: Слияние и релиз.
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: for that commit
+  term_ru: для этого коммита
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: explicit
+  term_ru: явными
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: 'the file has ALREADY been removed from the repo
+
+    or is no longer in use.'
+  term_ru: файл УЖЕ удалён из репо или уже не используется
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: 'Rule:'
+  term_ru: 'Правило:'
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: 'Why this matters:'
+  term_ru: 'Почему важно:'
+- file: docs/RELEASE-PROCESS.md
+  source: model
+  term_en: This configuration is not supported.
+  term_ru: Эта конфигурация не поддерживается.
