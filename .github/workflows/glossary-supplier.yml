@@ -67,7 +67,7 @@ jobs:
 
       - name: Walk the concept graph
         env:
-          GLOSSARY_EXPORTER_SERVICE_SECRET: ${{ secrets.GLOSSARY_EXPORTER_SERVICE_SECRET }}
+          GLOSSARY_EXPORTER_MACHINE_TOKEN: ${{ secrets.GLOSSARY_EXPORTER_MACHINE_TOKEN }}
         run: python3 scripts/fetch-glossary-concepts.py --output "$RUNNER_TEMP/concepts.json"
 
       - name: Find the open merge request of the supplier

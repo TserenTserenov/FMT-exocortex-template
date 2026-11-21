@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Обойти инструмент concept_list шлюза и записать вход для export-glossary-snapshot.py (WP-5 Ф67).
+"""Обойти инструмент concept_list через шлюз и записать вход для export-glossary-snapshot.py (WP-5 Ф67).
 
-Секрет сервисного ключа читается из переменной окружения GLOSSARY_EXPORTER_SERVICE_SECRET.
+Вход через общий шлюз (WP-560 Ф19): токен машинного клиента `mch_template-glossary-exporter.<секрет>`
+читается из переменной окружения GLOSSARY_EXPORTER_MACHINE_TOKEN. Шлюз сам проверяет токен, не пересылает
+его сервису знаний и подписывает вызов concept_list своим сервисным ключом.
 После обхода проверяются контрольные коды из эталона (inbox/WP-617/f67-nabor-priemki-shluza.md)
 и полнота: число строк равно concepts - hidden_by_closed_sources_count из graph_stats.
 Расхождение — обход повторяется (граф мог измениться), после исчерпания попыток файл не пишется.
@@ -17,9 +19,11 @@ import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 
-ENDPOINT = "https://knowledge-mcp.aisystant.workers.dev/mcp"
-SECRET_ENV = "GLOSSARY_EXPORTER_SERVICE_SECRET"
-AUTH_HEADER = "X-IWE-Service-Auth"
+ENDPOINT = "https://mcp.aisystant.com/mcp"
+TOKEN_ENV = "GLOSSARY_EXPORTER_MACHINE_TOKEN"
+# Gateway-facing tool names: the knowledge backend's tools carry the "knowledge_" prefix there.
+CONCEPT_LIST_TOOL = "knowledge_concept_list"
+GRAPH_STATS_TOOL = "knowledge_graph_stats"
 # Край Cloudflare отдаёт 403 запросам без собственного User-Agent.
 USER_AGENT = "iwe-glossary-exporter/1"
 PAGE_LIMIT = 500
@@ -50,7 +54,7 @@ class WalkError(FetchError):
     """Обход страниц сорвался (курсор, потолок страниц); граф мог измениться во время обхода — обход повторяется."""
 
 
-def http_transport(secret: str, endpoint: str = ENDPOINT) -> Transport:
+def http_transport(token: str, endpoint: str = ENDPOINT) -> Transport:
     def post(payload: dict) -> dict:
         request = urllib.request.Request(
             endpoint,
@@ -58,7 +62,7 @@ def http_transport(secret: str, endpoint: str = ENDPOINT) -> Transport:
             headers={
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                AUTH_HEADER: secret,
+                "Authorization": f"Bearer {token}",
                 "User-Agent": USER_AGENT,
             },
             method="POST",
@@ -76,7 +80,11 @@ def call_tool(post: Transport, name: str, arguments: dict) -> dict:
     if response.get("error"):
         # The run log of this repository is public: the gateway's text is not echoed, only its error code.
         raise FetchError(f"{name}: ошибка шлюза (код {response['error'].get('code', 'нет')})")
-    return json.loads(response["result"]["content"][0]["text"])
+    result = response["result"]
+    if result.get("isError"):
+        # Same rule as above: the gateway's refusal text is not echoed into the public run log.
+        raise FetchError(f"{name}: шлюз отказал в вызове")
+    return json.loads(result["content"][0]["text"])
 
 
 def page_ceiling(stats: dict) -> int:
@@ -90,7 +98,7 @@ def walk_pages(post: Transport, max_pages: int) -> tuple[list[dict], str]:
     as_of = ""
     after_id = 0
     for _ in range(max_pages):
-        page = call_tool(post, "concept_list", {"after_id": after_id, "limit": PAGE_LIMIT})
+        page = call_tool(post, CONCEPT_LIST_TOOL, {"after_id": after_id, "limit": PAGE_LIMIT})
         rows.extend(page["rows"])
         as_of = page["as_of"]
         next_after_id = page["next_after_id"]
@@ -138,14 +146,14 @@ def completeness_error(rows: list[dict], stats: dict) -> str | None:
 def fetch_payload(post: Transport) -> dict:
     last_error = ""
     for _ in range(MAX_ATTEMPTS):
-        stats_before = call_tool(post, "graph_stats", {})
+        stats_before = call_tool(post, GRAPH_STATS_TOOL, {})
         try:
             rows, as_of = walk_pages(post, page_ceiling(stats_before))
         except WalkError as exc:
             last_error = str(exc)
             continue
         check_controls(rows)
-        stats_after = call_tool(post, "graph_stats", {})
+        stats_after = call_tool(post, GRAPH_STATS_TOOL, {})
         last_error = completeness_error(rows, stats_before) or completeness_error(rows, stats_after) or ""
         if not last_error:
             return {
@@ -166,12 +174,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Обход concept_list для выгрузки снимка терминов")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args(argv)
-    secret = os.environ.get(SECRET_ENV, "")
-    if not secret:
-        print(f"fetch-glossary-concepts: нет переменной {SECRET_ENV}", file=sys.stderr)
+    token = os.environ.get(TOKEN_ENV, "")
+    if not token:
+        print(f"fetch-glossary-concepts: нет переменной {TOKEN_ENV}", file=sys.stderr)
         return 2
     try:
-        payload = fetch_payload(http_transport(secret))
+        payload = fetch_payload(http_transport(token))
     except (FetchError, OSError, KeyError, ValueError) as exc:
         print(f"fetch-glossary-concepts: {exc}", file=sys.stderr)
         return 2
