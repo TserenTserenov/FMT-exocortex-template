@@ -25,6 +25,10 @@ Refs: WP-NNN
 
 ### Added
 
+- [optional] (#1635) Навык разбора проекта (`/project-analysis`, «проверь мой проект»): агент проходит проект по признакам этапа S0–S3 программы «Личное развитие» (дела и проекты, своя ИИ-среда), ставит уровень со свидетельством по каждому признаку («неизвестно», «был случай», «устойчиво», «переносит»), называет три главных пробела и к каждому - роль и метод, а где есть - навык. Признаки и шкалу навык берёт из открытого пака PD.FORM.146: из пака на компьютере, иначе из базы знаний платформы, иначе с открытой страницы пака на GitHub. Проект не меняет и рабочих продуктов не создаёт. Вариант 6 голосования о 0.43.
+  - Цель: 54 · Результат: Ц54-01
+  - Как проверить: `bash scripts/validate-skill.sh project-analysis` - без ошибок; в новой беседе сказать «проверь мой проект, этап S1» и дать описание проекта - агент выдаёт таблицу «признак · уровень · свидетельство · источник» и три пробела с направлениями
+  - Как откатить: git revert слияния этого запроса; навык пропадёт из установки при следующем обновлении
 - [optional] `scripts/iwe-notify --direct`: one direct send to Telegram without looking up the notification gateway at all (row `direct-requested` in `direct-send-log.tsv`, outcome `direct-sent` / `direct-failed` / `not-sent`). For a sender whose message is about the governance repository itself being stale or stuck, so that repository's gateway and sender list cannot decide whether the message arrives. Without the flag nothing changes. Test: `scripts/tests/test_iwe_notify_direct.sh`. (#1630)
   - Цель: 84 · Результат: служебное — уведомление о зависшем или отставшем хранилище стратегии уходит в Telegram напрямую, не через шлюз этого хранилища; без флага поведение прежнее
   - Как проверить: bash scripts/tests/test_iwe_notify_direct.sh
