@@ -118,6 +118,27 @@ def test_coverage_refuses_modified_snapshot(root):
         SUP.coverage_rows(root, None, None, ALLOWLIST)
 
 
+def test_coverage_checks_even_unrequested_rows_before_reporting_absence(root):
+    forged = payload(dict(BASE_ROWS[0], code="DP.OTHER"), *BASE_ROWS[1:])
+    with pytest.raises(SUP.SupplierError, match="passport"):
+        SUP.coverage_rows(root, ["DP.MISSING"], forged, ALLOWLIST)
+
+
+def test_legacy_passport_still_reports_published_rows_but_cannot_authenticate_a_walk(
+    root,
+):
+    path = root / "translation/glossary-snapshot.meta.json"
+    meta = json.loads(path.read_text())
+    del meta["input_sha256"]
+    path.write_text(json.dumps(meta))
+    with pytest.raises(SUP.SupplierError, match="legacy passport"):
+        SUP.coverage_rows(root, ["DP.MISSING"], payload(*BASE_ROWS), ALLOWLIST)
+    assert (
+        SUP.coverage_rows(root, ["DP.MISSING"], None, ALLOWLIST)[0]["result"]
+        == "не установлено"
+    )
+
+
 def test_unchanged_graph_writes_nothing_even_with_a_new_as_of(root):
     before = files(root)
     result = run(root, *BASE_ROWS)

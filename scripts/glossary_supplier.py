@@ -322,13 +322,20 @@ def _cmd_refresh(args: argparse.Namespace) -> int:
     return 0
 
 
-def _input_dispositions(payload: dict, meta: dict, allowlist_path: Path) -> dict:
+def _input_dispositions(
+    payload: dict, meta: dict, allowlist_path: Path, snapshot: dict, held: set[str]
+) -> dict:
     """Classify only a walk corresponding to the accepted snapshot."""
     rows = payload["rows"]
+    if "input_sha256" not in meta:
+        raise SupplierError(
+            "legacy passport has no input checksum; omit --input for snapshot-only coverage"
+        )
     if (
         not isinstance(rows, list)
         or payload["as_of"] != meta["as_of"]
         or len(rows) != meta["input_rows"]
+        or EXPORTER.input_digest(rows) != meta["input_sha256"]
         or hashlib.sha256(allowlist_path.read_bytes()).hexdigest()
         != meta["allowlist_sha256"]
     ):
@@ -336,6 +343,14 @@ def _input_dispositions(payload: dict, meta: dict, allowlist_path: Path) -> dict
             "input walk or allowlist does not match the snapshot passport"
         )
     allowlist = EXPORTER.load_allowlist(allowlist_path)
+    included, _, _ = EXPORTER.build_rows(payload, allowlist)
+    projected = {
+        row["code"]: row for row in included if _key(row["term_ru"]) not in held
+    }
+    if projected != snapshot:
+        raise SupplierError(
+            "input and local conflict decisions do not reproduce the published snapshot"
+        )
     dispositions = {}
     for row in rows:
         action, reason = EXPORTER.classify_row(row, allowlist)
@@ -361,10 +376,10 @@ def coverage_rows(
     snapshot = {row["code"]: row for row in read_rows(path)}
     if len(snapshot) != meta["included"]:
         raise SupplierError("snapshot concept count differs from its passport")
-    incoming = (
-        _input_dispositions(payload, meta, allowlist) if payload is not None else None
-    )
     held = {_key(item["term_ru"]) for item in meta.get("conflict_local", [])}
+    incoming = (
+        _input_dispositions(payload, meta, allowlist, snapshot, held) if payload is not None else None
+    )
     consumer = {
         _key(term.term_ru): term.term_en for term in load_glossary(manifest, root).terms
     }
@@ -374,14 +389,6 @@ def coverage_rows(
         row = snapshot.get(code)
         ru, en = (row["term_ru"], row["term_en"]) if row is not None else ("", "")
         if row is not None:
-            if incoming is not None:
-                entry = incoming.get(code)
-                if (
-                    not entry
-                    or entry[0] != "include"
-                    or (entry[2].strip(), entry[3]) != (ru, en)
-                ):
-                    raise SupplierError(f"input and snapshot disagree for {code}")
             if not CYRILLIC_RE.search(ru):
                 status, reason = "не прошло проверку", "русское имя без кириллицы"
             elif consumer.get(_key(ru)) != en:
