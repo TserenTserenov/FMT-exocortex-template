@@ -25,6 +25,11 @@ Refs: WP-NNN
 
 ### Added
 
+- [optional] Экспериментальный скилл `/pack-subscribe` (0.3.0): по команде пользователя подключает базу знаний другого автора (пак) только для чтения и включает её в поиск по пакам; витрина берётся из поставляемого каталога `.claude/skills/pack-subscribe/pack-catalog.yaml` (только паки с открытым репозиторием) и, по желанию, из своего каталога (`extensions/pack-catalog.yaml` или ключ `pack_catalog_url` в `params.yaml`). Список подписок, автообновление в начале сессии и настройка области поиска хранятся в пользовательском файле `extensions/protocol-open.after.pack-subscriptions.md` (обновление его не трогает), не в `CLAUDE.md`; в копии пака коммит отклоняется. Скилл экспериментальный: в выпуск 0.43 он входит только после живого прогона у человека, не автора шаблона, который подключил базу и нашёл в ней ответ; без такого прогона — в 0.44 (#1642).
+  - Цель: 72 · Результат: Ц72-01, Ц72-04
+  - Как проверить: python3 -m pytest -q scripts/tests/test_pack_subscribe_catalog.py; python3 .claude/skills/pack-subscribe/catalog.py list --workspace /tmp/empty показывает четыре открытых пака; на установке из шаблона «/pack-subscribe PACK-rhetoric», затем вопрос, ответ на который есть в паке
+  - Как откатить: git revert слияния #1642; уже подключённые паки остаются обычными папками, их можно удалить вручную вместе с extensions/protocol-open.after.pack-subscriptions.md
+
 - [optional] `scripts/fetch-glossary-concepts.py`: the glossary exporter reaches the knowledge graph through the platform gateway as a registered machine client (token in `GLOSSARY_EXPORTER_MACHINE_TOKEN`), no longer through the knowledge worker's public address (#1639).
   - Цель: 84 · Результат: служебное — выгрузка терминов ходит через общий вход платформы, где действуют проверка доступа и суточный предел; снимок терминов прежний
   - Как проверить: python3 -m pytest scripts/tests -k glossary
