@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "217f5dc0426ac2093ad0147d397aa1551b55e1a392513372b22e9f06953d3674"
+      "sha256": "e737623d14a5a926c091a463b093b4dafaacd4ebd0635cc7e67c3c722989a194"
     },
     {
       "path": "CLAUDE.md",
@@ -2969,7 +2969,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "24fa79eb82fdd11ab11560a782d29f035ae4b49c315a416cbc2d635aca73d89e"
+      "sha256": "7323c8bfd2e8810e02a310d445d4f476001bb674628870064bdc7e009bf23e50"
     },
     {
       "path": "scripts/session-manifest-write.sh",
