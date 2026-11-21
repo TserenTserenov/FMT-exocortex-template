@@ -36,6 +36,11 @@ Refs: WP-NNN
 
 ### Changed
 
+- [behavior] English installation scripts keep their executable bits when the translated tree is published. (#1649)
+  - Цель: 93 · Результат: Ц93-06
+  - Как проверить: pytest scripts/tests/test_assemble_distribution.py
+  - Как откатить: вернуть изменение конвейера публикации из #1649.
+
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены scripts/lib/process-identity.sh (#1638).
   - Цель: 77 · Результат: служебное — доставка авторского источника в шаблон; пользователь получает эти файлы при следующем обновлении
   - Как проверить: git show --stat слияния #1638 перечисляет названные файлы, CHANGELOG.md и манифест обновления
