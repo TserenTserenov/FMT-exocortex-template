@@ -46,6 +46,23 @@
 
 set -euo pipefail
 
+# WP-530 F160: locale- and time-zone-independent owner identity, written as an
+# extra `pid_start_id:` line next to every existing `pid:` line this file
+# writes (scripts/lib/process-identity.sh). Optional and additive only: a
+# template install without the library keeps writing semaphores exactly as
+# before (no pid_start_id line) — this never changes which pid is treated as
+# the owner. Defined here, before the Git Bash degraded path below (_gb_main,
+# reached directly from the MINGW/MSYS branch further down) and before the
+# isolate helpers, because both call it and bash resolves a function call at
+# the time it runs, not at file-parse time (session-guard-top-level-flow
+# lesson: a function defined further down in the file is "command not found"
+# on whichever path reaches its call site first).
+_SG_PROCESS_IDENTITY_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/process-identity.sh"
+_owner_pid_start_id() {  # <pid>
+  [ -r "$_SG_PROCESS_IDENTITY_LIB" ] || return 0
+  ( . "$_SG_PROCESS_IDENTITY_LIB" && process_identity "$1" ) 2>/dev/null || true
+}
+
 # The transition lock below uses Unix fcntl, directory fsync through Python and
 # /bin/bash re-exec. Git Bash with native Windows Python cannot uphold that
 # contract (issue #1359). Everything except the three commands the nightly
@@ -298,17 +315,6 @@ if [ -f "$_SG_ISOLATE_LIB" ]; then
   . "$_SG_ISOLATE_LIB"
 fi
 
-# WP-530 F160: locale- and time-zone-independent owner identity, written as an
-# extra `pid_start_id:` line next to the existing `pid:` line everywhere this
-# file already writes one (scripts/lib/process-identity.sh). Optional, same
-# pattern as the isolate helpers above: a template install without the
-# library keeps writing semaphores exactly as before (no pid_start_id line) —
-# this is additive only and never changes which pid is treated as the owner.
-_SG_PROCESS_IDENTITY_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/process-identity.sh"
-_owner_pid_start_id() {  # <pid>
-  [ -r "$_SG_PROCESS_IDENTITY_LIB" ] || return 0
-  ( . "$_SG_PROCESS_IDENTITY_LIB" && process_identity "$1" ) 2>/dev/null || true
-}
 # issue #954: shared reader of WP numbers; the hypothesis gate in `open` finds the card by
 # the normalised number. The same lookup block as in the other consumers, but OPTIONAL here
 # (_WPN_OPTIONAL=1): a session must still open on an installation without the library, the
