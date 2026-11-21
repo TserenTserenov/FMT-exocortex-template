@@ -3,6 +3,8 @@
 table is rebuilt from the week plan; nothing the model put in the table
 disappears silently; every mismatch is a visible line in the plan."""
 
+from __future__ import annotations
+
 import re
 import subprocess
 import sys
@@ -13,6 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "day-open-week-sync-patch.py"
 BUDGET = ROOT / "scripts" / "day-open-budget-patch.py"
+PRIORITIES_PATCH = ROOT / "scripts" / "day-open-priorities-patch.py"
 SEED_SCRIPT = ROOT / "seed" / "strategy" / "scripts" / "day-open-week-sync-patch.py"
 
 WEEKPLAN = """<details open>
@@ -316,11 +319,35 @@ class WeekSyncPatchTest(PatchCase):
         rows = plan_rows(self.run_patch())
         self.assertEqual(rows["12"][3], "Плоская карточка · вне плана недели, часы не заданы")
 
-    def test_duplicate_model_rows_are_named(self):
-        text = replaced(DAYPLAN, "| 🔴 | С | 530 |", "| 🔴 | С | 561 | **дубль** | 1 | x |\n| 🔴 | С | 530 |")
+    def test_duplicate_model_rows_all_survive(self):
+        # Pilot decision: rows are never deleted. The first row of a WP takes the
+        # week-plan values; a second row with other hours and result stays as written.
+        header = ("| 🚦 | ТВС | # | РП | h | Статус |\n|----|-----|---|-----|---|--------|\n",
+                  "| 🚦 | ТВС | # | РП | h | Статус | Результат |\n|----|-----|---|-----|---|--------|-----------|\n")
+        text = replaced(DAYPLAN, *header)
+        text = replaced(text, "| 16 | in_progress |", "| 16 | in_progress | черновик схемы |")
+        text = replaced(text, "| 12h | in_progress |", "| 12h | in_progress | — |")
+        second = "| 🟢 | Т | 561 | **Конвейер закрытия: смоук** | 3 | pending | смоук пройден |"
+        text = replaced(text, "| 🔴 | С | 530 |", f"{second}\n| 🔴 | С | 530 |")
         out = self.run_patch(WEEKPLAN, text + ATTENTION)
-        self.assertEqual(sum(1 for line in out.splitlines() if line.startswith("|") and "| 561 |" in line), 1)
-        self.assertIn("повторены строки дел — оставлено по одной: WP-561", out)
+        rows_561 = [line for line in out.splitlines() if line.startswith("|") and "| 561 |" in line]
+        self.assertEqual(len(rows_561), 2)
+        self.assertEqual(rows_561[0], "| 🟡 | Т | 561 | **Конвейер закрытия** | 10 | in_progress | черновик схемы |")
+        self.assertEqual(rows_561[1], second)              # kept exactly as written, right after the first
+        self.assertIn("повторены строки дел — часы и пометки недели у первой строки, остальные оставлены "
+                      "как в заготовке, их часы тоже в сумме: WP-561", out)
+        self.assertNotIn("оставлено по одной", out)
+        self.assertEqual(self.rerun(), out)
+
+    def test_duplicate_rows_of_a_marked_wp_survive(self):
+        extra = ("| 🔴 | С | 999 | **Лишнее** | 5 | pending |\n"
+                 "| 🟢 | Т | 999 | **Лишнее, вторая часть** | 2 | pending |\n")
+        text = replaced(DAYPLAN, "| 🔴 | С | 530 |", extra + "| 🔴 | С | 530 |")
+        out = self.run_patch(WEEKPLAN, text + ATTENTION)
+        rows_999 = [line for line in out.splitlines() if line.startswith("|") and "| 999 |" in line]
+        self.assertEqual(rows_999, ["| 🔴 | Т | 999 | **Лишнее** · вне плана недели, часы не заданы | 0 | pending |",
+                                    "| 🟢 | Т | 999 | **Лишнее, вторая часть** | 2 | pending |"])
+        self.assertEqual(self.rerun(), out)
 
     def test_carry_over_formats_seen_in_archive(self):
         carry = ("  1. WP-581 — план фаз\n  - **РП-7** — остатки\n  - WP-561/WP-530 — такт\n"
@@ -475,6 +502,34 @@ class TemplateWeekPlanFormatsTest(PatchCase):
         self.assertIn("не найдена таблица дел", out)
         self.assertEqual(plan_rows(out)["530"][4], "12h")
         self.assertEqual(self.rerun(), out)
+
+
+class TemplateDayPlanFormatTest(PatchCase):
+    """The day table of templates.md has no ТВС column and puts «#» in cell 2."""
+
+    def test_week_sync_then_priorities_patch_find_every_priority(self):
+        sample = code_block_after(ROOT / ".claude/skills/day-open/templates.md", "## Шаблон DayPlan")
+        dayplan = replaced(sample, "| 🔴 | ... | **Название** | X | in_progress | Краткое название |",
+                           "| 🔴 | WP-561 | **Конвейер закрытия** | 16 | in_progress | Итог |")
+        self.priorities.write_text("phys_hours: 8\ntoday:\n  - WP-561\n  - WP-581\n", encoding="utf-8")
+        out = self.run_patch(WEEKPLAN, dayplan + ATTENTION)
+        self.assertNotIn("нет колонок", out)               # ТВС is optional: no daily warning
+        self.assertIn("| 🟡 | 561 | **Конвейер закрытия** | 10 | in_progress | Итог |", out)
+        self.assertIn("| 🟡 | 581 | **MCP Open Aisystant** | 25 | in_progress ||", out)
+        self.assertIn("| ⚫ | N | **Саморазвитие** — [тема] | 1-2 | pending | — |", out)
+        subprocess.run([sys.executable, str(PRIORITIES_PATCH), "--dayplan", str(self.dayplan),
+                        "--priorities", str(self.priorities)], check=True, capture_output=True, text=True)
+        out = self.dayplan.read_text(encoding="utf-8")
+        self.assertNotIn("отсутствует в таблице", out)
+        self.assertIn("— нет сигналов, требующих внимания.", out)   # neither patch found anything
+
+    def test_priorities_patch_still_names_a_missing_wp(self):
+        sample = code_block_after(ROOT / ".claude/skills/day-open/templates.md", "## Шаблон DayPlan")
+        self.dayplan.write_text(sample + ATTENTION, encoding="utf-8")
+        self.priorities.write_text("phys_hours: 8\ntoday:\n  - WP-12\n", encoding="utf-8")
+        subprocess.run([sys.executable, str(PRIORITIES_PATCH), "--dayplan", str(self.dayplan),
+                        "--priorities", str(self.priorities)], check=True, capture_output=True, text=True)
+        self.assertIn("WP-12 из priorities.yaml отсутствует в таблице", self.dayplan.read_text(encoding="utf-8"))
 
 
 class PipelineWiringTest(unittest.TestCase):

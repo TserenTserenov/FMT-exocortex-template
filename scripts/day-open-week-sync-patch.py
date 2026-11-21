@@ -20,6 +20,8 @@ Then every other row of the draft stays (nothing disappears silently):
 - any other WP with a visible mark — «вне плана недели» when the pool does not
   have it, «не в приоритетах дня» when the pool has it but today's priorities
   and carry-over do not — and a line in «Требует внимания».
+No row is ever deleted: a WP the draft lists twice keeps both rows, the first
+aligned with the pool, the rest as written, with a line in «Требует внимания».
 
 Contract: fail loud, never fail closed. The DayPlan is always kept:
 - the week plan file is missing or unreadable, or this script itself fails ->
@@ -91,8 +93,9 @@ OWN_MARK_RE = re.compile(r"\s·\s(?:" + re.escape(OUT_OF_WEEK) + "|" + re.escape
 # «NNN» or a PENDING marker in its «#» or «РП» cell.
 PLACEHOLDER_CELL_RE = re.compile(r"^\W*NNN\W*$|<!--\s*PENDING")
 OWN_ATTENTION_PREFIX = "- ⚠️ Сверка плана дня с неделей: "
-# A finding about rows a rerun no longer sees: it stays on rerun.
-STICKY_MARKS = ("оставлено по одной: ",)
+# Columns the rebuild fills when the table has them; a missing one is reported.
+# ТВС is optional: the templates.md day table has no such column.
+CHECKED_COLUMNS = ("РП", "h", "🚦")
 OWN_ATTENTION_LINE_RE = re.compile(r"(\n\n)(" + re.escape(OWN_ATTENTION_PREFIX) + r"[^\n]*)")
 DRAFT_STATUS_RE = re.compile(r"^status:\s*['\"]?draft['\"]?\s*$", re.M)
 
@@ -354,8 +357,8 @@ def insert_under_plan_header(dayplan_text: str, line: str) -> str:
 
 
 def is_stale_finding(line: str) -> bool:
-    """A line of this script that the current run recomputes."""
-    return line.startswith(OWN_ATTENTION_PREFIX) and not any(mark in line for mark in STICKY_MARKS)
+    """A line of this script; every run recomputes all of them."""
+    return line.startswith(OWN_ATTENTION_PREFIX)
 
 
 def clear_own_attention(dayplan_text: str) -> str:
@@ -418,16 +421,20 @@ def rebuild_table(lines: list[str], span: tuple[int, int], builder: RowBuilder,
                   wanted: list[str], mandatory: list[str]) -> tuple[list[str], list[str]]:
     """Replace the WP rows of the table: rows without a WP number stay on top,
     then `wanted` (urgent WPs first on an emergency) built from the pool, then
-    the draft's other WP rows — mandatory ones unmarked, the rest marked. Edits
-    `lines` in place; returns (stderr findings, findings visible in the plan)."""
+    the draft's other WP rows — mandatory ones unmarked, the rest marked.
+
+    No row is ever deleted (pilot decision): when the draft has several rows of
+    one WP, the first takes the week-plan values and the others follow it
+    exactly as written, named in «Требует внимания» (their hours count too).
+    Edits `lines` in place; returns (stderr findings, findings visible in the plan)."""
     first, last = span
     header = builder.header
     num_col, title_col = detect_columns(lines[first:last + 1])
-    missing = [name for name in ("РП", "h", "ТВС", "🚦") if name not in header]
+    missing = [name for name in CHECKED_COLUMNS if name not in header]
     visible = [f"в таблице дня нет колонок {', '.join(f'«{n}»' for n in missing)} — "
                "их значения не сверены"] if missing else []
 
-    other_rows, draft_rows, duplicated, findings = [], {}, [], []
+    other_rows, draft_rows, repeats, findings = [], {}, {}, []
     for row in lines[first + 2:last + 1]:
         if any(PLACEHOLDER_CELL_RE.search(cell(row, header.get(c))) for c in ("#", "РП")):
             findings.append(f"removed the scaffold sample row: {row.strip()}")
@@ -436,17 +443,20 @@ def rebuild_table(lines: list[str], span: tuple[int, int], builder: RowBuilder,
         if wp_num is None:
             other_rows.append(row)
         elif wp_num in draft_rows:
-            duplicated.append(wp_num)
+            repeats.setdefault(wp_num, []).append(row)
         else:
             draft_rows[wp_num] = row
-    if duplicated:
-        visible.append(f"в заготовке плана повторены строки дел — оставлено по одной: {wp_list(duplicated)}")
+    if repeats:
+        visible.append("в заготовке плана повторены строки дел — часы и пометки недели у первой строки, "
+                       "остальные оставлены как в заготовке, их часы тоже в сумме: " + wp_list(list(repeats)))
 
     order = list(dict.fromkeys((builder.urgent if builder.emergency else []) + wanted))
     if not wanted:
         order = list(dict.fromkeys(order + list(draft_rows)))
         visible.append("приоритеты дня и вчерашний перенос пусты — состав таблицы взят из заготовки плана")
-    built = [builder.build(n, draft_rows.get(n)) for n in order]
+    built = []
+    for n in order:
+        built += [builder.build(n, draft_rows.get(n))] + repeats.get(n, [])
 
     marked = []
     for n, row in draft_rows.items():
@@ -458,6 +468,7 @@ def rebuild_table(lines: list[str], span: tuple[int, int], builder: RowBuilder,
         else:
             built.append(builder.build(n, row, mark=NOT_TODAY))
             marked.append(n)
+        built += repeats.get(n, [])
     if marked:
         visible.append("в таблице дела вне приоритетов дня и вчерашнего переноса — оставлены с пометкой: "
                        + wp_list(marked))

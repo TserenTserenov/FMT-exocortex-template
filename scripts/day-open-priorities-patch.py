@@ -76,17 +76,30 @@ def extract_plan_table(dayplan_text):
     return out
 
 
+def number_column(plan_table):
+    """Index of the «#» cell in the table header; 3 (the «| 🚦 | ТВС | # |»
+    layout) when no header names it. The templates.md table has no ТВС, so its
+    «#» is cell 2 — a fixed 3 missed every row the week sync rebuilt there."""
+    for row in plan_table:
+        cells = [c.strip() for c in row.split("|")]
+        if "#" in cells:
+            return cells.index("#")
+    return 3
+
+
 def missing_priority_wps(today_wps, plan_table):
     """Same two-format match as day-open.checks.md (bug-2026-07-16 rewrite):
-    column 3 bare number OR a WP-prefixed number anywhere in that row."""
+    the «#» cell holds the number (bare or WP-prefixed, markup ignored) OR a
+    WP-prefixed number appears anywhere in that row."""
     missing = []
+    num_col = number_column(plan_table)
     for wp in today_wps:
         num = str(wp).replace("WP-", "").strip()
         found = False
         for row in plan_table:
             cells = row.split("|")
-            col3 = cells[3].strip() if len(cells) > 3 else ""
-            if col3 == num or re.search(rf"WP-{re.escape(num)}(?!\d)", row):
+            num_cell = cells[num_col].strip(" *_`") if len(cells) > num_col else ""
+            if num_cell in (num, f"WP-{num}") or re.search(rf"WP-{re.escape(num)}(?!\d)", row):
                 found = True
                 break
         if not found:
