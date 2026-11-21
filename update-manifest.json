@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "0fdf1375ca16828a02c13b2b2457d69f77ad6282a7001d9a444f282cca2f8730"
+      "sha256": "37d91c4e2c0e0177b1434005fcc1b49a4377003282e2e363f5b08bb208b24fbd"
     },
     {
       "path": "CLAUDE.md",
@@ -2713,7 +2713,7 @@
     },
     {
       "path": "scripts/iwe-notify",
-      "sha256": "32044284abef78ec22b5d5ffacefada6a1ea6377a1161b3dc7f967efa36b135f"
+      "sha256": "a5caca8bea4304a6a469b28a865f9f31d499bd804764a89e1ac399c3d6dd1c15"
     },
     {
       "path": "scripts/iwe-safe-pull.sh",
@@ -3842,6 +3842,7 @@
     "scripts/tests/test_issue_wp516_verify_skill.py",
     "scripts/tests/test_issues_919_920_929_day_open.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
+    "scripts/tests/test_iwe_notify_direct.sh",
     "scripts/tests/test_light_onboarding_state.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_memory_bleed_age_batch.sh",
