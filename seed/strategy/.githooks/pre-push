@@ -1,14 +1,59 @@
 #!/bin/bash
-# pre-push hook — force-push guard (WP-436)
+# pre-push hook — inbound mailbox gate (WP-503 Phase 110) + force-push guard (WP-436)
 # Blocks non-fast-forward pushes to protect shared repo history from agent overwrites.
 # Install: git config core.hooksPath .githooks (see scripts/install-hooks.sh)
-# Override: ALLOW_FORCE_PUSH=1 git push --force
+# Override: ALLOW_FORCE_PUSH=1 git push --force (the force-push guard only)
 
 set -uo pipefail
 
+# git passes the ref list once on stdin; both checks below need it.
+REF_UPDATES=()
+while IFS= read -r line; do
+  REF_UPDATES+=("$line")
+done
+
+# WP-503 Phase 110: a pushed commit must not close a WP whose inbound mailbox
+# still has «новое» entries. Commits replayed by cherry-pick or rebase never ran
+# pre-commit, so this is their only check. ALLOW_FORCE_PUSH does not skip it.
+HOOK_REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+WP_INBOX_GATE=""
+for d in "${IWE_SCRIPTS:-}" "$HOOK_REPO_ROOT/../FMT-exocortex-template/scripts"; do
+  if [ -n "$d" ] && [ -f "$d/wp-inbox-close-gate.sh" ]; then WP_INBOX_GATE="$d/wp-inbox-close-gate.sh"; break; fi
+done
+if [ -z "$WP_INBOX_GATE" ]; then
+  # No gate: a push whose commits delete a mailbox cannot be checked, so it is
+  # refused; any other push goes on with a warning.
+  echo "WARN: wp-inbox-close-gate.sh not found — inbound mailboxes are not checked (update the template: /iwe-update)." >&2
+  for line in "${REF_UPDATES[@]+"${REF_UPDATES[@]}"}"; do
+    read -r _ l_sha r_ref r_sha <<EOF
+$line
+EOF
+    [ "$l_sha" = "0000000000000000000000000000000000000000" ] && continue
+    case "$r_ref" in refs/heads/*|refs/tags/*) ;; *) continue ;; esac
+    if [ "$r_sha" != "0000000000000000000000000000000000000000" ]; then
+      base="$r_sha"
+    else
+      base=$(git merge-base origin/main "$l_sha" 2>/dev/null) || base=""
+    fi
+    if [ -z "$base" ] || ! closes=$(git log --no-renames --diff-filter=D --name-only --format= "$base..$l_sha" -- inbox); then
+      echo "❌ Push blocked ($r_ref): no base to check inbound mailboxes and wp-inbox-close-gate.sh is missing — run git fetch origin and /iwe-update." >&2
+      exit 1
+    fi
+    if printf '%s\n' "$closes" | grep -qE '^inbox/WP-[0-9]+/INBOX\.md$'; then
+      echo "❌ Push blocked ($r_ref): the commits close a WP with an inbound mailbox, and wp-inbox-close-gate.sh is missing to check it (/iwe-update)." >&2
+      exit 1
+    fi
+  done
+elif [ "${#REF_UPDATES[@]}" -gt 0 ]; then
+  printf '%s\n' "${REF_UPDATES[@]}" | bash "$WP_INBOX_GATE" pre-push || exit 1
+fi
+
 [ -n "${ALLOW_FORCE_PUSH:-}" ] && exit 0
 
-while read local_ref local_sha remote_ref remote_sha; do
+for line in "${REF_UPDATES[@]+"${REF_UPDATES[@]}"}"; do
+  read -r _ local_sha remote_ref remote_sha <<EOF
+$line
+EOF
   [ "$local_sha" = "0000000000000000000000000000000000000000" ] && continue
   [ "$remote_sha" = "0000000000000000000000000000000000000000" ] && continue
   if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
