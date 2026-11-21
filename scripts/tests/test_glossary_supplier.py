@@ -82,6 +82,42 @@ def snapshot_terms(root: Path) -> dict[str, str]:
     return {r["code"]: r["term_en"] for r in SUP.read_rows(root / "translation" / "glossary-snapshot.csv")}
 
 
+def test_coverage_distinguishes_source_absence_from_consumer_filtering(root):
+    extra = [
+        concept("DP.MAP.3", "AIST Bot", "AIST Bot"),
+        concept("DP.MAP.4", "Метод", "Method"),
+        concept("DP.MAP.5", "Смысл", "Meaning"),
+        concept("DP.MAP.6", "Смысл", "Sense"),
+    ]
+    rows = [*BASE_ROWS, *extra]
+    run(root, *rows)
+    expected = ["GUIDE.33", "DP.MISSING", "DP.MAP.3", "DP.MAP.4", "DP.MAP.5"]
+
+    def by_code(walk):
+        return {
+            row["code"]: row
+            for row in SUP.coverage_rows(root, expected, walk, ALLOWLIST)
+        }
+
+    report = by_code(payload(*rows))
+    assert report["GUIDE.33"]["result"] == "исключено политикой"
+    assert report["GUIDE.33"]["term_ru"] == ""
+    assert report["DP.MISSING"]["result"] == "нет на входе"
+    assert report["DP.MAP.3"]["reason"] == "русское имя без кириллицы"
+    assert report["DP.MAP.4"]["reason"] == "общее имя нескольких кодов"
+    assert report["DP.MAP.5"]["reason"] == "расходятся английские имена"
+    assert by_code(None)["DP.MISSING"]["result"] == "не установлено"
+    with pytest.raises(SUP.SupplierError, match="passport"):
+        by_code(dict(payload(*rows), as_of="2027-01-01T00:00:00Z"))
+
+
+def test_coverage_refuses_modified_snapshot(root):
+    path = root / "translation/glossary-snapshot.csv"
+    path.write_bytes(path.read_bytes().replace(b",Method,", b",Other,"))
+    with pytest.raises(SUP.SupplierError, match="checksum"):
+        SUP.coverage_rows(root, None, None, ALLOWLIST)
+
+
 def test_unchanged_graph_writes_nothing_even_with_a_new_as_of(root):
     before = files(root)
     result = run(root, *BASE_ROWS)

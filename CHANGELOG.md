@@ -25,6 +25,11 @@ Refs: WP-NNN
 
 ### Added
 
+- [optional] The glossary supplier can explain the outcome for each requested concept code. Run `python3 scripts/glossary_supplier.py coverage` for the published snapshot. Use `--expected FILE` for selected codes, and `--input FILE` for the corresponding verified graph walk. Output goes to standard output.
+  - Цель: 93 · Результат: для каждого кода видно, дошло ли имя до переводчика и где его исключили.
+  - Как проверить: python3 -m pytest scripts/tests/test_glossary_supplier.py -k coverage
+  - Как откатить: вернуть изменение команды coverage в scripts/glossary_supplier.py и соответствующие проверки.
+
 - [optional] `scripts/fetch-glossary-concepts.py`: the glossary exporter reaches the knowledge graph through the platform gateway as a registered machine client (token in `GLOSSARY_EXPORTER_MACHINE_TOKEN`), no longer through the knowledge worker's public address (#1639).
   - Цель: 84 · Результат: служебное — выгрузка терминов ходит через общий вход платформы, где действуют проверка доступа и суточный предел; снимок терминов прежний
   - Как проверить: python3 -m pytest scripts/tests -k glossary

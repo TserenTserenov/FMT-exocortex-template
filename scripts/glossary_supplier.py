@@ -29,16 +29,19 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import importlib.util
 import io
 import json
 import sys
 import tempfile
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
 from glossary_source import (
+    CYRILLIC_RE,
     LOCAL_DEFAULT_TIER,
     GlossaryError,
     _graph_terms,
@@ -319,10 +322,156 @@ def _cmd_refresh(args: argparse.Namespace) -> int:
     return 0
 
 
+def _input_dispositions(payload: dict, meta: dict, allowlist_path: Path) -> dict:
+    """Classify only a walk corresponding to the accepted snapshot."""
+    rows = payload["rows"]
+    if (
+        not isinstance(rows, list)
+        or payload["as_of"] != meta["as_of"]
+        or len(rows) != meta["input_rows"]
+        or hashlib.sha256(allowlist_path.read_bytes()).hexdigest()
+        != meta["allowlist_sha256"]
+    ):
+        raise SupplierError(
+            "input walk or allowlist does not match the snapshot passport"
+        )
+    allowlist = EXPORTER.load_allowlist(allowlist_path)
+    dispositions = {}
+    for row in rows:
+        action, reason = EXPORTER.classify_row(row, allowlist)
+        if not isinstance(row, dict) or not isinstance(row.get("code"), str):
+            raise SupplierError("input contains a row without an identifiable code")
+        value = (action, reason, row.get("name_ru"), row.get("name_en"))
+        if row["code"] in dispositions and dispositions[row["code"]] != value:
+            raise SupplierError("input contains conflicting rows for the same code")
+        dispositions[row["code"]] = value
+    return dispositions
+
+
+def coverage_rows(
+    root: Path, expected: list[str] | None, payload: dict | None, allowlist: Path
+) -> list[dict]:
+    manifest = yaml.safe_load(
+        (root / "translation-manifest.yaml").read_text(encoding="utf-8")
+    )
+    path = root / manifest["glossary"]["snapshot"]
+    meta = json.loads(path.with_suffix(".meta.json").read_text(encoding="utf-8"))
+    if hashlib.sha256(path.read_bytes()).hexdigest() != meta["output_sha256"]:
+        raise SupplierError("snapshot checksum differs from its passport")
+    snapshot = {row["code"]: row for row in read_rows(path)}
+    if len(snapshot) != meta["included"]:
+        raise SupplierError("snapshot concept count differs from its passport")
+    incoming = (
+        _input_dispositions(payload, meta, allowlist) if payload is not None else None
+    )
+    held = {_key(item["term_ru"]) for item in meta.get("conflict_local", [])}
+    consumer = {
+        _key(term.term_ru): term.term_en for term in load_glossary(manifest, root).terms
+    }
+    names = Counter(_key(row["term_ru"]) for row in snapshot.values())
+    result = []
+    for code in sorted(snapshot if expected is None else set(expected)):
+        row = snapshot.get(code)
+        ru, en = (row["term_ru"], row["term_en"]) if row is not None else ("", "")
+        if row is not None:
+            if incoming is not None:
+                entry = incoming.get(code)
+                if (
+                    not entry
+                    or entry[0] != "include"
+                    or (entry[2].strip(), entry[3]) != (ru, en)
+                ):
+                    raise SupplierError(f"input and snapshot disagree for {code}")
+            if not CYRILLIC_RE.search(ru):
+                status, reason = "не прошло проверку", "русское имя без кириллицы"
+            elif consumer.get(_key(ru)) != en:
+                status, reason = "не прошло проверку", "расходятся английские имена"
+            else:
+                status = "доступно переводчику"
+                reason = (
+                    "общее имя нескольких кодов"
+                    if names[_key(ru)] > 1
+                    else "совпадает со словарём переводчика"
+                )
+        elif incoming is None:
+            status, reason = "не установлено", "нет в снимке, вход обхода не приложен"
+        elif code not in incoming:
+            status, reason = "нет на входе", "кода нет в данном обходе"
+        else:
+            action, detail, raw_ru, _ = incoming[code]
+            if action == "include" and _key(raw_ru) in held:
+                status, reason = "исключено политикой", "конфликт с ручным словарём"
+            elif action == "include":
+                raise SupplierError(
+                    f"eligible input code missing from snapshot: {code}"
+                )
+            else:
+                status = (
+                    "исключено политикой"
+                    if action == "exclude"
+                    else "не прошло проверку"
+                )
+                reason = detail
+        result.append(
+            {
+                "code": code,
+                "term_ru": ru,
+                "term_en": en,
+                "result": status,
+                "reason": reason,
+                "as_of": meta["as_of"],
+            }
+        )
+    return result
+
+
+def _cmd_coverage(args: argparse.Namespace) -> int:
+    try:
+        expected = None
+        if args.expected:
+            expected = [
+                c.strip()
+                for c in args.expected.read_text(encoding="utf-8").splitlines()
+                if c.strip()
+            ]
+        payload = (
+            json.loads(args.input.read_text(encoding="utf-8")) if args.input else None
+        )
+        rows = coverage_rows(
+            args.root,
+            expected,
+            payload,
+            args.root / "translation/glossary-snapshot-allowlist.yaml",
+        )
+    except (
+        OSError,
+        ValueError,
+        KeyError,
+        TypeError,
+        yaml.YAMLError,
+        EXPORTER.SnapshotError,
+        GlossaryError,
+        SupplierError,
+    ) as exc:
+        print(f"glossary-supplier: {exc}", file=sys.stderr)
+        return 2
+    writer = csv.DictWriter(
+        sys.stdout,
+        fieldnames=("code", "term_ru", "term_en", "result", "reason", "as_of"),
+        lineterminator="\n",
+    )
+    writer.writeheader()
+    writer.writerows(rows)
+    return 0
+
+
 def _cmd_changelog(args: argparse.Namespace) -> int:
     path = args.root / "CHANGELOG.md"
     try:
-        path.write_text(add_changelog_entry(path.read_text(encoding="utf-8"), args.pr), encoding="utf-8")
+        path.write_text(
+            add_changelog_entry(path.read_text(encoding="utf-8"), args.pr),
+            encoding="utf-8",
+        )
     except (OSError, SupplierError) as exc:
         print(f"glossary-supplier: {exc}", file=sys.stderr)
         return 2
@@ -341,6 +490,10 @@ def main(argv: list[str] | None = None) -> int:
         "--announced-meta", type=Path, help="паспорт снимка из открытого запроса: о его конфликтах пилот уже знает"
     )
     p_refresh.set_defaults(handler=_cmd_refresh)
+    p_coverage = sub.add_parser("coverage", help="поимённый отчёт покрытия CSV в stdout")
+    p_coverage.add_argument("--expected", type=Path, help="ожидаемые коды, один на строку (по умолчанию — опубликованные)")
+    p_coverage.add_argument("--input", type=Path, help="сохранённый проверенный обход именно этого снимка")
+    p_coverage.set_defaults(handler=_cmd_coverage)
     p_log = sub.add_parser("changelog", help="добавить запись [Unreleased] со ссылкой на запрос")
     p_log.add_argument("--pr", required=True, type=int)
     p_log.set_defaults(handler=_cmd_changelog)
