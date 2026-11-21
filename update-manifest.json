@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e737623d14a5a926c091a463b093b4dafaacd4ebd0635cc7e67c3c722989a194"
+      "sha256": "15e5cc26e4e381f775b79eda5a618b74ed56f367b2fc78abe5fe0f08b7d1f6bc"
     },
     {
       "path": "CLAUDE.md",
@@ -2826,6 +2826,10 @@
     {
       "path": "scripts/lib/peer-adapter-common.sh",
       "sha256": "782d0316b8ef223c41d74e8c6c8293c41be3f4ed7dda2561985b72894f341f67"
+    },
+    {
+      "path": "scripts/lib/process-identity.sh",
+      "sha256": "a1eb29a8ead2aa71911826723c84b9367363245050a5dd5f53d3f839df127c9c"
     },
     {
       "path": "scripts/lib/runtime-placeholder-count.sh",
