@@ -1100,6 +1100,10 @@
       "sha256": "63418eae5d6713abfe367d9ca4cf283852b66ce69baaa567c8898b0cebe0e440"
     },
     {
+      "path": "docs/PACK-SUBSCRIBE-LIVE-CHECK.md",
+      "sha256": "a39d612caa07bd89fd76a2f0baf2a70c65a1a3e9642fa97196cd2691ae3542ce"
+    },
+    {
       "path": "docs/PLATFORM-COMPAT.md",
       "sha256": "1abb679869c51c0a6afd42f7c1ea6b82e374f72bd767c26642617b047e7da80d"
     },
