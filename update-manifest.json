@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "bbf400aedcae305cc6f5f0074318cf7871e94564587476d4797b34ab577746f6"
+      "sha256": "d48ccb914e46c08f2f717fefdcc72262f19360965650582d673650ba345f9a69"
     },
     {
       "path": "CLAUDE.md",
@@ -3361,11 +3361,11 @@
     },
     {
       "path": "seed/strategy/.githooks/pre-commit",
-      "sha256": "6c54749ea157afa4f041e6ae0d726fbfc74e7040ee2e1657e0f1ab64fb727d62"
+      "sha256": "ad0d8f6d6c92d4113a0d1c69040d8ecde0924bd0f938c146218f0c0826548ffe"
     },
     {
       "path": "seed/strategy/.githooks/pre-push",
-      "sha256": "d2fc416595518b4bf1d3989308a66090f9c2a984530388114244e5d3b6ca7c5f"
+      "sha256": "3323f5971c920c13b03ffed8484b06b96c0be196139a22d8c5098fc472ac4367"
     },
     {
       "path": "seed/strategy/exocortex/agent-fault-profile/.gitignore",
