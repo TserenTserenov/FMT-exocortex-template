@@ -186,7 +186,10 @@ _gb_main() {
         echo "session_id: $session_id"
         echo "created_at: $now"
         [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && echo "harness_session_id: $CLAUDE_CODE_SESSION_ID"
-        echo "pid: ${owner_pid:-${CLAUDE_PID:-$$}}"
+        _hk_open_pid="${owner_pid:-${CLAUDE_PID:-$$}}"
+        echo "pid: $_hk_open_pid"
+        _hk_open_pid_start_id=$(_owner_pid_start_id "$_hk_open_pid")
+        [ -n "$_hk_open_pid_start_id" ] && echo "pid_start_id: $_hk_open_pid_start_id"
         echo "---"
       } > "$tmp"
       # No-clobber: the full implementation uses another lock, so under WSL2 and
@@ -294,6 +297,18 @@ if [ -f "$_SG_ISOLATE_LIB" ]; then
   # shellcheck source=lib/session-guard-isolate-lib.sh
   . "$_SG_ISOLATE_LIB"
 fi
+
+# WP-530 F160: locale- and time-zone-independent owner identity, written as an
+# extra `pid_start_id:` line next to the existing `pid:` line everywhere this
+# file already writes one (scripts/lib/process-identity.sh). Optional, same
+# pattern as the isolate helpers above: a template install without the
+# library keeps writing semaphores exactly as before (no pid_start_id line) —
+# this is additive only and never changes which pid is treated as the owner.
+_SG_PROCESS_IDENTITY_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/process-identity.sh"
+_owner_pid_start_id() {  # <pid>
+  [ -r "$_SG_PROCESS_IDENTITY_LIB" ] || return 0
+  ( . "$_SG_PROCESS_IDENTITY_LIB" && process_identity "$1" ) 2>/dev/null || true
+}
 # issue #954: shared reader of WP numbers; the hypothesis gate in `open` finds the card by
 # the normalised number. The same lookup block as in the other consumers, but OPTIONAL here
 # (_WPN_OPTIONAL=1): a session must still open on an installation without the library, the
@@ -1770,7 +1785,10 @@ if [ "$CMD" = "open" ]; then
       # Code process that stays alive for the whole session; other agents keep
       # today's behavior (transient $$, harmless — dead-pid check just never
       # fires for them, same as before this fix).
-      echo "pid: ${OWNER_PID:-${CLAUDE_PID:-$$}}"
+      _hk2_open_pid="${OWNER_PID:-${CLAUDE_PID:-$$}}"
+      echo "pid: $_hk2_open_pid"
+      _hk2_open_pid_start_id=$(_owner_pid_start_id "$_hk2_open_pid")
+      [ -n "$_hk2_open_pid_start_id" ] && echo "pid_start_id: $_hk2_open_pid_start_id"
       echo "---"
     } > "$HK_TMP"
     _publish_open_no_clobber "$HK_TMP" "$HK_FILE" \
@@ -2161,10 +2179,17 @@ if [ "$CMD" = "open" ]; then
     # this script returns (verified live: recorded pid was dead within the
     # same second). Other agents get no pid line, same as before this fix —
     # strictly not worse, dead-pid check simply still can't fire for them.
+    _open_pid=""
     if [ -n "$OWNER_PID" ]; then
       echo "pid: $OWNER_PID"
+      _open_pid="$OWNER_PID"
     elif [ -n "${CLAUDE_PID:-}" ]; then
       echo "pid: $CLAUDE_PID"
+      _open_pid="$CLAUDE_PID"
+    fi
+    if [ -n "$_open_pid" ]; then
+      _open_pid_start_id=$(_owner_pid_start_id "$_open_pid")
+      [ -n "$_open_pid_start_id" ] && echo "pid_start_id: $_open_pid_start_id"
     fi
     echo "---"
     # initial --files CSV → append-log entries (git-root-relative expected from caller)
