@@ -1,11 +1,36 @@
 """Tests for assemble_distribution: manifest-driven English tree assembly."""
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import assemble_distribution as ad  # noqa: E402
+
+
+def test_sync_staged_modes_preserves_translations_and_english_file_selection(tmp_path):
+    src, en = tmp_path / "src", tmp_path / "en"
+    for repo, label in [(src, "source"), (en, "translation")]:
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        paths = ["my helper.sh", "data", "link", label]
+        for name in paths:
+            (repo / name).write_text(label, encoding="utf-8")
+        subprocess.run(["git", "add", "--", *paths], cwd=repo, check=True)
+    subprocess.run(["git", "update-index", "--chmod=+x", "my helper.sh", "link"], cwd=src, check=True)
+    subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.org",
+                    "-c", "core.hooksPath=/dev/null", "commit", "--no-gpg-sign", "-qm", "source"], cwd=src, check=True)
+    subprocess.run(["git", "update-index", "--chmod=+x", "data", "translation"], cwd=en, check=True)
+    (en / "link").unlink()
+    (en / "link").symlink_to("data")
+    subprocess.run(["git", "add", "--", "link"], cwd=en, check=True)
+    assert ad.sync_staged_modes(src, en) == 2
+    tree = subprocess.check_output(["git", "write-tree"], cwd=en).strip().decode()
+    result = subprocess.check_output(["git", "ls-tree", tree], cwd=en, text=True)
+    modes = {line.split("\t")[1]: line.split()[0] for line in result.splitlines()}
+    assert modes == {"my helper.sh": "100755", "data": "100644", "link": "120000", "translation": "100755"}
+    assert subprocess.check_output(["git", "show", f"{tree}:my helper.sh"], cwd=en) == b"translation"
+    assert ad.sync_staged_modes(src, en) == 0
 
 
 def make_source(tmp_path, files, manifest_paths):

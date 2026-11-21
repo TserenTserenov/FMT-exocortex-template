@@ -8,6 +8,7 @@ is never copied from the source: it keeps the translated version already in
 the output tree. Files outside the set are removed from the output tree.
 
 Usage: assemble_distribution.py <source dir> <output dir> [--check]
+       assemble_distribution.py --sync-staged-modes <source dir> <output dir>
 Exit codes: 0 clean; 1 usage; 2 offences (untranslated markdown missing from
 the output, or Cyrillic left in the assembled tree). The offence list is
 printed either way; --check only skips writing.
@@ -17,6 +18,7 @@ import fnmatch
 import json
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -79,6 +81,36 @@ def has_cyrillic(path: Path) -> bool:
         return False
 
 
+def sync_staged_modes(source: Path, output: Path) -> int:
+    """Keep the English index's paths and bytes, with source executable bits."""
+    regular = {b"100644", b"100755"}
+    source_modes = {}
+    tree = subprocess.check_output(["git", "ls-tree", "-rz", "HEAD"], cwd=source)
+    for record in tree.split(b"\0"):
+        if record:
+            metadata, path = record.split(b"\t", 1)
+            mode = metadata.split()[0]
+            if mode in regular:
+                source_modes[path] = mode
+
+    updates = []
+    index = subprocess.check_output(["git", "ls-files", "--stage", "-z"], cwd=output)
+    for record in index.split(b"\0"):
+        if not record:
+            continue
+        metadata, path = record.split(b"\t", 1)
+        mode, blob, stage = metadata.split()
+        if stage != b"0":
+            raise ValueError("Resolve the English index before syncing executable bits")
+        wanted = source_modes.get(path, mode)
+        if mode in regular and mode != wanted:
+            updates.append(wanted + b" " + blob + b"\t" + path + b"\0")
+    if updates:
+        subprocess.run(["git", "update-index", "-z", "--index-info"], cwd=output,
+                       input=b"".join(updates), check=True)
+    return len(updates)
+
+
 def assemble(source: Path, output: Path, write: bool = True) -> dict[str, list[str]]:
     wanted = distribution_set(source)
     patterns = adapted_patterns(source)
@@ -109,6 +141,10 @@ def assemble(source: Path, output: Path, write: bool = True) -> dict[str, list[s
 
 
 def main(argv: list[str]) -> int:
+    if len(argv) == 4 and argv[1] == "--sync-staged-modes":
+        changed = sync_staged_modes(Path(argv[2]), Path(argv[3]))
+        print(f"Updated executable bits for {changed} staged files.")
+        return 0
     args = [a for a in argv[1:] if a != "--check"]
     if len(args) != 2 or not all(Path(a).is_dir() for a in args):
         print(__doc__.strip().splitlines()[-1], file=sys.stderr)
