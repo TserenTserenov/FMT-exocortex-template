@@ -162,6 +162,7 @@ DP.ROLE.123,Приёмщик,Release Receiver,pack,DP,ok,name-en-publishable/1
 DP.ROLE.124,Планировщик выпусков,Release Scheduler,pack,DP,ok,name-en-publishable/1
 DP.ROLE.125,Диспетчер очереди,Delivery Queue Dispatcher,pack,DP,ok,name-en-publishable/1
 DP.ROLE.126,Учётчик доставки,Delivery Recorder,pack,DP,ok,name-en-publishable/1
+DP.ROLE.127,Визионер,Visionary,pack,DP,ok,name-en-publishable/1
 DP.RUNBOOK.001,Runbook: Aist Bot Errors,Runbook: Aist Bot Errors,pack,DP,ok,name-en-publishable/1
 DP.SC.001,Планирование дня,Day Planning,pack,DP,ok,name-en-publishable/1
 DP.SC.002,Планирование и ревью недели,Week Planning and Review,pack,DP,ok,name-en-publishable/1
@@ -267,6 +268,8 @@ DP.SC.226,Поток задач из интервью пользователей
 DP.SC.227,Использование IWE видно по каналам и доступу,IWE usage is visible by channel and access tier,pack,DP,ok,name-en-publishable/1
 DP.SC.228,Рейтинг с согласием участника,Ranking with participant consent,pack,DP,ok,name-en-publishable/1
 DP.SC.229,Свои уведомления и виджеты,Own notifications and widgets,pack,DP,ok,name-en-publishable/1
+DP.SC.230,Утверждённые английские имена в текстах,Approved English names in texts,pack,DP,ok,name-en-publishable/1
+DP.SC.231,Новые возможности каждый день — в свою деятельность,Daily new possibilities turned into own activity,pack,DP,ok,name-en-publishable/1
 DP.SC.NNN,"{""Название обещания""}",{Service Promise Name},pack,DP,ok,name-en-publishable/1
 DP.SOTA.001,DDD Strategic (Khononov),DDD Strategic (Khononov),pack,DP,ok,name-en-publishable/1
 DP.SOTA.002,Context Engineering,Context Engineering,pack,DP,ok,name-en-publishable/1
@@ -355,6 +358,7 @@ ECO.MAP.002,S2R Domain View,S2R Domain View,pack,ECO,ok,name-en-publishable/1
 ECO.MAP.003,Пять документов экосистемы,Five Ecosystem Documents,pack,ECO,ok,name-en-publishable/1
 ECO.MAP.004,Указатель объектов внимания,Attention Objects Index,pack,ECO,ok,name-en-publishable/1
 ECO.PRIN.001,Свод принципов экосистемы развития интеллекта,Intelligence Development Ecosystem Principles,pack,ECO,ok,name-en-publishable/1
+ECO.SC.009,Ты не останешься один на пути развития,You will not be alone on the path of development,pack,ECO,ok,name-en-publishable/1
 ECO.SOTA.001,EdTech Seed Funding Environment (2024-2026),EdTech Seed Funding Environment (2024-2026),pack,ECO,ok,name-en-publishable/1
 ECO.SOTA.002,Freemium Models in EdTech (2025-2026),Freemium Models in EdTech (2025-2026),pack,ECO,ok,name-en-publishable/1
 LS.D.003,Агент-агентный стиль (база),Agent-to-agent style (base),pack,LS,ok,name-en-publishable/1
