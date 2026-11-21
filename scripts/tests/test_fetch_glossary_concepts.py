@@ -71,7 +71,7 @@ class FakeGateway:
     def __call__(self, payload):
         name = payload["params"]["name"]
         args = payload["params"]["arguments"]
-        if name == "graph_stats":
+        if name == MOD.GRAPH_STATS_TOOL:
             body = self.stats_sequence.pop(0) if len(self.stats_sequence) > 1 else self.stats_sequence[0]
         else:
             self.list_calls += 1
@@ -110,7 +110,7 @@ class StuckCursorGateway(FakeGateway):
     """Answers every concept_list page with the same cursor — a gateway bug that would loop forever."""
 
     def __call__(self, payload):
-        if payload["params"]["name"] == "graph_stats":
+        if payload["params"]["name"] == MOD.GRAPH_STATS_TOOL:
             return super().__call__(payload)
         self.list_calls += 1
         body = {"as_of": "2026-11-01T20:00:00.000Z", "rows": self.rows[:1], "next_after_id": 1}
@@ -178,17 +178,17 @@ def test_gateway_error_is_reported_with_tool_name():
     def failing(payload):
         return {"error": {"code": -32001, "message": "internal detail that must not reach a public log"}}
 
-    with pytest.raises(MOD.FetchError, match=r"graph_stats: ошибка шлюза \(код -32001\)") as caught:
+    with pytest.raises(MOD.FetchError, match=r"knowledge_graph_stats: ошибка шлюза \(код -32001\)") as caught:
         MOD.fetch_payload(failing)
     assert "internal detail" not in str(caught.value)
 
 
 def test_cli_without_secret_writes_nothing(tmp_path: Path, monkeypatch, capsys):
-    monkeypatch.delenv(MOD.SECRET_ENV, raising=False)
+    monkeypatch.delenv(MOD.TOKEN_ENV, raising=False)
     out = tmp_path / "payload.json"
     assert MOD.main(["--output", str(out)]) == 2
     assert not out.exists()
-    assert MOD.SECRET_ENV in capsys.readouterr().err
+    assert MOD.TOKEN_ENV in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("cursor", ["5", 5.5, True, {"id": 5}])
@@ -197,10 +197,45 @@ def test_cursor_that_is_not_an_integer_is_a_walk_error_not_a_traceback(cursor):
 
     class OddCursor(FakeGateway):
         def __call__(self, payload):
-            if payload["params"]["name"] == "graph_stats":
+            if payload["params"]["name"] == MOD.GRAPH_STATS_TOOL:
                 return super().__call__(payload)
             body = {"as_of": "2026-11-01T20:00:00.000Z", "rows": self.rows[:1], "next_after_id": cursor}
             return {"result": {"content": [{"text": json.dumps(body)}]}}
 
     with pytest.raises(MOD.FetchError, match="курсор обхода не число"):
         MOD.fetch_payload(OddCursor(rows, [stats_for(rows)]))
+
+
+def test_gateway_refusal_is_a_fetch_error_without_echoing_its_text():
+    def refusing(payload):
+        return {"result": {"isError": True, "content": [{"type": "text", "text": "Tool not allowed for this client."}]}}
+
+    with pytest.raises(MOD.FetchError, match="шлюз отказал в вызове") as caught:
+        MOD.fetch_payload(refusing)
+    assert "Tool not allowed" not in str(caught.value)
+
+
+def test_transport_sends_the_machine_token_as_a_bearer_header(monkeypatch):
+    seen = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b"{}"
+
+    def fake_urlopen(request, timeout):
+        seen["headers"] = {key.lower(): value for key, value in request.header_items()}
+        seen["url"] = request.full_url
+        return FakeResponse()
+
+    monkeypatch.setattr(MOD.urllib.request, "urlopen", fake_urlopen)
+    token = "mch_template-glossary-exporter." + "unit-test-value"
+    MOD.http_transport(token)({"jsonrpc": "2.0"})
+    assert seen["headers"]["authorization"] == f"Bearer {token}"
+    assert "x-iwe-service-auth" not in seen["headers"]
+    assert seen["url"] == "https://mcp.aisystant.com/mcp"
