@@ -9,6 +9,9 @@ for MODULE in "$REPO/scripts/day-open-llm-fill.py" "$REPO/seed/strategy/scripts/
 import contextlib
 import importlib.util
 import io
+import json
+import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -60,6 +63,14 @@ class FillTests(unittest.TestCase):
             ("<details>", "today_plan marker\n", True),
             ("## today_plan", "", True),
             ("## Вчера", "", False),
+            ("## Plan for Today", "", True),
+            ("<details>", "<summary><b>Today’s Plan</b></summary>\n", True),
+            ("## Calendar", "A link to Plan for Today.\n", False),
+            ("## Calendar", "```md\n## Plan for Today\n```\n", False),
+            ("## Notes", "from today_plan_parser import fill\n", False),
+            ("## TodayXs Plan", "", False),
+            ("## Agenda", "<!-- PENDING: today_plan — table\n-->\n", True),
+            ("## Calendar", "```md\n<!-- PENDING: today_plan -->\n```", False),
         ]
         for header, content, expected in cases:
             with self.subTest(header=header, content=content), patch.object(mod, "call_proxy", return_value=TABLE) as proxy:
@@ -68,6 +79,50 @@ class FillTests(unittest.TestCase):
                                         [{"wp": "WP-901", "title": "Тест", "budget_h": 1}])
                 self.assertEqual(result, TABLE)
                 self.assertEqual(proxy.call_args.kwargs.get("temperature"), 0.0 if expected else None)
+
+    def test_priorities_update_only_the_matching_sections(self):
+        script = Path(mod.__file__).with_name("day-open-priorities-patch.py")
+        for plan, attention in [("Plan for Today", "Needs Attention"),
+                                ("План на сегодня", "Требует внимания"),
+                                ("Plan for today", "Requires attention")]:
+            with self.subTest(plan=plan), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp)
+                priorities = directory / "priorities.yaml"
+                priorities.write_text("today:\n  - WP-901\n  - WP-902\nphys_hours: 4\n")
+                dayplan = directory / "DayPlan.md"
+                section = f"<summary><b>{attention}</b></summary>"
+                initial = (f"```md\n## {attention}\n## {plan}\n| WP-902 |\n```\n"
+                           f"## Other\nSee {attention} in the plan.\n| WP-902 |\n"
+                           f"<details>\n<summary><b>{plan}</b></summary>\n| **`WP-901`** |\n</details>\n"
+                           f"<details>\n{section}\n</details>\n")
+                dayplan.write_text(initial)
+                subprocess.run([sys.executable, str(script), "--dayplan", str(dayplan),
+                                "--priorities", str(priorities)], cwd=directory, check=True,
+                               capture_output=True, text=True)
+                result = dayplan.read_text()
+                inserted = result.split(section + "\n", 1)[1].split("\n", 1)[0]
+                self.assertIn("WP-902", inserted)
+                self.assertNotIn("WP-901", inserted)
+                self.assertEqual(result.replace(inserted + "\n", "", 1), initial)
+
+    def test_empty_plan_does_not_borrow_a_neighboring_table(self):
+        script = Path(mod.__file__).with_name("day-open-priorities-patch.py")
+        spec = importlib.util.spec_from_file_location("priorities", script)
+        priorities = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(priorities)
+        for other in ["## Calendar", "<details><summary><b>Calendar</b></summary>"]:
+            text = f"## Plan for Today\n{other}\n| 🟢 | **WP-999** | Other |\n"
+            self.assertEqual(priorities.extract_plan_table(text), [])
+            self.assertEqual(mod.rebuild_compact_dashboard(text), text)
+
+    def test_catalog_supplied_by_installation_controls_dispatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            key = "recognition.dayplan.section.plan_today"
+            (directory / "en.json").write_text(json.dumps({key: "Agenda"}))
+            with patch.dict(os.environ, {"IWE_LOCALE_DIR": tmp}):
+                self.assertTrue(mod.is_today_plan_section("## Agenda", ""))
+                self.assertFalse(mod.is_today_plan_section("## Plan for Today", ""))
 
     def test_final_placeholder_formats(self):
         for placeholder in ["<!-- PENDING -->", "<!-- PENDING: название -->", "NNN", "X"]:

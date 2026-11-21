@@ -373,11 +373,11 @@
     },
     {
       "path": ".claude/lib/locale/en.json",
-      "sha256": "c7a18f316bd8898eedc0a8a30b2b6bcec5629372abd43da700ef764a532157b1"
+      "sha256": "689739906457c3f8245df56782babb1e27283894d2267b15ddc3481116707fe5"
     },
     {
       "path": ".claude/lib/locale/ru.json",
-      "sha256": "c3cf753864ed1cbc562dab16179459b8c33a16d5c386c9110547e2fb53af3f2b"
+      "sha256": "6803c6728c50e88f5731c6a3bee338b50e06430af1de3f469dc6fd004460bb0d"
     },
     {
       "path": ".claude/lib/log_formatter.sh",
@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "15e5cc26e4e381f775b79eda5a618b74ed56f367b2fc78abe5fe0f08b7d1f6bc"
+      "sha256": "188d3695a10b2aef19b7540930bcd2b488c82cbac15b3d90ff3c8964fb8eb9a7"
     },
     {
       "path": "CLAUDE.md",
@@ -2521,7 +2521,7 @@
     },
     {
       "path": "scripts/day-open-llm-fill.py",
-      "sha256": "5702f670e217e8e6475525a626604cca313ade74d4eb08c14ef19fd6fc49f1af"
+      "sha256": "b2afc88377f0164f2651d4816ef926c63ae5d712ab01386880aff90d4ff6322e"
     },
     {
       "path": "scripts/day-open-multiplier-backfill-patch.py",
@@ -2537,7 +2537,7 @@
     },
     {
       "path": "scripts/day-open-priorities-patch.py",
-      "sha256": "37f61c2cd68ff29cee97652e287e2394565560265ce963e353818e92879b91eb"
+      "sha256": "55057e05f5b4a7cfc81daaeb2c0e8e39e04cebf5cdbda1ca7fdaf01cea908cbb"
     },
     {
       "path": "scripts/day-open-scaffold.sh",
@@ -2778,6 +2778,10 @@
     {
       "path": "scripts/lib/day-open-hooks.sh",
       "sha256": "d036781319493cfe1d58f369a87d0d52756cc6c7b0cdef8b5783594fd3d09ab6"
+    },
+    {
+      "path": "scripts/lib/dayplan_sections.py",
+      "sha256": "6bdfa947ce2b233f7d252f218942bc98fe7b86f66ddf8060bef4856acd2af1eb"
     },
     {
       "path": "scripts/lib/dirty-guard-lock.sh",
@@ -3413,7 +3417,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-llm-fill.py",
-      "sha256": "b1d538707efbcb5ed040f9cfe7fc603cbfb792bd25bd3daf6f675b146c47b847"
+      "sha256": "828181fcc6924258dc2af1e164c4adba52230bf16b8c3bacde8aee2827d47f5a"
     },
     {
       "path": "seed/strategy/scripts/day-open-multiplier-backfill-patch.py",
@@ -3425,7 +3429,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
-      "sha256": "c5b59d11e34d7e33b2771d24175921d8c4d7e04b568c74abd2e4fa815c479f1f"
+      "sha256": "5c826a28ba66346e104b6c50d139aa4bd84bf685b77a17e742977a28c9054f22"
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",

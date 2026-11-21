@@ -36,6 +36,11 @@ Refs: WP-NNN
 
 ### Changed
 
+- [behavior] Day Open recognizes the plan table and attention section from the installed language catalogs. English and Russian headings route to the same plan prompt and priority check.
+  - Цель: 93 · Результат: Ц93-06 — общий код распознаёт заголовки плана дня из каталогов языка.
+  - Как проверить: `bash scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh`
+  - Как откатить: вернуть изменение читателей и каталогов вместе.
+
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены scripts/lib/process-identity.sh (#1638).
   - Цель: 77 · Результат: служебное — доставка авторского источника в шаблон; пользователь получает эти файлы при следующем обновлении
   - Как проверить: git show --stat слияния #1638 перечисляет названные файлы, CHANGELOG.md и манифест обновления
