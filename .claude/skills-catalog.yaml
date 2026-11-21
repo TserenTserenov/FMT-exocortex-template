@@ -2,7 +2,7 @@
 # see DP.SC.153
 # НЕ редактировать вручную — перегенерировать через generate-skills-catalog.sh
 #
-generated: 2026-11-21T11:05:24Z
+generated: 2026-11-21T17:27:43Z
 skills_dir: .claude/skills
 
 skills:
@@ -100,7 +100,6 @@ skills:
         - /author-mode
     depends_on: []
     invoked_by:
-    - CLAUDE.md
     - author-mode
   - id: bottleneck-pick
     name: "bottleneck-pick"
@@ -413,6 +412,7 @@ skills:
         - /onboarding
     depends_on: []
     invoked_by:
+    - CLAUDE.md
     - diagnose
     - onboarding
   - id: org-dev
@@ -692,7 +692,7 @@ skills:
   - id: week-close
     name: "week-close"
     description: "Протокол закрытия недели (Week Close). Ретро 7 дней + carry-over в новую неделю + платформенные шаги (бэкап, dirty repos)."
-    version: 1.2.0
+    version: 1.3.0
     layer: L1
     status: active
     triggers:
@@ -720,6 +720,7 @@ skills:
         - /wp-new
     depends_on: []
     invoked_by:
+    - CLAUDE.md
     - strategy-session
     - artifactor
     - wp-new

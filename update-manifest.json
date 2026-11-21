@@ -501,7 +501,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "b527ef96d81ed4f9db215cfcc84a822312a23b19335663c3ab5055c11854225d"
+      "sha256": "be3180ce17a6e0b43d914f2d92844090d7a5664acab26e97889719487c6ded47"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -913,7 +913,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "7104b48f8ef4df73c98fe754543ce2bd7f4a9783b16b3d5c08de0433b4ca267a"
+      "sha256": "7ebc2bff5a881cbd8dda61e4c3c05cc044d8cdb23b038dcc96287377c821f6b3"
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
@@ -2416,6 +2416,10 @@
       "sha256": "1b5bd16ed3c7e39dd161023d5e062b9e9a088eac137587717ea06e58d644a132"
     },
     {
+      "path": "scripts/check-repo-residue.sh",
+      "sha256": "e83d2813aa64240523d033fb1def2ac3227b63809096b8c824dad781b6697d9a"
+    },
+    {
       "path": "scripts/check-script-collisions.sh",
       "sha256": "7cdf22d4b83e752188a437200fbc873b5456faac20f2a7605fa7153696210b36"
     },
@@ -3085,7 +3089,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "e46fbd6e75d7d8b55c6d15ffbd4f9dd4fa15fbe8b617c46f537a72175e27c7d3"
+      "sha256": "e55464493f16f7a2c04cb2a99096bc20b86c2d055d501670552d965f0c491021"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3626,6 +3630,7 @@
     "scripts/tests/session-guard-isolate-t1-t20-smoke.sh",
     "scripts/tests/session-guard-second-open-warning-smoke.sh",
     "scripts/tests/test-captures-write-lock-840.sh",
+    "scripts/tests/test-check-repo-residue.sh",
     "scripts/tests/test-delivered-exec-bit-matches-update.sh",
     "scripts/tests/test-issue-1411-secret-scan-fp.sh",
     "scripts/tests/test-issue-1411-update-rollback-unrelated-history.sh",
