@@ -501,7 +501,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "f8c5466b6a24c84cd947295ac7c7d9e3a5e6d4646dd86f926d87d2478d6a8dd3"
+      "sha256": "135ace0ae8158c6400e4fc7ab69c30ba01a981dad322bdc6f13f676dff715795"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "37d91c4e2c0e0177b1434005fcc1b49a4377003282e2e363f5b08bb208b24fbd"
+      "sha256": "67230e6d6894cecb9eafe45665c53ad9a9202603240a038e824a0b72379cf01a"
     },
     {
       "path": "CLAUDE.md",
@@ -2761,7 +2761,7 @@
     },
     {
       "path": "scripts/kimi-standalone-preflight.sh",
-      "sha256": "b160dc2bfd0d4ba2f3c96f892a32478d72ecc518adb5659b9f593662f3792c6e"
+      "sha256": "deffe73a1c818b2e3b69de7e32356d55ca802c76f4861cf7c6dfdd7c51c1133d"
     },
     {
       "path": "scripts/kimi-whisper-safe.sh",
@@ -3081,7 +3081,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "9d71fbe0223c3cd753d0cc55bf215ca18f141ea33f4201bc71f7883cbf46a18e"
+      "sha256": "e46fbd6e75d7d8b55c6d15ffbd4f9dd4fa15fbe8b617c46f537a72175e27c7d3"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3843,6 +3843,7 @@
     "scripts/tests/test_issues_919_920_929_day_open.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
     "scripts/tests/test_iwe_notify_direct.sh",
+    "scripts/tests/test_kimi_standalone_preflight.sh",
     "scripts/tests/test_light_onboarding_state.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_memory_bleed_age_batch.sh",
