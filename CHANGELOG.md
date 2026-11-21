@@ -26,7 +26,7 @@ Refs: WP-NNN
 ### Added
 
 - [optional] The glossary supplier can explain the outcome for each requested concept code. Run `python3 scripts/glossary_supplier.py coverage` for the published snapshot. Use `--expected FILE` for selected codes, and `--input FILE` for the corresponding verified graph walk. New passports authenticate the entire input walk. The report goes to standard output. (#1647)
-  - Цель: 93 · Результат: для каждого кода видно, дошло ли имя до переводчика и где его исключили.
+  - Цель: 93 · Результат: Ц93-02
   - Как проверить: python3 -m pytest scripts/tests/test_glossary_supplier.py -k coverage
   - Как откатить: вернуть изменение команды coverage в scripts/glossary_supplier.py и соответствующие проверки.
 
