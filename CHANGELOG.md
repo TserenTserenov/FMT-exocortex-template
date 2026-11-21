@@ -26,7 +26,7 @@ Refs: WP-NNN
 ### Fixed
 
 - [behavior] Translation reports match local glossary entries as whole terms in Markdown. The glossary supplies *Ceiling* for «Тупик» when it names the second practitioner state (#1645).
-  - Цель: 93 · Результат: слово «работать» больше не добавляет строку «Работа» в отчёт. Для диагностического состояния переводчик получает имя Ceiling с указанием контекста.
+  - Цель: 93 · Результат: Ц93-01, Ц93-05
   - Как проверить: `python3 -m pytest scripts/tests/test_translate_unapproved_report.py scripts/tests/test_glossary_source.py -q`
   - Как откатить: вернуть коммит слияния #1645 через `git revert`.
 
