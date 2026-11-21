@@ -3,6 +3,74 @@
 # push/reset/clean), filesystem (recursive forced rm — only through
 # .claude/bin/guarded-rm), prod DB (psql DROP/TRUNCATE/DELETE without WHERE),
 # GitHub repo deletion. Exit 2 = block.
+# A start file in BASH_ENV or ENV runs before this line and could redefine its commands: run again
+# without it (rc.11 red team F12). Whoever sets the hook's environment can still bypass it, as with
+# CC_ALLOW_DESTRUCTIVE_INPUT.
+if [ -n "${BASH_ENV-}${ENV-}" ]; then exec env -u BASH_ENV -u ENV bash "${BASH_SOURCE[0]}"; fi
+# A total time budget (rc.12 red team): Claude Code gives a hook 60 s and treats a time-out as a
+# non-blocking error, so the call would go ahead. The hook runs as a child in its own process group;
+# past DG_BUDGET seconds the group is stopped and the answer is a block. The marker is an argument,
+# which the caller's environment cannot set.
+if [ "${1:-}" != --dg-budget ]; then
+  dg_proof=$(mktemp "${TMPDIR:-/tmp}/dg-proof.XXXXXX") \
+    || { echo "BLOCKED: ошибка проверки destructive-guard (mktemp) — команда не пропущена." >&2; exit 2; }
+  dg_nonce="$$.$RANDOM.$RANDOM.$RANDOM"
+  perl -e '
+    use strict; use warnings; use POSIX ();
+    my $budget = shift;
+    my $pid = fork();
+    defined $pid or do { print STDERR "BLOCKED: ошибка проверки destructive-guard (fork) — команда не пропущена.\n"; exit 2; };
+    if (!$pid) { setpgrp(0, 0); exec(@ARGV) or POSIX::_exit(127); }
+    my $stop = sub { kill("TERM", -$pid); my $t = time() + 2;
+                     while (time() < $t) { last if waitpid($pid, POSIX::WNOHANG()) == $pid; select(undef, undef, undef, 0.05); }
+                     kill("KILL", -$pid); };
+    $SIG{$_} = sub { $stop->(); exit 2; } for qw(TERM INT HUP QUIT);
+    my $deadline = time() + $budget;
+    while (1) {
+      if (waitpid($pid, POSIX::WNOHANG()) == $pid) { my $st = $?; exit(($st & 127) ? 2 : $st >> 8); }
+      if (time() > $deadline) {
+        $stop->();
+        print STDERR "BLOCKED: проверка destructive-guard не уложилась в $budget с — команда не пропущена. Раздели команду на части поменьше.\n";
+        exit 2;
+      }
+      select(undef, undef, undef, 0.005);
+    }
+  ' -- 40 bash "${BASH_SOURCE[0]}" --dg-budget "$dg_proof" "$dg_nonce" <&0 &
+  dg_budget_pid=$!
+  # A second clock, independent of the timer (rc.14 red team, F22: a stopped timer left the hook
+  # waiting): at 45 s it signals this shell, which stops the timer and the hook and blocks.
+  dg_outer=$$
+  ( trap 'kill "$dg_sleep" 2>/dev/null; exit 0' TERM; sleep 45 & dg_sleep=$!; wait "$dg_sleep"; kill -TERM "$dg_outer" ) \
+    </dev/null >/dev/null 2>&1 &
+  dg_watch_pid=$!
+  dg_outer_stop() {
+    local inner
+    kill -KILL "$dg_budget_pid" 2>/dev/null || true
+    inner=$(sed -n 's/^pid //p' "$dg_proof" 2>/dev/null || true)
+    [ -n "$inner" ] && kill -KILL -- "-$inner" 2>/dev/null
+    kill -TERM "$dg_watch_pid" 2>/dev/null
+    rm -f "$dg_proof"
+  }
+  # Killed while waiting, or the second clock ran out: the answer is a block.
+  trap 'dg_outer_stop; echo "BLOCKED: проверка destructive-guard прервана или не уложилась во время — команда не пропущена." >&2; exit 2' TERM INT HUP QUIT
+  dg_budget_rc=0
+  wait "$dg_budget_pid" || dg_budget_rc=$?
+  kill -TERM "$dg_watch_pid" 2>/dev/null || true
+  # An allow counts only with the proof the hook itself writes at its end: a perl that exits 0
+  # without running it blocks (rc.14 red team, F21). A broken or missing perl blocks too.
+  dg_proof_text=$(cat "$dg_proof" 2>/dev/null || true)
+  rm -f "$dg_proof"
+  case "$dg_budget_rc" in
+    0) [ "$dg_proof_text" = "ok $dg_nonce" ] && exit 0
+       echo "BLOCKED: ошибка проверки destructive-guard (нет подтверждения проверки) — команда не пропущена." >&2; exit 2 ;;
+    2) exit 2 ;;
+    *) echo "BLOCKED: ошибка проверки destructive-guard (счётчик времени, код $dg_budget_rc) — команда не пропущена. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота." >&2; exit 2 ;;
+  esac
+fi
+DG_PROOF=${2:-}
+DG_NONCE=${3:-}
+# The process group of this run, for the outer shell to stop if its timer cannot.
+[ -n "$DG_PROOF" ] && printf 'pid %s\n' "$$" >"$DG_PROOF" 2>/dev/null
 set -euo pipefail
 
 block() {
@@ -17,13 +85,87 @@ block() {
 fail_check() {
   block "ошибка проверки destructive-guard ($1) — команда не пропущена. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 }
+# Monotone by construction (WP-529 F275, rc.10 red team F8): the same input also goes, in
+# parallel, through the released guards in destructive-guard.d/ (v0.42.1-rc.6, rc.8 and rc.10,
+# unchanged but for the hook-directory line), each over the whole text with its own pipeline. The
+# verdict is the strictest of all, so this guard is never looser than those releases on any input,
+# whatever its own parser gets wrong. Every failure of that floor blocks (rc.11 red team F12): the
+# folder or a file missing, changed (sha256 below) or unreadable; a run that gives no verdict, a
+# verdict other than allow, ask or block, or runs over DG_LEGACY_LIMIT seconds. Each run is its own
+# process group, killed when the hook ends or is killed; its temporary folder is removed.
+DG_LEGACY_NAMES=(v0.42.1-rc.6 v0.42.1-rc.8 v0.42.1-rc.10)
+DG_LEGACY_SHA256=(
+  3a5f36125a7e25ec21c15e3257cf2f49d962ff9a81de52535684a04a69b72fa0
+  9e62ba99f07f36465c7dbf92fccd345b85e270d99e77236425ee4f492e8a676d
+  be3698952655a6ea720310b4bd76c90ce9888fab2536b96687e5d359e43d66a7
+)
+DG_LEGACY_LIMIT=35
+DG_LEGACY_TMP=
+DG_LEGACY_PIDS=()
+DG_NEW_ASKED=0
+DG_LEGACY_BYPASS=0
+dg_legacy_cleanup() {
+  local pid n
+  for pid in ${DG_LEGACY_PIDS[@]+"${DG_LEGACY_PIDS[@]}"}; do
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  DG_LEGACY_PIDS=()
+  [ -n "$DG_LEGACY_TMP" ] || return 0
+  for n in input "${DG_LEGACY_NAMES[@]}"; do
+    rm -f "$DG_LEGACY_TMP/$n" "$DG_LEGACY_TMP/$n.out" "$DG_LEGACY_TMP/$n.err" "$DG_LEGACY_TMP/$n.rc" "$DG_LEGACY_TMP/$n.rc.tmp" 2>/dev/null || true
+  done
+  rm -f "$DG_LEGACY_TMP/bin/jq" 2>/dev/null || true
+  rmdir "$DG_LEGACY_TMP/bin" 2>/dev/null || true
+  rmdir "$DG_LEGACY_TMP" 2>/dev/null || true
+  DG_LEGACY_TMP=
+}
+# Called when this guard allows or asks: every released guard must have answered allow, ask or
+# block; a block wins, an ask is asked, anything else blocks.
+dg_legacy_verdict() {
+  local n rc base asked=
+  if [ -z "$DG_LEGACY_TMP" ]; then
+    [ "$DG_LEGACY_BYPASS" = 1 ] && return 0
+    fail_check "прежние проверки не запущены"
+  fi
+  wait ${DG_LEGACY_PIDS[@]+"${DG_LEGACY_PIDS[@]}"} 2>/dev/null || true
+  for n in "${DG_LEGACY_NAMES[@]}"; do
+    base="$DG_LEGACY_TMP/$n"
+    rc=$(cat "$base.rc" 2>/dev/null || true)
+    case "$rc" in
+      0)
+        if [ -s "$base.out" ]; then
+          jq -e -s 'length > 0 and all(.[]; (.hookSpecificOutput.permissionDecision? // "") == "ask")' "$base.out" >/dev/null 2>&1 \
+            || { dg_legacy_cleanup; fail_check "прежняя проверка $n: неожиданный ответ"; }
+          asked="$base.out"
+        fi ;;
+      2) cat "$base.err" >&2 2>/dev/null || true; dg_legacy_cleanup; exit 2 ;;
+      *) dg_legacy_cleanup; fail_check "прежняя проверка $n, итог «${rc:-нет}»" ;;
+    esac
+  done
+  if [ -n "$asked" ] && [ "$DG_NEW_ASKED" = 0 ]; then cat "$asked" 2>/dev/null || true; fi
+  dg_legacy_cleanup
+}
 on_exit() {
   local rc=$?
   if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ]; then
+    dg_legacy_cleanup
     fail_check "неожиданный выход, код $rc"
   fi
+  if [ "$rc" -eq 0 ]; then
+    dg_legacy_verdict
+    [ -n "${DG_PROOF:-}" ] && printf 'ok %s' "$DG_NONCE" >"$DG_PROOF"
+  fi
+  dg_legacy_cleanup
 }
 trap on_exit EXIT
+# Killed while waiting (a harness timeout): the legacy runs go with it, and the answer is a block.
+trap 'dg_legacy_cleanup; exit 2' TERM INT HUP QUIT
+# The caller's shell settings must not change how this file reads the text (rc.11 red team F12:
+# SHELLOPTS=noglob reached the hook).
+set +f
+shopt -u nullglob failglob 2>/dev/null || true
+unset GLOBIGNORE CDPATH
+IFS=$' \t\n'
 
 # matches TEXT <grep options and pattern...> — 0 = match, 1 = no match. A grep or printf that
 # FAILS (exit code 2 or more: a broken binary, a bad pattern) is a failed check and blocks;
@@ -46,7 +188,7 @@ matches() {
 # (there it is -n) is acceptable for existing code, but should not be copied into a new one
 # (Codex peer review, WP-544 Phase 1, 20.08): -n would let CC_ALLOW_DESTRUCTIVE_INPUT=0 through as a bypass.
 # First thing, before parsing the input: the pilot's bypass must work even with a broken jq.
-[ "${CC_ALLOW_DESTRUCTIVE_INPUT:-}" = "1" ] && exit 0
+[ "${CC_ALLOW_DESTRUCTIVE_INPUT:-}" = "1" ] && { DG_LEGACY_BYPASS=1; exit 0; }
 
 # Portable timeout (same helper as rule-engine.sh:_safe_timeout — kept local,
 # not sourced, since this hook has no other dependency on rule-engine.sh).
@@ -70,6 +212,104 @@ _safe_timeout() {
 # silently zeroed out $CWD on every invocation (found WP-547, 03.09, while
 # verifying the stash-pop/apply check below, which depends on the real cwd).
 HOOK_INPUT=$(cat 2>/dev/null || true)
+
+# The folder is found from the real path of this file, so a hook reached through a symlink still
+# finds it. Each file is checked against its sha256 before it runs.
+DG_HOOK_REAL_DIR=$(perl -MCwd=abs_path -MFile::Basename=dirname -e 'my $p = abs_path($ARGV[0]); print dirname($p) if defined $p' -- "${BASH_SOURCE[0]}") \
+  || fail_check "perl, путь хука"
+[ -n "$DG_HOOK_REAL_DIR" ] || fail_check "путь хука не найден"
+DG_LEGACY_DIR="$DG_HOOK_REAL_DIR/destructive-guard.d"
+DG_LEGACY_CHECK=$(perl -MDigest::SHA -e '
+  my $dir = shift;
+  while (@ARGV) {
+    my ($name, $want) = (shift, shift);
+    my $f = "$dir/$name.sh";
+    if (-l $f || !-f $f || !-r $f) { print "$name: нет файла"; exit 0; }
+    my $sha = Digest::SHA->new(256);
+    eval { $sha->addfile($f); 1 } or do { print "$name: не читается"; exit 0; };
+    if ($sha->hexdigest ne $want) { print "$name: изменён"; exit 0; }
+  }
+  print "OK";
+' -- "$DG_LEGACY_DIR" "${DG_LEGACY_NAMES[0]}" "${DG_LEGACY_SHA256[0]}" "${DG_LEGACY_NAMES[1]}" "${DG_LEGACY_SHA256[1]}" \
+  "${DG_LEGACY_NAMES[2]}" "${DG_LEGACY_SHA256[2]}") || fail_check "perl, проверка прежних проверок"
+[ "$DG_LEGACY_CHECK" = OK ] || block "прежние проверки в $DG_LEGACY_DIR не в порядке (${DG_LEGACY_CHECK}) — без них проверка опасных команд не работает, команда не пропущена. Восстанови папку обновлением (update.sh). Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+# One run: the released guard in its own process group, the shell settings of the caller removed.
+# The runner writes the exit code to NAME.rc when the guard ends; "timeout" past the time limit,
+# "orphan" when the hook is gone. Killed (TERM), or on either of those, it kills the whole group
+# of the guard, so no process of it outlives the hook.
+DG_LEGACY_RUN_PL='
+  use strict; use warnings; use POSIX ();
+  my ($guard, $hookdir, $in, $out, $err, $rcf, $limit, $pathpre, $watch) = @ARGV;
+  my $parent = getppid();
+  # Removes the whole folder of this call: the command text must not outlive the hook (rc.12, F17).
+  my $dir = $in; $dir =~ s{/[^/]*$}{};
+  my $wipe = sub { unlink(glob("$dir/bin/*"), glob("$dir/*")); rmdir("$dir/bin"); rmdir($dir); };
+  $ENV{PATH} = "$pathpre:$ENV{PATH}" if defined $pathpre && length $pathpre;
+  delete @ENV{qw(BASH_ENV ENV SHELLOPTS BASHOPTS GLOBIGNORE CDPATH IFS POSIXLY_CORRECT)};
+  $ENV{DG_LEGACY_HOOK_DIR} = $hookdir;
+  my $put = sub {
+    open(my $fh, ">", "$rcf.tmp") or return;
+    print $fh "$_[0]\n"; close $fh; rename("$rcf.tmp", $rcf);
+  };
+  my $pid = fork();
+  defined $pid or exit 1;
+  if (!$pid) {
+    setpgrp(0, 0);
+    open(STDIN, "<", $in) and open(STDOUT, ">", $out) and open(STDERR, ">", $err) or POSIX::_exit(127);
+    exec("bash", $guard) or POSIX::_exit(127);
+  }
+  my $stop = sub { kill("KILL", -$pid); kill("KILL", $pid); waitpid($pid, 0); };
+  $SIG{TERM} = $SIG{INT} = $SIG{HUP} = $SIG{QUIT} = sub { $stop->(); exit 0; };
+  my $deadline = time() + $limit;
+  while (1) {
+    if (waitpid($pid, POSIX::WNOHANG()) == $pid) {
+      my $st = $?;
+      $put->(($st & 127) ? 128 + ($st & 127) : $st >> 8);
+      kill("KILL", -$pid);
+      # One runner leaves a watcher behind that removes the folder if the hook dies by a signal
+      # it cannot trap (KILL), after it has stopped waiting for the runners.
+      if ($watch && !fork()) {
+        POSIX::setsid();
+        select(undef, undef, undef, 0.05) while kill(0, $parent);
+        $wipe->();
+        POSIX::_exit(0);
+      }
+      exit 0;
+    }
+    if (time() > $deadline) { $stop->(); $put->("timeout"); exit 0; }
+    if (getppid() != $parent) { $stop->(); $wipe->(); exit 0; }
+    select(undef, undef, undef, 0.005);
+  }
+'
+DG_LEGACY_TMP=$(mktemp -d "${TMPDIR:-/tmp}/dg-legacy.XXXXXX") || fail_check "mktemp, прежние проверки"
+chmod 700 "$DG_LEGACY_TMP" || fail_check "chmod, прежние проверки"
+printf '%s' "$HOOK_INPUT" >"$DG_LEGACY_TMP/input" || fail_check "запись входа прежних проверок"
+# The released guards read the command with `jq -r`. A jq that writes CR LF for every newline of
+# the text (native Windows jq) gets replaced for them by one that writes the bytes as they are:
+# `jq -b` where it exists, else the CRs that text mode added are removed from its output. The probe
+# runs on every platform, not only where uname says Windows (rc.12 red team, F15).
+DG_LEGACY_PATH=
+# Captured, not piped into `grep -q`: under pipefail its early exit would fail the probe.
+DG_JQ_NL=$(printf '"a\\nb"' | jq -j . 2>/dev/null; printf x)
+if [ "$DG_JQ_NL" != $'a\nbx' ]; then
+  dg_jq=$(command -v jq) || fail_check "jq не найден"
+  mkdir "$DG_LEGACY_TMP/bin" || fail_check "mkdir, прежние проверки"
+  if [ "$(printf '"a\\nb"' | jq -b -j . 2>/dev/null; printf x)" = $'a\nbx' ]; then
+    printf '#!/bin/bash\nexec %q -b "$@"\n' "$dg_jq" >"$DG_LEGACY_TMP/bin/jq"
+  else
+    printf '#!/bin/bash\nset -o pipefail\n%q "$@" | tr -d %q\n' "$dg_jq" $'\r' >"$DG_LEGACY_TMP/bin/jq"
+  fi
+  chmod +x "$DG_LEGACY_TMP/bin/jq" || fail_check "chmod, прежние проверки"
+  DG_LEGACY_PATH="$DG_LEGACY_TMP/bin"
+fi
+dg_watch=1
+for dg_name in "${DG_LEGACY_NAMES[@]}"; do
+  perl -e "$DG_LEGACY_RUN_PL" -- "$DG_LEGACY_DIR/$dg_name.sh" "$DG_HOOK_REAL_DIR" "$DG_LEGACY_TMP/input" \
+    "$DG_LEGACY_TMP/$dg_name.out" "$DG_LEGACY_TMP/$dg_name.err" "$DG_LEGACY_TMP/$dg_name.rc" "$DG_LEGACY_LIMIT" "$DG_LEGACY_PATH" \
+    "$dg_watch" </dev/null >/dev/null 2>&1 &
+  DG_LEGACY_PIDS+=("$!")
+  dg_watch=0
+done
 
 # Fail-closed on a malformed/schema-invalid envelope (WP-544 Д22, peer session
 # 2026-09-08-25-wp544-continue-f7, Codex). The old `jq ... // empty || true`
@@ -98,8 +338,207 @@ fi
 # never actually fail here (the identical content just parsed successfully
 # one line up), but "should never fail" is exactly the assumption Д22 exists
 # to not make.
-CMD=$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_input.command') || block "jq отказал при извлечении команды после успешной валидации — блокирую."
-CWD=$(printf '%s' "$HOOK_INPUT" | jq -r '.cwd // .tool_input.cwd // empty' 2>/dev/null || true)
+# `jq -j` and the `x` sentinel keep trailing newlines: `$(…)` would strip them, and with them the
+# newline of a final backslash-newline, which then hid the last word (rc.6 red team, F3).
+# Base64 keeps the exact bytes of the command: a native Windows jq writes every newline of a raw
+# string as CR LF, and the stray CR broke here-doc delimiters and quotes on Git Bash (Windows check
+# of the rc.11 red team F12 fix).
+CMD=$(printf '%s' "$HOOK_INPUT" | jq -j '.tool_input.command | @base64' | perl -MMIME::Base64 -0777 -ne 'print decode_base64($_)' && printf x) \
+  || block "jq отказал при извлечении команды после успешной валидации — блокирую."
+CMD=${CMD%x}
+# Base64 too: the exact bytes, without stripping a CR that is really in the path (rc.12, F14).
+CWD=$(printf '%s' "$HOOK_INPUT" | jq -j '(.cwd // .tool_input.cwd // empty) | @base64' 2>/dev/null \
+  | perl -MMIME::Base64 -0777 -ne 'print decode_base64($_)' 2>/dev/null || true)
+
+# Line continuations are removed first, the way bash does before it reads the words (rc.2 red team,
+# finding A): `ls # don't` + `grep zz F > \` + `params.yaml` ran `grep zz F > params.yaml`, while the
+# passes below, which know no comments, read the quote of the comment as an open string and never
+# joined the split redirection. A backslash-newline goes away everywhere except inside single quotes,
+# `$'…'`, a `#` comment (it ends at the newline) and the body of a here-doc with a quoted delimiter;
+# an unquoted-delimiter body is joined as bash joins it, before the delimiter is compared. Inside a
+# quoted body a continuation is joined too unless the next line closes the body: a body fed to an
+# interpreter is joined by that interpreter, and a data body is dropped below anyway. A here-doc
+# whose body never closes was not one (an arithmetic `<<`): the text is then joined everywhere
+# outside quotes and comments. A backslash that ends the whole text escapes nothing: bash, zsh and
+# sh drop it and run the command, so it is dropped here too (rc.6 red team, F3: `git push --force\`
+# hid `--force` from every rule anchored on a space or the end). Every pass below reads only the
+# joined text.
+JOIN_CONTINUATIONS_PL='
+  use strict; use warnings;
+  my $text = do { local $/; <STDIN> };
+  sub body_lines {
+    # Reads the bodies of @$pending from $$i; returns 0 when a body is not closed.
+    my ($s, $i, $pending, $out) = @_;
+    my $n = length $s;
+    for my $h (@$pending) {
+      my ($delim, $quoted, $dash) = @$h;
+      my $closed = 0;
+      while ($$i < $n) {
+        my $e = index($s, "\n", $$i); $e = $n if $e < 0;
+        my $line = substr($s, $$i, $e - $$i);
+        $$i = $e < $n ? $e + 1 : $n;
+        my $probe_of = sub { my $p = shift; $p =~ s/^\t+// if $dash; return $p; };
+        while ($line =~ /(?<!\\)(?:\\\\)*\\$/ && $$i < $n) {
+          my $e2 = index($s, "\n", $$i); $e2 = $n if $e2 < 0;
+          my $next = substr($s, $$i, $e2 - $$i);
+          last if $quoted && $probe_of->($next) eq $delim;
+          chop $line;
+          $line .= $next;
+          $$i = $e2 < $n ? $e2 + 1 : $n;
+        }
+        $$out .= $line . "\n";
+        if ($probe_of->($line) eq $delim) { $closed = 1; last; }
+      }
+      return 0 unless $closed;
+    }
+    @$pending = ();
+    return 1;
+  }
+  sub join_text {
+    my ($s, $heredocs, $quotes) = @_;
+    my $out = q{};
+    my @stack = (q{N});   # N code, S single quote, A $quote, D double quote, B backtick, P $( … ),
+                          # X ${ … }, $(( … )), $[ … ] or (( … )), closed by $close[-1]
+    my @depth;            # parentheses open inside each P frame
+    my (@close, @xdepth, @xdollar); # closing bracket, brackets open inside, `$((` flag of each X frame
+    my @pending;          # here-docs whose bodies start at the next code newline
+    my $push_x = sub { my ($close, $dollar) = @_; push @stack, q{X}; push @xdepth, 0; push @close, $close; push @xdollar, $dollar; };
+    my $word_start = 1;
+    my $n = length $s;
+    pos($s) = 0;
+    while (pos($s) < $n) {
+      my $top = $stack[-1];
+      if ($top eq q{S}) {
+        $s =~ /\G[^\x27]*\x27?/gc;
+        my $m = $&;
+        # A single-quoted text that ends in a lone backslash (bash -c, eval, a here-string) is
+        # run by a shell that drops that backslash, as at the end of the call (rc.8 red team, F6).
+        if (substr($m, -1) eq "\x27") { pop @stack; $m =~ s/(?<!\\)((?:\\\\)*)\\\x27\z/$1\x27/; }
+        $out .= $m; next;
+      }
+      if ($top eq q{A}) {
+        $s =~ /\G(?:[^\x27\\]|\\.)*(?:\\\z)?(\x27?)/gcs; $out .= $&; pop @stack if length $1; next;
+      }
+      if ($s =~ /\G\\\n/gc) { next; }
+      if ($s =~ /\G\\(.)/gcs) { $out .= $&; $word_start = 0; next; }
+      if ($top eq q{D}) {
+        if ($s =~ /\G[^"\\`\$]+/gc) { $out .= $&; next; }
+        if ($s =~ /\G"/gc) { $out .= q{"}; pop @stack; next; }
+        if ($s =~ /\G`/gc) { $out .= "`"; push @stack, q{B}; $word_start = 1; next; }
+        if ($s =~ /\G\$\(/gc) { $out .= q{$(}; push @stack, q{P}; push @depth, 0; $word_start = 1; next; }
+        # `"${x:-"<<EOF"}"`: the word of ${…} has quotes of its own (rc.8 red team, F6).
+        if ($s =~ /\G\$\{/gc) { $out .= "\$\{"; $push_x->("}", 0); $word_start = 0; next; }
+        $s =~ /\G./gcs; $out .= $&; next;
+      }
+      if ($s =~ /\G\n/gc) {
+        $out .= "\n"; $word_start = 1;
+        if (@pending) {
+          my $i = pos($s);
+          return undef unless body_lines($s, \$i, \@pending, \$out);
+          pos($s) = $i;
+        }
+        next;
+      }
+      if ($word_start && $s =~ /\G#[^\n]*/gc) { $out .= $&; next; }
+      if ($quotes && $s =~ /\G\x27/gc) { $out .= "\x27"; push @stack, q{S}; $word_start = 0; next; }
+      if ($quotes && $s =~ /\G\$\x27/gc) { $out .= "\$\x27"; push @stack, q{A}; $word_start = 0; next; }
+      if ($quotes && $s =~ /\G"/gc) { $out .= q{"}; push @stack, q{D}; $word_start = 0; next; }
+      # `<<` inside an expansion is a shift or plain text, not a here-doc (rc.6 red team, F4).
+      # So is `<<` inside `for((`, `if((` and an array subscript `x[1<<W]=5`, `x=([1<<W]=5)` (rc.8, F6).
+      my $xo;
+      if ($s =~ /\G(?:\$\(\(|\$\{|\$\[)/gc) { $xo = $&; }
+      elsif (substr($s, pos($s), 2) eq "((") {
+        my $back = length($out) > 16 ? substr($out, -16) : $out;
+        if ($back =~ /(?:^|[\s;&|()!{])(?:(?:if|elif|while|until|for|then|do|else|time|coproc)[ \t]*)?\z/) { $xo = "(("; pos($s) += 2; }
+      }
+      elsif (substr($s, pos($s), 1) eq "(") {
+        # An array literal `x=(…)` (rc.10 red team, F10).
+        my $back = length($out) > 64 ? substr($out, -64) : $out;
+        if ($back =~ /(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*\+?=\z/) { $xo = "("; pos($s) += 1; }
+      }
+      elsif (substr($s, pos($s), 1) eq "[") {
+        my $back = length($out) > 64 ? substr($out, -64) : $out;
+        # Only a real subscript, closed by `]=` or `]+=` on the line: `: x[ <<W` is a word and a
+        # here-doc (rc.12 red team, F16).
+        if ($back =~ /(?:(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*|[A-Za-z0-9_]\+?=\()\z/ && $s =~ /\G\[[^\]\n]{0,256}\]\+?=/) { $xo = "["; pos($s) += 1; }
+      }
+      if (defined $xo) {
+        $out .= $xo;
+        $push_x->(substr($xo, -1) eq "{" ? "}" : substr($xo, -1) eq "[" ? "]" : ")", $xo eq "\$((" ? 1 : 0);
+        $word_start = $xo =~ /\(\z/ ? 1 : 0; next;
+      }
+      if ($s =~ /\G(?:\$|[<>])\(/gc) { $out .= $&; push @stack, q{P}; push @depth, 0; $word_start = 1; next; }
+      if ($s =~ /\G`/gc) {
+        $out .= "`";
+        if ($top eq q{B}) { pop @stack; $word_start = 0; } else { push @stack, q{B}; $word_start = 1; }
+        next;
+      }
+      if ($top eq q{P} && $s =~ /\G([()])/gc) {
+        $out .= $1;
+        if ($1 eq "(") { $depth[-1]++; $word_start = 1; next; }
+        if ($depth[-1]) { $depth[-1]--; } else { pop @stack; pop @depth; }
+        $word_start = 0; next;
+      }
+      if ($top eq q{X} && $s =~ /\G[(){}\[\]]/gc) {
+        my $c = $&;
+        $out .= $c;
+        my $open = { ")" => "(", "}" => "{", "]" => "[" }->{$close[-1]};
+        if ($c eq $open) { $xdepth[-1]++; }
+        elsif ($c eq $close[-1]) {
+          if ($xdepth[-1]) { $xdepth[-1]--; }
+          elsif ($xdollar[-1] && substr($s, pos($s), 1) ne ")") {
+            # `$((1)<<W)` has no `))`: bash reads `$( (1)<<W )`, a command substitution (rc.8, F6).
+            pop @xdepth; pop @close; pop @xdollar; $stack[-1] = q{P}; push @depth, 0;
+          }
+          else {
+            # `))` closes an arithmetic frame; a single `)` ends it as well.
+            $out .= ")" if $c eq ")" && $s =~ /\G\)/gc;
+            pop @stack; pop @xdepth; pop @close; pop @xdollar;
+          }
+        }
+        $word_start = $c eq "(" ? 1 : 0; next;
+      }
+      # A here-doc opens a body only at command level: one inside $(…), a backquote, <(…) or an
+      # expansion may close before its body, and shells disagree (rc.10 red team, F10).
+      if ($s =~ /\G<<</gc) { $out .= "<<<"; $word_start = 1; next; }
+      if ($heredocs && $top eq q{N} && $s =~ /\G<<(?!<)(-?)[ \t]*/gc) {
+        my $dash = $1 eq q{-};
+        $out .= $&;
+        # The delimiter word: quotes and backslashes make it quoted; a continuation inside is joined.
+        my ($delim, $quoted) = (q{}, 0);
+        while (pos($s) < $n) {
+          if ($s =~ /\G\\\n/gc) { next; }
+          if ($s =~ /\G\\(.)/gcs) { $out .= $&; $delim .= $1; $quoted = 1; next; }
+          if ($s =~ /\G\$?\x27([^\x27]*)\x27?/gc) { $out .= $&; $delim .= $1; $quoted = 1; next; }
+          if ($s =~ /\G"((?:[^"\\]|\\.)*)"?/gcs) { $out .= $&; $delim .= $1; $quoted = 1; next; }
+          if ($s =~ /\G[^ \t\n;&|()<>\\\x27"]+/gc) { $out .= $&; $delim .= $&; next; }
+          last;
+        }
+        push @pending, [ $delim, $quoted, $dash ];
+        $word_start = 0; next;
+      }
+      if ($top eq q{X} && $s =~ /\G[^\\\n#\x27"`\$()<{}\[\]]+/gc) {
+        $out .= $&; $word_start = $& =~ /[\s;&|()<>]$/ ? 1 : 0; next;
+      }
+      if ($top ne q{X} && $s =~ /\G[^\\\n#\x27"`\$()<\[]+/gc) {
+        $out .= $&; $word_start = $& =~ /[\s;&|()<>]$/ ? 1 : 0; next;
+      }
+      $s =~ /\G./gcs; $out .= $&; $word_start = $& =~ /[\s;&|()<>]/ ? 1 : 0;
+    }
+    return undef if @pending;
+    # A single quote left open: bash stops with a syntax error there, but the passes below may
+    # still read the text differently, so the call is joined again with quotes ignored.
+    return ($out, scalar grep { $_ eq q{S} || $_ eq q{A} } @stack);
+  }
+  sub drop_final_backslash { my $t = shift; $t =~ s/(?<!\\)((?:\\\\)*)\\\z/$1/; return $t; }
+  # Most calls have no continuation at all: nothing to join.
+  if (index($text, "\\\n") < 0 && index($text, "\\\x27") < 0) { print drop_final_backslash($text); exit 0; }
+  sub join_any { my $q = shift; my @r = join_text($text, 1, $q); @r = join_text($text, 0, $q) unless defined $r[0]; return @r; }
+  my ($joined, $open) = join_any(1);
+  ($joined) = join_any(0) if $open;
+  print drop_final_backslash($joined);
+'
+CMD=$(printf '%s' "$CMD" | perl -e "$JOIN_CONTINUATIONS_PL") || fail_check "perl, склейка переносов строк"
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 WORKSPACE_ROOT="$(cd "$HOOK_DIR/../.." && pwd -P)"
 GUARDED_RM="$WORKSPACE_ROOT/.claude/bin/guarded-rm"
@@ -129,26 +568,36 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   # exit 0, bypassing every check below it). Stdin has no such limit.
   my $text = do { local $/; <STDIN> };
   my @lines = split(/\n/, $text, -1);
-  my (@out, @pending);
+  # Set when a `<<` was not taken for a here-doc: inside ${…}, $((…)), $[…], ((…)), an array
+  # subscript or literal (rc.6 red team, F4; rc.10, F10), in a comment, or in $(…), <(…) or a
+  # backquote (rc.8, F6; rc.10, F10).
+  my $shift_in_expansion = 0;
   # Скан состояния кавычек — чистая функция (состояние, текст): заголовок с
   # переносами сканируется инкрементально, каждый новый сегмент один раз,
   # состояние переносится между итерациями. Прежняя continued_header заново
   # проходила всю уже склеенную строку на каждом переносе — квадратичное
   # время на длинных `\`-цепочках (issue #1148).
+  # Returns the quote open at the end of $line ("a" for $\x27…\x27) and whether the line ends in a
+  # comment: a backslash there is part of the comment, not a continuation (rc.8 red team, F5).
   sub scan_quote_state {
     my ($line, $quote) = @_;
+    my $escaped = -1;
     for (my $i = 0; $i < length($line); $i++) {
       my $char = substr($line, $i, 1);
       if (defined $quote) {
         if ($quote ne chr(39) && $char eq "\\" && $i + 1 < length($line)) { $i++; next; }
-        undef $quote if $char eq $quote;
+        undef $quote if $char eq ($quote eq "a" ? chr(39) : $quote);
       } elsif ($char eq "\\" && $i + 1 < length($line)) {
-        $i++;
+        $i++; $escaped = $i;
+      } elsif ($char eq "#" && ($i == 0 || ($escaped != $i - 1 && substr($line, $i - 1, 1) =~ /[\s;&|()<>`]/))) {
+        return (undef, 1);
+      } elsif ($char eq chr(39) && $i && substr($line, $i - 1, 1) eq "\$") {
+        $quote = "a";
       } elsif ($char eq chr(39) || $char eq q{"}) {
         $quote = $char;
       }
     }
-    return $quote;
+    return ($quote, 0);
   }
 
   sub is_data_command {
@@ -275,8 +724,12 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   }
 
   sub line_heredocs {
-    my ($line, $initial_quote, $initial_depth, $prior_group_source, $compound_frames) = @_;
+    my ($line, $initial_quote, $initial_depth, $prior_group_source, $compound_frames, $expansions, $bq_state) = @_;
     my (@specs, $start, $group_depth, $closed_prior_group, $last_heredoc_end);
+    my $swallow_at = -1;
+    # A backquote open at the end of a line stays open on the next one (rc.12 comparison, row r480).
+    my $in_bq = $$bq_state;
+    my $in_word_at = -1;   # the char at this index ends inside a word: escaped, or closing $(…) or a backquote
     my $quote = $initial_quote;
     $start = 0;
     $group_depth = $initial_depth;
@@ -286,11 +739,75 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       my $char = substr($line, $i, 1);
       if (defined $quote) {
         if ($quote ne chr(39) && $char eq "\\" && $i + 1 < length($line)) { $i++; next; }
-        undef $quote if $char eq $quote;
+        if ($quote eq q{"} && $char eq "\$" && substr($line, $i + 1, 1) eq "{") {
+          # `"${x:-"<<EOF"}"`: the word of ${…} has quotes of its own (rc.8 red team, F6).
+          push @$expansions, { close => "}", skip => 0, depth => 0, requote => q{"} };
+          undef $quote; $i++; next;
+        }
+        undef $quote if $char eq ($quote eq "a" ? chr(39) : $quote);
         next;
       }
-      if ($char eq "\\" && $i + 1 < length($line)) { $i++; next; }
+      if ($char eq "\\" && $i + 1 < length($line)) { $i++; $in_word_at = $i; next; }
+      if ($char eq "`") { $in_bq = !$in_bq; $in_word_at = $i unless $in_bq; next; }
+      # A comment: a `<<` or a quote in it means nothing; in backquotes it ends at the backquote.
+      # Inside ${…} and the like `#` starts no comment; in an array literal it does.
+      # `a\ #b`, `$(:)#b`, `` `:`#b ``: the `#` is inside a word, no comment (rc.12 red team, F16).
+      if ($char eq "#" && ($i == 0 || ($in_word_at != $i - 1 && substr($line, $i - 1, 1) =~ /[\s;&|()<>`]/))
+          && !grep { !$_->{comsub} && !$_->{array} } @$expansions) {
+        $shift_in_expansion = 1 if index($line, "<<", $i) >= 0;
+        last unless $in_bq;
+        my $e = index($line, "`", $i);
+        last if $e < 0;
+        $i = $e - 1; next;
+      }
+      if ($char eq chr(39) && $i && substr($line, $i - 1, 1) eq "\$") { $quote = "a"; next; }
       if ($char eq chr(39) || $char eq q{"}) { $quote = $char; next; }
+      # Open expansions ${…}, $((…)), $[…], ((…)) (also after for/if/while/`)`…), array subscripts
+      # x[…] and literals x=(…), command and process substitutions $(…), <(…), >(…), kept across
+      # lines in @$expansions: a `<<` inside one is not a here-doc. Only tracked here; the group
+      # logic below is unchanged.
+      if ($char =~ /[\$(){}\[\]]/) {
+        my $top = @$expansions ? $expansions->[-1] : undef;
+        my $two = substr($line, $i, 2);
+        if ($char eq "\$" && substr($line, $i + 1, 2) eq "((") { push @$expansions, { close => ")", skip => 2, depth => 0, arith => 1, dollar => 1 }; }
+        elsif ($two eq "\$(" || ($char eq "(" && $i && substr($line, $i - 1, 1) =~ /[<>]/)) {
+          # $(…) and a process substitution <(…), >(…) (rc.10 red team, F10).
+          push @$expansions, { close => ")", skip => 1, depth => 0, comsub => 1 };
+        }
+        elsif ($two eq "\$\{" || $two eq "\$[") { push @$expansions, { close => substr($two, 1) eq "{" ? "}" : "]", skip => 1, depth => 0 }; }
+        elsif ($two eq "((" && !($top && $top->{skip})
+               && substr($line, $i > 16 ? $i - 16 : 0, $i > 16 ? 16 : $i) =~ /(?:^|[\s;&|()!{])(?:(?:if|elif|while|until|for|then|do|else|time|coproc)[ \t]*)?$/) {
+          push @$expansions, { close => ")", skip => 2, depth => 0, arith => 1 };
+        }
+        elsif ($char eq "[" && !($top && $top->{close} eq "]")
+               && substr($line, $i > 64 ? $i - 64 : 0, $i > 64 ? 64 : $i) =~ /(?:(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*|[A-Za-z0-9_]\+?=\()$/
+               && substr($line, $i, 260) =~ /^\[[^\]]{0,256}\]\+?=/) {
+          push @$expansions, { close => "]", skip => 1, depth => 0 };
+        }
+        elsif ($char eq "(" && !($top && $top->{skip})
+               && substr($line, $i > 64 ? $i - 64 : 0, $i > 64 ? 64 : $i) =~ /(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*\+?=$/) {
+          # An array literal x=(…) (rc.10 red team, F10).
+          push @$expansions, { close => ")", skip => 1, depth => 0, array => 1 };
+        }
+        if ($top = @$expansions ? $expansions->[-1] : undef) {
+          my $open = { ")" => "(", "}" => "{", "]" => "[" }->{$top->{close}};
+          if ($char eq $open) { if ($top->{skip}) { $top->{skip}--; } else { $top->{depth}++; } }
+          elsif ($char eq $top->{close}) {
+            if ($swallow_at == $i) { }
+            elsif ($top->{depth}) { $top->{depth}--; }
+            elsif ($top->{dollar} && $top->{arith} && substr($line, $i + 1, 1) ne ")") {
+              # `$((1)<<W)` has no `))`: bash reads `$( (1)<<W )`, a command substitution.
+              $top->{arith} = 0; $top->{comsub} = 1;
+            }
+            else {
+              pop @$expansions;
+              $in_word_at = $i if $top->{comsub};
+              $swallow_at = $i + 1 if $top->{arith} && substr($line, $i + 1, 1) eq ")";
+              if ($top->{requote}) { $quote = $top->{requote}; next; }
+            }
+          }
+        }
+      }
       if ($char eq "(" || $char eq "{") { $group_depth++; next; }
       if ($char eq ")" || $char eq "}") {
         $group_depth-- if $group_depth;
@@ -317,11 +834,43 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
         next;
       }
       next unless substr($line, $i, 2) eq "<<";
-      next if substr($line, $i, 3) eq "<<<";
+      if (substr($line, $i, 3) eq "<<<") { $i += 2; next; }
+      # A here-doc opens a body only at command level: inside an expansion, $(…), <(…) or a
+      # backquote it may close before its body, and shells disagree (rc.10 red team, F10).
+      if (@$expansions || $in_bq) { $shift_in_expansion = 1; next; }
       my $tail = substr($line, $i);
-      next unless $tail =~ /^<<(-?)\s*(?!<)(?:([\x27"])([A-Za-z_][A-Za-z0-9_]*)\2|([A-Za-z_][A-Za-z0-9_]*))/;
-      my $match_length = length($&);
-      my ($indent, $delim) = ($1 eq q{-}, defined $3 ? $3 : $4);
+      # The delimiter is the whole word after `<<`/`<<-`, as bash reads it: up to an unquoted blank or
+      # metacharacter, with quotes and backslashes removed; any quoting makes the body literal. A CR
+      # is part of the word (rc.12 red team, F16); `END-MSG`, `W.x`, `E"O"F` are words too (rc.14, F18).
+      next unless $tail =~ /^<<(-?)[ \t]*(?!<)/;
+      my ($indent, $j) = ($1 eq q{-}, length($&));
+      my ($delim, $quoted, $open) = (q{}, 0, 0);
+      while ($j < length($tail)) {
+        my $c = substr($tail, $j, 1);
+        last if $c =~ /[ \t;&|()<>]/;
+        if ($c eq "\\") { $quoted = 1; $delim .= substr($tail, $j + 1, 1); $j += 2; next; }
+        if ($c eq chr(39) || ($c eq "\$" && substr($tail, $j + 1, 1) eq chr(39))) {
+          my $from = $c eq chr(39) ? $j + 1 : $j + 2;
+          my $e = index($tail, chr(39), $from);
+          if ($c ne chr(39)) { $e = $from; $e += substr($tail, $e, 1) eq "\\" ? 2 : 1 while $e < length($tail) && substr($tail, $e, 1) ne chr(39); $e = -1 if $e >= length($tail); }
+          if ($e < 0) { $open = 1; last; }
+          $quoted = 1; $delim .= substr($tail, $from, $e - $from); $j = $e + 1; next;
+        }
+        if ($c eq q{"}) {
+          my $e = $j + 1;
+          my $word = q{};
+          while ($e < length($tail) && substr($tail, $e, 1) ne q{"}) {
+            if (substr($tail, $e, 1) eq "\\" && substr($tail, $e + 1, 1) =~ /[\\"\$`]/) { $e++; }
+            $word .= substr($tail, $e, 1); $e++;
+          }
+          if ($e >= length($tail)) { $open = 1; last; }
+          $quoted = 1; $delim .= $word; $j = $e + 1; next;
+        }
+        $delim .= $c; $j++;
+      }
+      # A quote that runs past the line or an empty word: not read here, so no body is dropped.
+      if ($open || !length $delim) { $shift_in_expansion = 1; next; }
+      my $match_length = $j;
       my $recipient = substr($line, $start, $i - $start);
       my $prefix_is_data = data_command_before_heredoc($recipient);
       my @right_stages = right_command_stages(substr($line, $i + $match_length));
@@ -350,7 +899,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       for my $stage (@right_stages[1 .. $#right_stages]) {
         $keep ||= heredoc_recipient($stage);
       }
-      push @specs, { indent => $indent, delim => $delim, keep => $keep };
+      push @specs, { indent => $indent, delim => $delim, keep => $keep, quoted => $quoted };
       $last_heredoc_end = $i + $match_length;
       $i += $match_length - 1;
     }
@@ -366,10 +915,52 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       $frame->{source} .= substr($line, $frame->{line_start}) . "\n";
       $frame->{line_start} = 0;
     }
+    $$bq_state = $in_bq;
     return (\@specs, $quote, $group_depth);
   }
 
+  # The command substitutions $(…) and `…` of an unquoted here-doc body: bash runs them when it
+  # reads the body, whatever command gets the text (rc.14 red team, F19; issue #1002). Each inner
+  # command is returned as its own text, with a quote it leaves open closed after it.
+  sub body_substitutions {
+    my ($t) = @_;
+    my @found;
+    my $n = length $t;
+    for (my $i = 0; $i < $n; $i++) {
+      my $c = substr($t, $i, 1);
+      if ($c eq "\\") { $i++; next; }
+      my ($from, $end);
+      if ($c eq "\$" && substr($t, $i + 1, 1) eq "(" && substr($t, $i + 2, 1) ne "(") {
+        my ($depth, $q) = (0, undef);
+        for (my $k = $i + 2; $k < $n; $k++) {
+          my $d = substr($t, $k, 1);
+          if (defined $q) { $k++ if $d eq "\\" && $q ne chr(39); undef $q if $d eq $q; next; }
+          if ($d eq "\\") { $k++; next; }
+          if ($d eq chr(39) || $d eq q{"}) { $q = $d; next; }
+          if ($d eq "(") { $depth++; next; }
+          if ($d eq ")") { if ($depth) { $depth--; next; } $end = $k; last; }
+        }
+        ($from, $end) = ($i + 2, defined $end ? $end : $n);
+      } elsif ($c eq "`") {
+        $end = $i + 1;
+        $end += substr($t, $end, 1) eq "\\" ? 2 : 1 while $end < $n && substr($t, $end, 1) ne "`";
+        ($from, $end) = ($i + 1, $end < $n ? $end : $n);
+      } else { next; }
+      my $inner = substr($t, $from, $end - $from);
+      push @found, $inner;
+      my ($q) = scan_quote_state($inner, undef);
+      push @found, ($q eq "a" ? chr(39) : $q) if defined $q;
+      push @found, q{};
+      $i = $end;
+    }
+    return @found;
+  }
+
+  sub reduce {
+  my (@out, @pending, @substituted);
   my ($header_quote, $header_group_depth, $group_source, @compound_frames) = (undef, 0, q{});
+  my @expansions;
+  my $in_bq_state = 0;
   # Set when some here-doc body has no non-blank line (issue #1568): `cat > f <<EOF` + `EOF`
   # empties f, so the reader-overwrite rule below must not exempt here-docs in this call.
   my $empty_body = 0;
@@ -379,9 +970,23 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       my $body = $pending[0];
       my $probe = $line;
       $probe =~ s/^\t+// if $body->{indent};
-      if ($probe eq $body->{delim}) { $empty_body = 1 unless $body->{text}; shift @pending; push @out, q{}; next; }
+      if ($probe eq $body->{delim}) {
+        $empty_body = 1 unless $body->{text};
+        push @substituted, body_substitutions($body->{source}) if defined $body->{source};
+        # A kept body is a script of its own: a quote it leaves open must not swallow the lines of
+        # the call after it (rc.12 red team, F16: `bash <<W` + `echo \x27a` + `W` + a command).
+        push @out, ($body->{quote} eq "a" ? chr(39) : $body->{quote}) if $body->{keep} && defined $body->{quote};
+        shift @pending; push @out, q{}; next;
+      }
       $body->{text} = 1 if $line =~ /\S/;
-      push @out, $line if $body->{keep};
+      # An interpreter drops a lone backslash ending its script line (`bash <<\x27EOF\x27`, rc.8 F6).
+      (my $kept = $line) =~ s/(?<!\\)((?:\\\\)*)\\$/$1/;
+      if ($body->{keep}) {
+        push @out, $kept;
+        ($body->{quote}) = scan_quote_state($kept, $body->{quote});
+      } elsif (!$body->{quoted} && ($line =~ /\$\(|`/ || defined $body->{source})) {
+        $body->{source} = (defined $body->{source} ? $body->{source} . "\n" : q{}) . $line;
+      }
       next;
     }
     # Сегменты накапливаются списком и склеиваются один раз; состояние
@@ -393,23 +998,31 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
     while ($line_no + 1 < @lines) {
       my ($slashes) = $joined =~ /(\\+)$/;
       last unless defined $slashes && length($slashes) % 2;
-      $seg_quote = scan_quote_state($joined, $seg_quote);
-      last if defined $seg_quote && $seg_quote ne q{"};
+      ($seg_quote, my $comment) = scan_quote_state($joined, $seg_quote);
+      last if $comment || (defined $seg_quote && $seg_quote ne q{"});
       push @segments, substr($joined, 0, -1);
       $joined = $lines[++$line_no];
     }
     $line = @segments ? join(q{}, @segments, $joined) : $joined;
     push @out, $line;
-    my ($specs, $after_quote, $after_depth) = line_heredocs($line, $header_quote, $header_group_depth, $group_source, \@compound_frames);
+    my ($specs, $after_quote, $after_depth) = line_heredocs($line, $header_quote, $header_group_depth, $group_source, \@compound_frames, \@expansions, \$in_bq_state);
     push @pending, @$specs;
     $header_quote = $after_quote;
     $group_source = $after_depth ? $group_source . $line . "\n" : q{};
     $header_group_depth = $after_depth;
   }
+  return (scalar @pending, $empty_body, [@out, @substituted]);
+  }
+  # One reading only: the released guards in destructive-guard.d/ read the text their own way, and
+  # the strictest verdict wins (rc.10 red team, F8: two readings joined into one text let the open
+  # quote of one swallow the other).
+  my ($left, $empty_body, $out) = reduce();
   # An unterminated body means this was not a heredoc at all (an arithmetic
   # shift, a quoted "<<" in prose): stripping there would hide real commands,
   # so the whole reduction is discarded rather than trusted.
-  if (@pending) { print "UNTERMINATED"; exit 0; }
+  if ($left) { print "UNTERMINATED"; exit 0; }
+  my @out = @$out;
+  $empty_body ||= $shift_in_expansion;
   print "OK", ($empty_body ? "E" : "-"), join("\n", @out);
 ')
 # HEREDOC_EMPTY=E: a here-doc body is empty or could not be delimited; either way the
@@ -589,9 +1202,11 @@ SEGMENTER_PL='
       } elsif ($char eq q{"} || $char eq chr(39)) {
         $quote = $char;
         $segment .= $char;
-      } elsif ($char eq q{#} && $escaped_at != length($segment) && ($segment eq q{} || $segment =~ /[ \t]$/)) {
+      } elsif ($char eq q{#} && $escaped_at != length($segment) && ($segment =~ /[ \t]$/
+               || ($segment eq q{} && ($i == 0 || substr($text, $i - 1, 1) ne chr(123))))) {
         # A comment runs to the end of the line; an apostrophe in it must not open a quote
-        # that swallows the next lines (and a command hidden behind them).
+        # that swallows the next lines (and a command hidden behind them). `{#` starts no
+        # comment: `${#x} ; rm -rf x` runs the rm (rc.8 red team, F6).
         my $end = index($text, "\n", $i);
         $i = ($end < 0 ? $n : $end) - 1;
       } elsif ($char eq q{$} && $next eq chr(123)) {
@@ -895,13 +1510,33 @@ SEGMENTER_PL='
     return @scripts;
   }
 
+  # A literal here-string read by a shell as its script: `bash <<< "git push --force"` (rc.8, F6).
+  # A word with `$` or a backquote is not known here and is left as before.
+  sub herestring_scripts {
+    my @scripts;
+    for my $item (@_) {
+      next if index($item->[0], "<<<") < 0;
+      my @tokens = words($item->[0]);
+      my ($sink) = command_indices(@tokens);
+      next unless defined $sink && command_base($tokens[$sink]) =~ /^(?:ba|z|k|da|a)?sh$/;
+      my (@args, $script);
+      for (my $k = $sink + 1; $k < @tokens; $k++) {
+        if ($tokens[$k] =~ /^0?<<<(.*)$/s) { $script = length $1 ? $1 : $tokens[++$k]; next; }
+        push @args, $tokens[$k];
+      }
+      next unless defined $script && $script !~ /[\$`]/ && shell_reads_stdin(@args);
+      push @scripts, $script;
+    }
+    return @scripts;
+  }
+
   sub inspected_segments {
     my ($text, $depth) = @_;
     $depth //= 0;
     my @lexed = lex_segments($text);
     my @out = map { $_->[0] } @lexed;
     if ($depth < 3) {
-      push @out, inspected_segments($_, $depth + 1) for piped_scripts(@lexed);
+      push @out, inspected_segments($_, $depth + 1) for piped_scripts(@lexed), herestring_scripts(@lexed);
     }
     return @out;
   }
@@ -1318,7 +1953,10 @@ fi
 # (`--del`, `--forc`, `--mo`). Creating a branch and every listing form stay allowed.
 # rc.5 red team (RT5-3): `git branch --unset-upstream`/`-u` rewrites the tracking config and
 # `git remote update --prune` deletes remote-tracking branches; both passed the same way.
-GIT_BRANCH_WRITE=$(git_segment branch | grep -E -- ' branch( .*)? (-[a-zA-Z]*[dDfmMCu][a-zA-Z]*|--(d[a-z]*|forc|force|mo|mov|move|unset-upstream|set-upstream-to|set-upstream))( |=|$)' || true)
+# 0.42 red team F6: the prefix rule above applies to these too — `--unset`, `--u` and
+# `--set-upstream-t` are accepted by git as --unset-upstream / --set-upstream-to.
+# (`--se`, `--set`, `--set-u` are ambiguous with the retired --set-upstream and git refuses them.)
+GIT_BRANCH_WRITE=$(git_segment branch | grep -E -- ' branch( .*)? (-[a-zA-Z]*[dDfmMCu][a-zA-Z]*|--(d[a-z]*|forc|force|mo|mov|move|u[a-z-]*|set-upstream[a-z-]*))( |=|$)' || true)
 GIT_REMOTE_WRITE=$(git_segment remote | grep -E -- ' remote( -v| --verbose)* ((add|rename|remove|rm|set-head|set-branches|set-url|prune)( |$)|update( .*)? (--prune|-p)( |$))' || true)
 if [ -n "$GIT_BRANCH_WRITE$GIT_REMOTE_WRITE" ]; then
   block "git branch -d/-D/-f/-m/-M/-C/-u, --unset-upstream и git remote add/rename/remove/set-url/set-head/set-branches/prune, git remote update --prune запрещены — разрешены без запроса только для просмотра, а эти формы удаляют ветку или меняют адрес хранилища. Просмотр (git branch, git branch -a -vv, git remote -v, git remote get-url) работает; удаление ветки и смену адреса делает пилот сам. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
@@ -1376,20 +2014,38 @@ WRITE_TARGETS_PL='
       if (!$in_word) {
         if ($c =~ /[ \t]/) { $i++; next; }
         if (my $m = $at->(qr/(\d*|&)(>>|>\||>&|>)/)) {
-          my $op = $m->[1];
+          my ($fd, $op) = @$m;
           $i = pos($s);
+          # Any later redirection of fd 0 (`0>&-`, `0>/dev/null`, `0>f`) replaces the here-doc or
+          # here-string as the input of cat (rc.2 red team, finding C).
+          $here = 0 if $fd eq "0";
           if ($op eq ">&") {
             # >&2, 1>&2, >&- copy a descriptor; >&file (no fd) writes the file like &>.
-            if ($at->(qr/\s*(?:\d+|-)(?![^\s;&|()<>])/)) { $skip_next = 1; next; }
+            # `n>&0-` moves fd 0 away: stdin is closed.
+            if (my $d = $at->(qr/\s*((?:\d+-?|-))(?![^\s;&|()<>])/)) { $here = 0 if $d->[0] eq "0-"; $skip_next = 1; next; }
             $pending = "T"; next;
           }
           $pending = $op eq ">>" ? "A" : "T";
           next;
         }
-        if (my $m = $at->(qr/\d*(<<<|<<-?|<>|<&|<)/)) {
+        if (my $m = $at->(qr/(\d*)(<<<|<<-?|<>|<&|<)/)) {
           $i = pos($s);
-          if ($m->[0] eq "<<<") { $herestr = 1; }
-          elsif ($m->[0] =~ /^<</) { $here = 1 if ($ENV{HEREDOC_EMPTY} // q{}) eq "-"; }
+          # Only stdin (no descriptor or 0) feeds cat, and only the LAST stdin redirection counts:
+          # `cat 3<<< x > f`, `cat <<EOF > f <&-` and `cat <<< x > f < /dev/null` read nothing
+          # from the given text (rc.1 red team F2).
+          my ($fd, $op) = @$m;
+          my $stdin = $fd eq q{} || $fd eq "0";
+          if ($op eq "<<<") { $herestr = $stdin ? 1 : 0; }
+          elsif ($op =~ /^<</) {
+            # Only a delimiter the first pass can match (a name, maybe quoted) has a body known to be
+            # non-empty; `<<\x27\x27` ends at the first empty line and gives nothing (rc.2 red team, C).
+            my $named = $at->(qr/[ \t]*(?:(["\x27])[A-Za-z_][A-Za-z0-9_]*\1|[A-Za-z_][A-Za-z0-9_]*)(?![^\s;&|()<>])/);
+            $i = pos($s) if $named;
+            $here = ($named && ($ENV{HEREDOC_EMPTY} // q{}) eq "-") ? 1 : 0 if $stdin;
+            next if $named;
+          }
+          elsif ($op eq "<&" && $at->(qr/[ \t]*0-(?![^\s;&|()<>])/)) { $i = pos($s); $here = 0; next; }  # `n<&0-` closes fd 0
+          elsif ($stdin) { $here = 0; }
           if (substr($s, $i, 1) eq "(") { $flush_seg->(); $i++; next; }  # <( … )
           $skip_next = 1; next;
         }
@@ -1398,7 +2054,7 @@ WRITE_TARGETS_PL='
       # Inside or at the start of a word.
       if ($in_word && ($c =~ /[ \t\n;&|()<>`]/)) {
         my $w = $word; $word = q{}; $in_word = 0;
-        if ($skip_next) { $skip_next = 0; $here = 1 if $herestr && $w ne q{} && $w !~ /\$/; $herestr = undef; }
+        if ($skip_next) { $skip_next = 0; $here = ($w ne q{} && $w !~ /\$/) ? 1 : 0 if $herestr; $herestr = undef; }
         elsif ($pending) { push @redirs, [ $pending, $w ]; $pending = undef; }
         else { push @words, $w; }
         next;
@@ -1428,7 +2084,7 @@ WRITE_TARGETS_PL='
       $word .= $c; $i++;
     }
     if ($in_word) {
-      if ($skip_next) { $here = 1 if $herestr && $word ne q{} && $word !~ /\$/; } elsif ($pending) { push @redirs, [ $pending, $word ]; } else { push @words, $word; }
+      if ($skip_next) { $here = ($word ne q{} && $word !~ /\$/) ? 1 : 0 if $herestr; } elsif ($pending) { push @redirs, [ $pending, $word ]; } else { push @words, $word; }
       $in_word = 0; $word = q{};
     }
     $flush_seg->();
@@ -1474,11 +2130,21 @@ WRITE_TARGETS=$(printf '%s' "$CMD_EXEC" | HEREDOC_EMPTY="$HEREDOC_EMPTY" perl -e
 # that can name a protective file counts as naming it.
 PROTECTED_TARGET_PL='
   use strict; use warnings;
+  # Brace expansion is exponential in the number of brace groups (`x{a,b}` 40 times is 2^40 words:
+  # rc.1 red team, the hook hung with memory growing). Expansion is capped; a target over the cap,
+  # one whose glob cannot be compiled, or a run past the wall-clock limit is unresolvable and
+  # fails closed below.
+  my $cap = 256;
+  my $produced;
   sub braces {
-    my $s = shift;
-    return ($s) unless $s =~ /^(.*?)\{([^{}]*,[^{}]*)\}(.*)$/s;
+    my ($s, $depth) = @_;
+    die "brace nesting\n" if $depth > 16;
+    unless ($s =~ /^(.*?)\{([^{}]*,[^{}]*)\}(.*)$/s) {
+      die "brace cap\n" if ++$produced > $cap;
+      return ($s);
+    }
     my ($pre, $mid, $post) = ($1, $2, $3);
-    return map { braces($pre . $_ . $post) } split /,/, $mid, -1;
+    return map { braces($pre . $_ . $post, $depth + 1) } split /,/, $mid, -1;
   }
   sub glob_re {
     my $g = shift; my $re = q{};
@@ -1489,93 +2155,296 @@ PROTECTED_TARGET_PL='
       elsif ($t =~ /^\[(!?)(.*)\]$/s && length($t) > 2) { my ($neg, $set) = ($1, $2); $set =~ s/\\/\\\\/g; $re .= "[" . ($neg ? "^" : q{}) . $set . "]"; }
       else { $re .= quotemeta $t; }
     }
-    return qr/^(?:$re)$/s;
+    # Case-insensitive: on the default macOS file system `.Claude/Hooks` is the same directory.
+    return qr/^(?:$re)$/si;
   }
   sub names { my ($comp, $name) = @_; return $name =~ glob_re($comp); }
-  my $hit = 0;
+  sub protected_path {
+    my ($path) = @_;
+    my @parts;
+    for my $p (split m{/+}, $path) {
+      next if $p eq q{} || $p eq ".";
+      if ($p eq ".." && @parts && $parts[-1] ne "..") { pop @parts; next; }
+      push @parts, $p;
+    }
+    for my $k (0 .. $#parts - 1) {
+      next unless names($parts[$k], ".claude");
+      my $next = $parts[$k + 1];
+      return 1 if ($k + 1 < $#parts && (names($next, "hooks") || names($next, "bin")))
+               || ($k + 1 == $#parts && (names($next, "settings.json") || names($next, "settings.local.json")));
+    }
+    return 0;
+  }
+  # Raw-text test for an unresolvable target: does it mention claude or hook, case-insensitive,
+  # with quotes and brace punctuation removed and ?, *, [...] standing for any letter.
+  sub mentions_protected {
+    my $t = lc shift;
+    $t =~ s/["\x27{},\\]//g;
+    for my $word (qw(claude hook)) {
+      my $re = join q{}, map { "(?:\\*?(?:\Q$_\E|\\?|\\[[^\\]]*\\]))" } split //, $word;
+      return 1 if $t =~ /$re/ || $t =~ /\*/;
+    }
+    return 0;
+  }
+  my @targets;
   while (my $line = <STDIN>) {
     chomp $line;
     my (undef, undef, $target) = split /\t/, $line, 4;
-    next unless defined $target;
-    for my $path (braces($target)) {
-      my @parts;
-      for my $p (split m{/+}, $path) {
-        next if $p eq q{} || $p eq ".";
-        if ($p eq ".." && @parts && $parts[-1] ne "..") { pop @parts; next; }
-        push @parts, $p;
-      }
-      for my $k (0 .. $#parts - 1) {
-        next unless names($parts[$k], ".claude");
-        my $next = $parts[$k + 1];
-        if (($k + 1 < $#parts && (names($next, "hooks") || names($next, "bin")))
-            || ($k + 1 == $#parts && (names($next, "settings.json") || names($next, "settings.local.json")))) {
-          $hit = 1;
-        }
-      }
-    }
+    push @targets, $target if defined $target;
   }
-  print $hit ? "HIT" : "MISS";
+  my ($hit, @unresolved) = (0);
+  for my $target (@targets) {
+    my $ok = eval {
+      local $SIG{ALRM} = sub { die "time limit\n" };
+      alarm 3;
+      $produced = 0;
+      # The target as written is compared first, before any expansion.
+      $hit = 1 if protected_path($target);
+      unless ($hit) { for my $path (braces($target, 0)) { if (protected_path($path)) { $hit = 1; last; } } }
+      alarm 0;
+      1;
+    };
+    alarm 0;
+    last if $hit;
+    push @unresolved, $target unless $ok;
+  }
+  if ($hit) { print "HIT"; }
+  elsif (grep { mentions_protected($_) } @unresolved) { print "BLOCK"; }
+  elsif (@unresolved) { print "ASK\t$unresolved[0]"; }
+  else { print "MISS"; }
 '
-PROTECTED_TARGET=$(printf '%s' "$WRITE_TARGETS" | perl -e "$PROTECTED_TARGET_PL") || fail_check "perl, сравнение целей записи"
-if [ "$PROTECTED_TARGET" = "HIT" ] \
-  || matches "$CMD_EXEC" -E '(>|>>|>\||(^|[[:space:];|&])tee([[:space:]]+-[a-z]+)*)[[:space:]]*["'"'"']?[^[:space:];|&]*\.claude/(hooks/|bin/|settings(\.local)?\.json)'; then
+# The literal spelling is checked first, before the perl pass expands anything.
+if matches "$CMD_EXEC" -iE '(>|>>|>\||(^|[[:space:];|&])tee([[:space:]]+-[a-z]+)*)[[:space:]]*["'"'"']?[^[:space:];|&]*\.claude/(hooks/|bin/|settings(\.local)?\.json)'; then
+  PROTECTED_TARGET=HIT
+else
+  PROTECTED_TARGET=$(printf '%s' "$WRITE_TARGETS" | perl -e "$PROTECTED_TARGET_PL") || fail_check "perl, сравнение целей записи"
+fi
+case "$PROTECTED_TARGET" in
+  BLOCK) block "цель записи не удалось разобрать (слишком много вариантов в фигурных скобках, неверный шаблон или превышено время), и в её тексте есть claude или hook — защитный файл не исключён. Запиши путь буквально. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота." ;;
+  ASK*) UNRESOLVED_ASK="цель записи не удалось разобрать ($(printf '%s' "${PROTECTED_TARGET#ASK?}" | head -c 200)): слишком много вариантов в фигурных скобках, неверный шаблон или превышено время — подтверди запись вручную." ;;
+esac
+if [ "$PROTECTED_TARGET" = "HIT" ]; then
   block "запись перенаправлением или tee в .claude/hooks, .claude/bin или settings.json запрещена — так затирают защитные проверки (в любом написании пути: .claude//hooks, ./.claude/./hooks, шаблоны и фигурные скобки). Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
-# A `#` comment the scanners above do not understand (WP-529 F275). They know no comments, so a
-# quote inside one (`ls # don't`) opens a string that swallows the next lines, and a `<<WORD` inside
-# one makes the first pass drop the next lines as a here-doc body; bash runs those lines. Teaching
-# every scanner comments is not a small change, so this fails closed instead: when a comment
-# (a `#` starting a word, in the text left after data here-doc bodies are removed) holds an odd
-# number of ' or " or a `<<`, every raw line after it is checked as text. A `>` or tee followed
-# by `.claude` and then hooks, bin or settings blocks; any other `>` into a path outside
-# temporary directories and /dev asks. Each pass walks a line once (no backtracking regex).
-COMMENT_TAIL_PL='
+# Write targets read from the text alone, fail-closed (rc.2 red team, finding B). The scanner above
+# ends a word at `$(` and ends a segment at `<(`, so `> $(pwd)/.claude//hooks/x`,
+# `tee <(true) .claude//hooks/x`, `tee $(pwd)/…` and `> .claude/$'hooks'/x` (all silent in v0.42.0,
+# rc.1, rc.2) never reached the comparison. Here every target of `>`, `>>`, `>|`, `&>`, `>&file` and
+# every non-option operand of tee (process substitutions skipped) is taken from the text as a shell
+# word, then normalised: `$'…'` decoded, quotes and backslashes removed, a leading `$(…)`, `${…}`,
+# `$VAR` or backtick substitution dropped (it can only expand to a directory in front), `//` and
+# `/./` collapsed. A protective path by the regular expression or by the glob comparison above blocks.
+TEXT_TARGETS_SUB='
+  sub ansi_decode {
+    my $s = shift;
+    my %e = (n => "\n", t => "\t", r => "\r", a => "\a", b => "\b", e => "\e", f => "\f", v => "\x0b");
+    $s =~ s{\\(x[0-9A-Fa-f]{1,2}|[0-7]{1,3}|.)}{
+      my $x = $1;
+      $x =~ /^x(.+)/ ? chr(hex $1) : $x =~ /^[0-7]+$/ ? chr(oct $x) : exists $e{$x} ? $e{$x} : $x
+    }gse;
+    return $s;
+  }
+  my $nest = qr/(\((?:[^()\x27"]++|\x27[^\x27]*\x27|"(?:[^"\\]|\\.)*"|(?-1))*\))/s;
+  # One shell word from $$i on: quotes, $(…), ${…}, backticks and escapes are kept whole.
+  sub word_at {
+    my ($s, $i) = @_;
+    pos($$s) = $$i;
+    $$s =~ /\G(?:[^\s;&|<>()\x27"`\\\$]++|\\.|\$\x27(?:[^\x27\\]|\\.)*\x27?|\x27[^\x27]*\x27?|"(?:[^"\\]|\\.)*"?|\$$nest|\$\{[^}]*\}?|`[^`]*`?|\$)*/gcs;
+    $$i = pos($$s);
+    return $&;
+  }
+  sub normal_target {
+    my $w = shift;
+    $w =~ s{\$\x27((?:[^\x27\\]|\\.)*)\x27?}{ansi_decode($1)}gse;
+    my $strip = qr/^(?:\$$nest|\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9#?\$!@*-]|`[^`]*`|~[A-Za-z0-9_.-]*)/;
+    for (1 .. 2) {
+      1 while $w =~ s/$strip//;
+      $w =~ s/["\x27]//g;
+      $w =~ s/\\(.)/$1/gs;
+    }
+    1 while $w =~ s{/\.(?=/|$)}{}g;
+    $w =~ s{/+}{/}g;
+    $w =~ s{^\./}{};
+    return $w;
+  }
+  sub protected_text { return $_[0] =~ m{(?:^|/)\.claude/+(?:hooks|bin)(?:/|$)|(?:^|/)\.claude/+settings(?:\.local)?\.json$}i; }
+  sub text_targets {
+    my $s = shift;
+    my @t;
+    my $n = length $s;
+    while ($s =~ /(&>>?|\d*>>?|\d*>\||\d*>&)/g) {
+      my ($op, $i) = ($1, pos($s));
+      pos($s) = $i;
+      $s =~ /\G[ \t]*/gc;
+      $i = pos($s);
+      next if $op =~ /&$/ && substr($s, $i) =~ /^(?:\d+-?|-)(?![^\s;&|()<>])/;  # 2>&1, >&2, >&-
+      next if substr($s, $i, 1) eq "(";                                            # >(…)
+      my $w = word_at(\$s, \$i);
+      push @t, $w if length $w;
+      pos($s) = $i;
+    }
+    pos($s) = 0;
+    while ($s =~ /(?:^|[\s;&|(`\/])tee(?=[ \t]|$)/gm) {
+      my $i = pos($s);
+      my $opts = 1;
+      while ($i < $n) {
+        pos($s) = $i;
+        $s =~ /\G[ \t]*/gc; $i = pos($s);
+        my $c = substr($s, $i, 1);
+        last if $i >= $n || $c =~ /[;&|\n)]/;
+        if ($c =~ /[<>]/ && substr($s, $i + 1, 1) eq "(") {
+          pos($s) = $i + 1;
+          if ($s =~ /\G$nest/gc) { $i = pos($s); } else { last; }
+          next;
+        }
+        if ($s =~ /\G\d*(?:<<<|<<-?|<>|<&|>&|>>|>\||&>>?|>|<)[ \t]*/gc) { $i = pos($s); word_at(\$s, \$i); next; }
+        my $w = word_at(\$s, \$i);
+        if (!length $w) { $i++; next; }
+        if ($opts && $w eq "--") { $opts = 0; next; }
+        push @t, $w unless $opts && $w =~ /^-./;
+      }
+      pos($s) = $i;
+    }
+    my %seen;
+    return grep { length && !$seen{$_}++ } map { normal_target($_) } @t;
+  }
+'
+TEXT_TARGETS_PL="$TEXT_TARGETS_SUB"'
+  use strict; use warnings;
+  my ($text, $checked) = split /\0/, do { local $/; <STDIN> }, 2;
+  my @t = text_targets($text // q{});
+  print((grep { protected_text($_) } @t) ? "HIT\n" : q{});
+  # Targets the scanner above already compared need no second (brace, glob) comparison.
+  my %done = map { (split /\t/, $_, 4)[2] // q{} => 1 } split /\n/, $checked // q{};
+  print "x\tT\t$_\t-\n" for grep { !$done{$_} } @t;
+'
+TEXT_TARGETS=$(printf '%s\0%s' "$CMD_EXEC" "$WRITE_TARGETS" | perl -e "$TEXT_TARGETS_PL") || fail_check "perl, цели записи по тексту"
+case "$TEXT_TARGETS" in
+  HIT*) TEXT_PROTECTED=HIT ;;
+  *) TEXT_PROTECTED=$(printf '%s\n' "$TEXT_TARGETS" | perl -e "$PROTECTED_TARGET_PL") || fail_check "perl, сравнение целей по тексту" ;;
+esac
+case "$TEXT_PROTECTED" in
+  HIT|BLOCK) block "запись в .claude/hooks, .claude/bin или settings.json запрещена в любом написании пути — и через подстановку перед ним (\$(pwd)/.claude//hooks, \`pwd\`/…, \$HOME/…), \$'…', tee после <(…). Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота." ;;
+esac
+
+# A `#` comment or a command substitution the scanners above do not understand (WP-529 F275). They
+# know no comments, so a quote or backtick inside one (`ls # don't`, `ls # a\'b'`) opens a string
+# that swallows the next lines, and a `<<WORD` inside one makes the first pass drop the next lines as
+# a here-doc body; bash runs those lines. A quote nested in `"$(…)"` or a backtick substitution
+# (`cat F "$(echo "'")" > T`) does the same to the rest of the line. Teaching every scanner comments
+# and nesting is not a small change, so this fails closed instead: after such a comment (a `#`
+# starting a word holding a quote, a backtick or `<<`, in the text left after data here-doc bodies
+# are removed) every raw line, and from such a substitution every remaining line, is checked as text.
+# Write targets of `>`, `>>`, `>|`, `&>`, `>&file` and tee are taken with quotes and backslashes
+# removed and go through the same path comparison as above (glob, braces, `//`, `..`): a
+# protective file blocks; any other target outside temporary directories and /dev asks.
+COMMENT_TAIL_PL="$TEXT_TARGETS_SUB"'
   use strict; use warnings;
   my ($exec, $raw) = split /\0/, do { local $/; <STDIN> }, 2;
-  $raw //= q{};
-  my $trigger;
-  for my $line (split /\n/, $exec // q{}) {
-    # Right to left, so the quotes after each "#" are counted once for the whole line.
-    my ($sq, $dq, $lt) = (0, 0, 0);
+  $exec //= q{}; $raw //= q{};
+  my ($trigger, $from);
+  my @lines = split /\n/, $exec;
+  LINE: for my $n (0 .. $#lines) {
+    my $line = $lines[$n];
+    # Right to left, so what follows each "#" is known in one pass over the line.
+    my $seen = 0;
     for (my $i = length($line) - 1; $i >= 0; $i--) {
       my $c = substr($line, $i, 1);
-      if ($c eq "#" && ($i == 0 || substr($line, $i - 1, 1) =~ /[\s;&|()]/) && ($sq % 2 || $dq % 2 || $lt)) {
-        $trigger = substr($line, $i); last;
+      if ($c eq "#" && ($i == 0 || substr($line, $i - 1, 1) =~ /[\s;&|()`]/) && $seen) {
+        $trigger = substr($line, $i); last LINE;
       }
-      $sq++ if $c eq "\x27";
-      $dq++ if $c eq q{"};
-      $lt = 1 if $c eq "<" && substr($line, $i + 1, 1) eq "<";
+      $seen = 1 if $c eq "\x27" || $c eq q{"} || $c eq "`" || ($c eq "<" && substr($line, $i + 1, 1) eq "<");
     }
-    last if defined $trigger;
   }
-  exit 0 unless defined $trigger;
-  my $at = index($raw, $trigger);
-  my $tail = $at < 0 ? $raw : substr($raw, $at + length $trigger);
-  my $ask;
+  # A substitution holding a quote: `$(` to its matching `)` (parentheses counted, quotes ignored),
+  # or a backtick to the next one, over the whole text.
+  for (my $i = 0; !defined $trigger && $i < length($exec); $i++) {
+    my $c = substr($exec, $i, 1);
+    my $end;
+    if ($c eq q{$} && substr($exec, $i + 1, 1) eq "(") {
+      my $depth = 0;
+      for (my $j = $i + 1; $j < length($exec); $j++) {
+        my $d = substr($exec, $j, 1);
+        $depth++ if $d eq "(";
+        if ($d eq ")" && --$depth == 0) { $end = $j; last; }
+      }
+      $end //= length($exec);
+    } elsif ($c eq "`") {
+      $end = index($exec, "`", $i + 1);
+      $end = length($exec) if $end < 0;
+    } else { next; }
+    my $body = substr($exec, $i, $end - $i);
+    if ($body =~ /["\x27]/ || ($c ne "`" && $body =~ /`/)) {
+      # Text before the substitution was read correctly by the scanners above.
+      $from = $i;
+      last;
+    }
+    $i = $end if $c eq "`";
+  }
+  exit 0 unless defined $trigger || defined $from;
+  my $tail;
+  if (defined $trigger) {
+    my $at = index($raw, $trigger);
+    $tail = $at < 0 ? $raw : substr($raw, $at + length $trigger);
+  } else {
+    $tail = substr($exec, $from);
+  }
+  my ($block, $ask) = (0, undef);
+  my @targets;
+  my $body_end;
   for my $line (split /\n/, $tail) {
-    my $w = index($line, ">");
-    my $t = index($line, "tee");
+    # In the substitution case the first pass kept here-doc bodies (an opener inside quotes is not
+    # seen there): a body read by cat (`--body "$(cat <<\x27EOF\x27` + markdown `> quote`) is data.
+    if (defined $body_end) { undef $body_end if $line =~ /^\t*\Q$body_end\E$/; next; }
+    if (!defined $trigger && $line =~ /(?:^|[\s;&|(`])cat[ \t]*<<-?[ \t]*(["\x27]?)([A-Za-z_][A-Za-z0-9_]*)\1/) { $body_end = $2; }
+    my $l = $line;
+    $l =~ s/["\x27\\]//g;
+    # The same shell-word targets as the text pass over the whole call (rc.2 red team, finding B):
+    # compared as protective paths only; a stripped `$TMPDIR` prefix must not turn into an ask.
+    my @text = text_targets($line);
+    $block = 1 if grep { protected_text($_) } @text;
+    push @targets, @text;
+    my @found;
+    while ($l =~ /(&>>?|\d*>>?[|&]?)[ \t]*([^\s;&|<>()`]*)/g) {
+      my ($op, $t) = ($1, $2);
+      next if $t eq q{} || $t =~ /^&/;
+      next if $op =~ /&$/ && $op !~ /^&/ && $t =~ /^(?:\d+|-)$/;   # 2>&1, >&2, >&- copy a descriptor
+      push @found, $t;
+    }
+    while ($l =~ /(?:^|[\s;&|(`])tee((?:[ \t]+[^\s;&|<>()`]+)*)/g) {
+      push @found, grep { length && !/^-/ } split /[ \t]+/, $1;
+    }
+    # Literal fallback, as in rc.1: `.claude` and then hooks, bin or settings after the first `>` or tee.
+    my $w = index($l, ">");
+    my $t = index($l, "tee");
     $w = $t if $w < 0 || ($t >= 0 && $t < $w);
-    next if $w < 0;
-    my $c = index($line, ".claude", $w);
-    if ($c >= 0 && substr($line, $c) =~ /hooks|bin|settings/) { print "BLOCK"; exit 0; }
-    while (!defined $ask && $line =~ /(?<![>&0-9])\d*>[>|]?\s*["\x27]?([^\s;&|"\x27<>()]+)/g) {
-      my $target = $1;
-      next if $target =~ m{^&} || $target =~ m{^/dev/(null|stdout|stderr|tty|fd/\d+)$};
-      next if $target =~ m{^(/tmp/|/private/tmp/|/var/folders/|/private/var/folders/|\$TMPDIR/|\$\{TMPDIR\}/)} && $target !~ m{/\.\.(/|$)};
-      $ask = $target;
+    $block = 1 if $w >= 0 && substr($l, $w) =~ /\.claude.*(?:hooks|bin|settings)/;
+    for my $t (@found) {
+      push @targets, $t;
+      next if $t =~ m{^/dev/(null|stdout|stderr|tty|fd/\d+)$};
+      next if $t =~ m{^(/tmp/|/private/tmp/|/var/folders/|/private/var/folders/|\$TMPDIR/|\$\{TMPDIR\}/)} && $t !~ m{/\.\.(/|$)};
+      $ask //= $t;
     }
   }
-  print "ASK\t$ask" if defined $ask;
+  if ($block) { print "BLOCK\n"; exit 0; }
+  print "x\tT\t$_\n" for @targets;
+  print "ASK\t$ask\n" if defined $ask;
 '
 COMMENT_TAIL=
 case "$CMD_EXEC" in
-  *"#"*) COMMENT_TAIL=$(printf '%s\0%s' "$CMD_EXEC" "$CMD" | perl -e "$COMMENT_TAIL_PL") || fail_check "perl, строки после комментария" ;;
+  *"#"*|*'$('*|*'`'*) COMMENT_TAIL=$(printf '%s\0%s' "$CMD_EXEC" "$CMD" | perl -e "$COMMENT_TAIL_PL") || fail_check "perl, строки после комментария" ;;
 esac
+if [ -n "$COMMENT_TAIL" ] && [ "$COMMENT_TAIL" != "BLOCK" ]; then
+  COMMENT_PROTECTED=$(printf '%s\n' "$COMMENT_TAIL" | awk '!/^ASK\t/' | perl -e "$PROTECTED_TARGET_PL") || fail_check "perl, цели после комментария"
+  case "$COMMENT_PROTECTED" in
+    HIT|BLOCK) COMMENT_TAIL=BLOCK ;;
+    ASK*) COMMENT_TAIL="$COMMENT_TAIL"$'\n'"ASK"$'\t'"${COMMENT_PROTECTED#ASK?}" ;;
+  esac
+fi
 case "$COMMENT_TAIL" in
-  BLOCK) block "после комментария с непарной кавычкой или << идёт запись в .claude/hooks, .claude/bin или settings.json — такой комментарий сбивает разбор команды, поэтому защитные файлы проверяются по тексту. Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота." ;;
-  ASK*) COMMENT_ASK="перенаправление «>» после комментария с непарной кавычкой или << ($(printf '%s' "${COMMENT_TAIL#ASK?}" | head -1)): такой комментарий сбивает разбор команды, поэтому запись в рабочий файл подтверждается вручную." ;;
+  BLOCK) block "после комментария с кавычкой, обратной кавычкой или << (или подстановки \$(…) с кавычкой внутри) идёт запись в .claude/hooks, .claude/bin или settings.json — такой текст сбивает разбор команды, поэтому защитные файлы проверяются по тексту. Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота." ;;
+  *ASK*) COMMENT_ASK="перенаправление «>» или tee после комментария с кавычкой или << (или подстановки \$(…) с кавычкой внутри) ($(printf '%s\n' "$COMMENT_TAIL" | awk -F'\t' '$1 == "ASK" { print $2; exit }')): такой текст сбивает разбор команды, поэтому запись в рабочий файл подтверждается вручную." ;;
 esac
 
 # A truncating redirection after a pre-approved reader (issue #1568, F2 of the v0.42.0 red team).
@@ -1603,6 +2472,9 @@ if [ -n "$READER_OVERWRITE" ]; then
 fi
 if [ -z "${ASK_REASON:-}" ] && [ -n "${COMMENT_ASK:-}" ]; then
   ASK_REASON="$COMMENT_ASK"
+fi
+if [ -z "${ASK_REASON:-}" ] && [ -n "${UNRESOLVED_ASK:-}" ]; then
+  ASK_REASON="$UNRESOLVED_ASK"
 fi
 
 # SQL clients: DROP/TRUNCATE — irreversible loss of structure/data.
@@ -1660,6 +2532,7 @@ fi
 # Not forbidden, but not for silent approval either: ask the person (issue #1568). Emitted last,
 # after every block above has had its say.
 if [ -n "${ASK_REASON:-}" ]; then
+  DG_NEW_ASKED=1
   jq -n --arg reason "$ASK_REASON" \
     '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $reason}}' \
     || fail_check "jq, ответ с запросом"

@@ -1,21 +1,21 @@
 {
   "allowlist_sha256": "d3e6acb77b5996a809285644ff3785868a13230b121e6ef2e04b9934bf6af4b8",
-  "as_of": "2026-11-16T14:56:07.395Z",
+  "as_of": "2026-11-19T02:39:28.815Z",
   "excluded": {
     "domain": 262,
     "equals-code": 192,
-    "kind": 1259,
-    "level": 3465,
-    "not-publishable": 819,
+    "kind": 1301,
+    "level": 3532,
+    "not-publishable": 818,
     "too-long": 2
   },
   "graph_stats": {
-    "visible_concepts": 6583,
-    "visible_publishable": 3595
+    "visible_concepts": 6717,
+    "visible_publishable": 3663
   },
-  "included": 584,
-  "input_rows": 6583,
-  "output_sha256": "726c79c88771ac14829aab1d43cb0fb2fbd90706c5e0f8f7081226f6c8ab8535",
+  "included": 610,
+  "input_rows": 6717,
+  "output_sha256": "495f12c08288364e8f80009702f80684e1e2d20fd9a78705e315a1f0bf9f170a",
   "rules_version": "name-en-publishable/1",
   "schema": "glossary-snapshot/1"
 }

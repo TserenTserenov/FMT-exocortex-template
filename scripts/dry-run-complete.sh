@@ -100,7 +100,7 @@ case "$CURRENT" in
         # with live confirmation from the pilot's terminal).
         recorded_sha=$(jq -r '.owner_token_sha256 // empty' "$SP" 2>/dev/null || true)
         if [ -n "$TOKEN" ] && [ -n "$recorded_sha" ]; then
-            given_sha=$(printf '%s' "$TOKEN" | shasum -a 256 | awk '{print $1}')
+            given_sha=$(printf '%s' "$TOKEN" | dry_run_sha256)
             [ "$given_sha" = "$recorded_sha" ] || fail "capability token mismatch for gate_id=$GATE_ID"
         elif [ "$REASON" = "manual-recovery" ] && [ -z "$TOKEN" ]; then
             { printf 'dry-run-complete: завершить gate_id=%s с reason=manual-recovery без capability token? [yes/N] ' "$GATE_ID"
@@ -123,10 +123,7 @@ esac
 # The sentinel is removed ONLY after completed and ONLY if it refers to
 # this same gate_id — and it is a regular file of the same owner (lstat, Codex r1).
 if [ -f "$SENTINEL" ] && [ ! -L "$SENTINEL" ]; then
-    case "$(uname)" in
-    Darwin) S_UID=$(stat -f %u "$SENTINEL" 2>/dev/null || true) ;;
-    *)      S_UID=$(stat -c %u "$SENTINEL" 2>/dev/null || true) ;;
-esac
+    S_UID=$(dry_run_stat uid "$SENTINEL" || true)
     [ "$S_UID" = "$(id -u)" ] || fail "sentinel $SENTINEL owned by uid $S_UID"
     S_GID=$(jq -r '.gate_id // empty' "$SENTINEL" 2>/dev/null || true)
     if [ "$S_GID" = "$GATE_ID" ]; then

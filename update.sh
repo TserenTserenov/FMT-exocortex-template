@@ -5188,6 +5188,52 @@ is_fork_owned_path() {
     return 1
 }
 
+# Defined before the manifest loop: Step 2 calls it for unchanged programs that lack +x
+# (WP-529 F275); a call above the definition fails as 'command not found' = false.
+# Pattern of "executable" paths of the apply loops: files arrive via raw
+# `curl -o` without permissions, so +x is set at delivery (on a temporary
+# file before rename). issue #308: .githooks/* is not cosmetic (git silently skips a
+# non-executable hook); wp-list.py/check-claude-md-links.py — 755 in git upstream.
+# WP-529 Ф270 (F1 of the rc.3 red team): 54 programs that are 755 in git matched no pattern and
+# arrived non-executable on upgrade (scripts/iwe-notify among them: notify.sh looks it up with
+# `[ -x ]`, so every Telegram notification stopped). A delivered file that starts with `#!` is
+# a program meant to be run directly, so it gets +x too; SRC is the downloaded payload.
+update_needs_exec_bit() {
+    case "$1" in
+        *.sh | .githooks/* | .claude/bin/* | scripts/wp-list.py | scripts/check-claude-md-links.py) return 0 ;;
+    esac
+    [ -n "${2:-}" ] && [ -f "$2" ] && [ "$(head -c 2 "$2")" = "#!" ]
+}
+
+# The unchanged-program +x repair (WP-529 F275) relies on chmod taking effect. On Git Bash
+# (MSYS/MinGW) and Cygwin chmod is a no-op and `-x` follows the shebang, so a shebang-less *.sh
+# would be re-delivered on every run and the update would never report «Всё актуально» (rc.6 red
+# team F2, rc.8 F7).
+UPDATE_EXEC_REPAIR=true
+case "$(uname -s 2>/dev/null)" in MINGW* | MSYS* | CYGWIN*) UPDATE_EXEC_REPAIR=false ;; esac
+# update_exec_bit_takes_effect DIR — whether a file in DIR given the mode the plan sets for a
+# program (666 and `chmod +x`, masked by umask) would be executable. It is not under umask 177,
+# 111 or 133 (no x bit is left), in a directory the run cannot write, or on a noexec mount: there
+# a program whose mode has the owner x bit is still not executable (`-x` is false). The repair
+# would then queue the same programs on every run (rc.8 red team F7). Nothing is written, so
+# --check reaches the same verdict as the run (rc.10 red team F9). With no such program to look
+# at, a noexec mount cannot be told and the repair stays on, in both modes alike.
+update_exec_bit_takes_effect() {
+    local _um _mode _program
+    _um=$(umask)
+    _mode=$(( (8#666 & ~8#$_um) | (8#111 & ~8#$_um) ))
+    [ $(( _mode & 8#100 )) -ne 0 ] || return 1
+    [ -d "$1" ] && [ -w "$1" ] || return 1
+    _program=$(find "$1" -maxdepth 2 -type f -name '*.sh' -perm -u+x 2>/dev/null | head -n 1) || true
+    [ -z "$_program" ] || [ -x "$_program" ]
+}
+UPDATE_EXEC_REPAIR_OFF_HERE=false
+if $UPDATE_EXEC_REPAIR && ! update_exec_bit_takes_effect "$SCRIPT_DIR"; then
+    UPDATE_EXEC_REPAIR=false
+    UPDATE_EXEC_REPAIR_OFF_HERE=true
+fi
+EXEC_REPAIR_SKIPPED=()
+
 while IFS='|' read -r fpath fdesc expected_hash; do
     [ -z "$fpath" ] && continue
     # issue #402 (defect 3): native Windows Python prints \r\n even inside a
@@ -5219,13 +5265,23 @@ while IFS='|' read -r fpath fdesc expected_hash; do
     # half of the speedup alongside parallel download, since a typical update
     # leaves most files unchanged.
     if [ -n "$expected_hash" ] && [ -f "$SCRIPT_DIR/$fpath" ] && [ "$(hash_file "$SCRIPT_DIR/$fpath")" = "$expected_hash" ]; then
-        UNCHANGED=$((UNCHANGED + 1))
-        continue
+        # WP-529 F275: an unchanged program without +x is still fetched, so Step 2 re-delivers it
+        # with the same content and the plan sets +x (rc.3-rc.5 upgrade runs: NOEXEC 27).
+        if ! $UPDATE_EXEC_REPAIR || [ -x "$SCRIPT_DIR/$fpath" ] || ! update_needs_exec_bit "$fpath" "$SCRIPT_DIR/$fpath"; then
+            if $UPDATE_EXEC_REPAIR_OFF_HERE && [ ! -x "$SCRIPT_DIR/$fpath" ] && update_needs_exec_bit "$fpath" "$SCRIPT_DIR/$fpath"; then
+                EXEC_REPAIR_SKIPPED+=("$fpath")
+            fi
+            UNCHANGED=$((UNCHANGED + 1))
+            continue
+        fi
     fi
     DOWNLOAD_QUEUE+=("$fpath")
     DOWNLOAD_DESCS+=("$fdesc")
     DOWNLOAD_HASHES+=("$expected_hash")
 done < "$MANIFEST_PARSED"
+if [ ${#EXEC_REPAIR_SKIPPED[@]} -gt 0 ]; then
+    echo "⚠ Право на запуск здесь не ставится (umask $(umask) или том смонтирован с noexec): ${#EXEC_REPAIR_SKIPPED[@]} программ остаются без +x и не перевыкладываются при каждом запуске. Поставьте право вручную (chmod +x) или смените umask/том: ${EXEC_REPAIR_SKIPPED[*]}" >&2
+fi
 
 # curl_supports_parallel_batch — one-time capability probe (peer-session
 # 2026-08-21-09, consensus with Codex): --parallel/--parallel-max shipped
@@ -5479,6 +5535,12 @@ for _dq_i in "${!DOWNLOAD_QUEUE[@]}"; do
             case "$fpath" in
                 memory/*.md|memory/*.yaml|memory/*.yml) record_memory_old_hash "$fpath" "$LOCAL_HASH" ;;
             esac
+        elif $UPDATE_EXEC_REPAIR && update_needs_exec_bit "$fpath" "$REMOTE_FILE" && [ ! -x "$SCRIPT_DIR/$fpath" ]; then
+            # WP-529 F275 (rc.3 upgrade-from-release, NOEXEC 27): a program whose content did not
+            # change but which lacks +x (a git mode flip, or an older install that delivered it
+            # without +x) is re-delivered with the same content, so the plan sets +x on it.
+            UPDATED_FILES+=("$fpath")
+            UPDATED_LINES+=("0")
         else
             UNCHANGED=$((UNCHANGED + 1))
         fi
@@ -6081,21 +6143,6 @@ update_mode_plus_x() {
     local _um
     _um=$(umask)
     printf '%03o\n' "$(( 8#$1 | ( 8#111 & ~8#$_um ) ))"
-}
-
-# Pattern of "executable" paths of the apply loops: files arrive via raw
-# `curl -o` without permissions, so +x is set at delivery (on a temporary
-# file before rename). issue #308: .githooks/* is not cosmetic (git silently skips a
-# non-executable hook); wp-list.py/check-claude-md-links.py — 755 in git upstream.
-# WP-529 Ф270 (F1 of the rc.3 red team): 54 programs that are 755 in git matched no pattern and
-# arrived non-executable on upgrade (scripts/iwe-notify among them: notify.sh looks it up with
-# `[ -x ]`, so every Telegram notification stopped). A delivered file that starts with `#!` is
-# a program meant to be run directly, so it gets +x too; SRC is the downloaded payload.
-update_needs_exec_bit() {
-    case "$1" in
-        *.sh | .githooks/* | .claude/bin/* | scripts/wp-list.py | scripts/check-claude-md-links.py) return 0 ;;
-    esac
-    [ -n "${2:-}" ] && [ -f "$2" ] && [ "$(head -c 2 "$2")" = "#!" ]
 }
 
 # update_dest_mode REL — current permissions of the target in the clone: cp into an existing file

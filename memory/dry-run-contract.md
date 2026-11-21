@@ -100,7 +100,7 @@ curl -X (POST|PUT|DELETE|PATCH) | curl --data | curl -d
 psql ... (INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER)   # матчится по оригиналу (SQL в кавычках)
 bash|sh|zsh <script>              # indirect execution — block, КРОМЕ whitelist ниже (issue #264)
 python|python3 <script>           # indirect execution — block, КРОМЕ whitelist ниже (issue #460 путь 5)
-python|python3 -c "..."           # inline snippet — вне контракта по threat model (см. ниже), allow
+python|python3 -c "..."           # inline snippet — allow, если в коде нет записи/запуска (open с режимом, os, subprocess, exec, write…; issue #1468)
 eval|source|.|xargs               # indirect execution — payload неинспектируем после quote-strip
 ./x | ../x | $VAR/x | ~/x | x.sh | /abs/x.py   # программа по пути или скрипт по имени — indirect execution, block (issue #1434)
                                   # Читается .claude/hooks/dry-run-cmd-parse.pl по исходной команде с учётом кавычек,
@@ -159,18 +159,31 @@ LD_* и DYLD_* (LD_PRELOAD, LD_AUDIT, LD_LIBRARY_PATH, DYLD_INSERT_LIBRARIES…)
 присваивание. Простое упоминание имени (`grep -r PYTHONPATH .`) проходит. Относительные пути
 помощников, включая `.claude/scripts/load-extensions.sh`, после cd/pushd/popd не доверяются.
 
-Известные пределы гейта (issue #1454, ревью 3). Гейт — список запрещённых форм команд
-(denylist), а не песочница: форма, которой нет в списке, проходит, даже если исполняет запись.
-Сейчас под репетицией проходят, в частности:
-- `git -c core.fsmonitor='git push' status` и другие ключи `-c`, которые запускают команду
-  (core.pager, diff.external, alias.*, *.textconv, core.sshCommand);
-- переменные GIT_CONFIG_COUNT/GIT_CONFIG_KEY_*/GIT_CONFIG_VALUE_*, GIT_EXTERNAL_DIFF, GIT_PAGER;
-- команды, которые исполняют строку-аргумент: `find -exec`/`-ok`, `awk '…system(…)…'`,
-  команда `e` в sed, `python3 -c '…'`;
-- индекс массива в арифметике, который подставляет команду
-  (`[[ 1 -eq 'a[$(…)]' ]]`, `x='a[$(…)]'; echo $((x))`);
-- присваивание со значением в кавычках перед командой (`X='a' git push`): гейт не доходит
-  до слова команды после такого присваивания.
+Формы, найденные ревью #1454 (issue #1468), гейт блокирует с 0.42.1 — отдельным разбором всей
+команды с учётом кавычек (он только добавляет блокировки, проверка по словам ниже остаётся):
+слово команды в кавычках или с `\` (`"git" push`), присваивание со значением в кавычках перед
+командой (`X='a' git push`); `git -c`, `--config-env`, `--exec-path=`; присваивание
+GIT_CONFIG_*, GIT_PAGER, PAGER, GIT_EXTERNAL_DIFF, GIT_SSH*, GIT_ASKPASS, EDITOR и подобных;
+`find -exec/-execdir/-ok/-okdir/-delete/-fprint*/-fls`; `awk` с `system(`, `getline`,
+`print >`/`|`, `-f`/`-i`; `sed` с командами или флагами `e`/`w`/`W`, `-f`; `python -c` с кодом,
+который может писать или запускать (open с режимом, os, subprocess, exec, write, …);
+`perl/ruby/node -e`; `let`, `declare -i`; арифметика над значением переменной (`$((x))`,
+`(( x ))`, `[[ x -eq … ]]`, `${s:x}`, `${a[x]}`) — разрешена только над числами и видимыми `$(…)`.
+
+Известные пределы гейта. Гейт — по-прежнему список запрещённых форм (denylist), а не песочница:
+форма, которой нет в списке, проходит, даже если исполняет запись. Сейчас проходят, в частности:
+- слово команды из переменной (`G=git; $G push`) — шаг day-close запускает `"$PY3" -c …` так же;
+- подкоманды git, которые пишут, но не в списке (`stash`, `clean`, `restore`, `switch`,
+  `cherry-pick`, `revert`, `am`, `apply`, `tag`, `branch -D`, `config <ключ> <значение>`,
+  `update-ref`, `worktree`, `fetch`);
+- запись встроенными командами, которые арифметически вычисляют аргумент вне перечисленных форм.
+Переход на список разрешённого (allow-list) или на окружение без прав записи — 0.43.
+
+Где гейт работает (issue #1124): хук запускает только Claude Code (из `.claude/settings.json`).
+Kimi Code CLI, Codex и другие агенты его не вызывают, поэтому `dry-run-begin.sh` вне Claude Code
+(нет `CLAUDECODE=1`) отказывается начинать репетицию; среда, которая сама вызывает
+`.claude/hooks/dry-run-gate.sh` перед каждым инструментом, подтверждает это переменной
+`IWE_DRY_RUN_HOOKED_RUNTIME=1`. Защита записи внутри скриптов ритуалов для других агентов — 0.43.
 
 Python-whitelist (issue #460 путь 5, добавлен после того как code review поймал, что
 безусловный block ломает `close day` на первом же шаге):
@@ -401,7 +414,7 @@ Subagent после прогона ритуала анализирует transcr
 
 - **Гарантия что ритуал работает корректно содержательно** (pas-fail logic). Это open-loop verification, не closed-loop. Smoke-тест проверяет инициируемость, не правильность.
 - **Покрытие тонких side-effects** — например, скилл может прочитать `/tmp` файл, в нём `mktemp` (создаёт временный файл, формально write). Хук таких не блокирует. Принцип: блокируем то, что меняет user-data, не temp-state.
-- **Защита от malicious extensions.** Контракт работает в условиях добросовестных пилотов. Если extension намеренно обходит хук (например, через `python -c 'open(...,"w")'`) — это вне модели угроз.
+- **Защита от malicious extensions.** Контракт работает в условиях добросовестных пилотов. Если extension намеренно обходит хук (например, через слово команды из переменной: `G=git; $G push`) — это вне модели угроз.
 
 ## История
 

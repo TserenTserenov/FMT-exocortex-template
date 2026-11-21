@@ -21,6 +21,7 @@ Commands are passed to the hook as data, nothing is executed.
 import json
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -498,10 +499,14 @@ def main():
         check(code == 2 and "неожиданный выход" in err, f"an unexpected failure under set -e -> {code}: blocked")
     else:
         check(False, "the hook has no exit trap")
-    env_file = os.path.join(tempfile.mkdtemp(prefix="dg-env-"), "env.sh")
-    with open(env_file, "w", newline="\n", encoding="utf-8") as f:
-        f.write('printf() { if [ "${FUNCNAME[1]:-}" = matches ]; then return 3; fi; builtin printf "$@"; }\n')
-    code, err = run(hook, "git add -A", env=dict(os.environ, BASH_ENV=env_file))
+    # The hook runs again without BASH_ENV (rc.11 red team F12), so the failing printf is put into a
+    # copy of the hook, next to a copy of its released guards.
+    hooks_copy = os.path.join(tempfile.mkdtemp(prefix="dg-env-"), "hooks")
+    shutil.copytree(os.path.dirname(os.path.abspath(hook)), hooks_copy, symlinks=True)
+    broken = os.path.join(hooks_copy, "destructive-guard.sh")
+    with open(broken, "w", encoding="utf-8", newline="") as f:
+        f.write(text.replace(anchor, anchor + '\nprintf() { if [ "${FUNCNAME[1]:-}" = matches ]; then return 3; fi; builtin printf "$@"; }', 1))
+    code, err = run(broken, "git add -A")
     check(code == 2 and "ошибка проверки" in err, f"a failing printf inside matches -> {code}: blocked as a failed check")
 
     # --- the pilot's bypass works even with a broken jq ---
@@ -524,11 +529,15 @@ def main():
             code, err = run(hook, command)
             check(code != 0 or named in doc, f"{command!r} -> {code}: a pass-through the guide names as {named}")
         # Known limits remain observable until an executable detector replaces them (#1002).
-        for command, named in (("bash <<< 'rm -rf /important'", "`bash <<<`"),
-                               ("sh -s <<< 'rm -rf /important'", "`sh -s <<<`"),
-                               ('echo "$(rm -rf /important)"', "`$(...)`"),
+        # A substitution in an unquoted here-doc body is checked since the rc.14 red team (F19).
+        code, err = run(hook, 'cat <<EOF\n$(rm -rf /important)\nEOF')
+        check(code == 2, f"a substitution in an unquoted here-doc body -> {code}: checked")
+        # A literal here-string read by a shell is checked since the rc.8 red team (F6).
+        for command in ("bash <<< 'rm -rf /important'", "sh -s <<< 'rm -rf /important'"):
+            code, err = run(hook, command)
+            check(code == 2, f"{command!r} -> {code}: a literal here-string fed to a shell is checked")
+        for command, named in (('echo "$(rm -rf /important)"', "`$(...)`"),
                                ('echo "`rm -rf /important`"', "обратных кавычках"),
-                               ('cat <<EOF\n$(rm -rf /important)\nEOF', "`cat <<EOF`"),
                                ('cat <<EOF > >(bash)\nrm -rf /important\nEOF', "> >(bash)")):
             code, err = run(hook, command)
             check(code == 0 and named in doc, f"{command!r} -> {code}: unresolved pass-through named as {named}")

@@ -76,6 +76,9 @@ CYRILLIC_RE = re.compile(r"[а-яёА-ЯЁ]")
 # Report sources (WP-620 Ф4): where an unapproved English name came from
 REPORT_SOURCE_LOCAL = "local-glossary"
 REPORT_SOURCE_MODEL = "model"
+# A bold Russian name was translated, and neither the model nor the glossaries named the English.
+REPORT_EN_UNNAMED = "не названо"
+BOLD_SPAN_RE = re.compile(r"\*\*(.+?)\*\*", re.DOTALL)
 
 
 # ---------------------------------------------------------------------------
@@ -385,7 +388,16 @@ def _find_repo_root(start: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 
-def _build_system_prompt(style_path: Path, glossary: dict, manifest: dict) -> str:
+def _glossary_line(ru: str, en: str, only_as: str) -> str:
+    """One glossary line; a term that is also an ordinary word carries where it applies."""
+    if not only_as:
+        return f"  {ru} → {en}"
+    return f"  {ru} → {en} (only as {only_as}; elsewhere translate the word as an ordinary word)"
+
+
+def _build_system_prompt(
+    style_path: Path, glossary: dict, manifest: dict, scopes: dict[str, str] | None = None
+) -> str:
     """Assemble three-layer system prompt: style + glossary + exclusions."""
     style_text = style_path.read_text(encoding="utf-8") if style_path.exists() else ""
 
@@ -393,7 +405,8 @@ def _build_system_prompt(style_path: Path, glossary: dict, manifest: dict) -> st
     id_patterns = exclusions.get("id_patterns", [])
     proper_names = exclusions.get("proper_names", [])
 
-    glossary_lines = "\n".join(f"  {ru} → {en}" for ru, en in glossary.items())
+    scopes = scopes or {}
+    glossary_lines = "\n".join(_glossary_line(ru, en, scopes.get(ru, "")) for ru, en in glossary.items())
     id_pattern_lines = "\n".join(f"  - {p}" for p in id_patterns)
     proper_name_lines = "\n".join(f"  - {n}" for n in proper_names)
 
@@ -509,14 +522,80 @@ def local_terms_used(text: str, unapproved: dict[str, str]) -> list[tuple[str, s
     return [(ru, en) for ru, en in unapproved.items() if ru.casefold() in haystack]
 
 
+def bold_spans(text: str) -> list[str]:
+    """Text of **bold** spans outside code, in order."""
+    return [m.group(1).strip() for m in BOLD_SPAN_RE.finditer(strip_code_for_guard(text))]
+
+
+def _approved_rendering(
+    phrase: str, english: str, glossary: dict[str, str], unapproved: dict[str, str]
+) -> bool:
+    """True when the English is the approved name of this term, or of a longer approved term that starts with it.
+
+    A longer entry covers a shorter bold name only when the English in the
+    document is that entry's approved English. «Исполнитель» → Work Executor is
+    covered by «Исполнитель работы». «Верификатор» → Verifier is not covered by
+    «Верификатор допуска» → Admission class verifier. A local-glossary candidate
+    is not an approved name.
+    """
+    if not english:
+        return False
+    approved = {ru: en for ru, en in glossary.items() if ru not in unapproved}
+    p = phrase.casefold()
+    en = english.casefold()
+    for ru, name in approved.items():
+        key = ru.casefold()
+        if key == p or key.startswith(p + " ") or key.startswith(p + "-"):
+            if name.casefold() == en:
+                return True
+    return False
+
+
+def omitted_bold_terms(
+    source_text: str,
+    translated: str,
+    glossary: dict[str, str],
+    unapproved: dict[str, str],
+    already: set[str],
+) -> list[tuple[str, str]]:
+    """Bold Russian names translated without an approved name and without a model confession.
+
+    Spans are paired in order. When the two texts have different numbers of bold
+    spans, the English name is unknown and the row says «не названо».
+    """
+    src = bold_spans(source_text)
+    out = bold_spans(translated)
+    paired = len(src) == len(out)
+    seen = set(already)
+    rows: list[tuple[str, str]] = []
+    local = {ru.casefold(): en for ru, en in unapproved.items()}
+    for i, ru in enumerate(src):
+        key = ru.casefold()
+        if not CYRILLIC_RE.search(ru) or key in seen:
+            continue
+        en = out[i].strip() if paired and i < len(out) else ""
+        if paired and _approved_rendering(ru, en, glossary, unapproved):
+            continue
+        if paired and key in local and en.casefold() == local[key].casefold():
+            continue
+        seen.add(key)
+        rows.append((ru, en if en else REPORT_EN_UNNAMED))
+    return rows
+
+
 def unapproved_report_items(
     rel: str,
     source_text: str,
     glossary: dict[str, str],
     unapproved: dict[str, str],
     unlisted: list[tuple[str, str]],
+    translated: str | None = None,
 ) -> list[dict[str, str]]:
-    """Report rows for one file: every unapproved English name that may appear in its translation."""
+    """Report rows for one file: every unapproved English name that may appear in its translation.
+
+    Model-chosen names come from the model's own list and, when that list is
+    short, from bold Russian names paired with the bold English in the document.
+    """
     items = [
         {"file": rel, "term_ru": ru, "term_en": en, "source": REPORT_SOURCE_LOCAL}
         for ru, en in local_terms_used(source_text, unapproved)
@@ -529,6 +608,10 @@ def unapproved_report_items(
             continue  # the model listed a glossary term anyway, or repeated itself
         seen.add(key)
         items.append({"file": rel, "term_ru": ru, "term_en": en, "source": REPORT_SOURCE_MODEL})
+    if translated is not None:
+        already = {it["term_ru"].casefold() for it in items}
+        for ru, en in omitted_bold_terms(source_text, translated, glossary, unapproved, already):
+            items.append({"file": rel, "term_ru": ru, "term_en": en, "source": REPORT_SOURCE_MODEL})
     return items
 
 
@@ -559,6 +642,7 @@ def run_translate(
     glossary: dict,
     unapproved: dict[str, str] | None = None,
     report: list[dict[str, str]] | None = None,
+    scopes: dict[str, str] | None = None,
 ) -> int:
     """Translate files and write output to --output-dir.
 
@@ -575,7 +659,7 @@ def run_translate(
     translate_keys: list[str] = manifest.get("frontmatter_translate_keys", [])
 
     client = _make_client()
-    system_prompt = _build_system_prompt(style_path, glossary, manifest)
+    system_prompt = _build_system_prompt(style_path, glossary, manifest, scopes)
     model: str = args.model
 
     repo_root = _find_repo_root(Path.cwd())
@@ -612,9 +696,14 @@ def run_translate(
             continue
 
         out_path.write_text(translated, encoding="utf-8")
-        run_items += unapproved_report_items(
-            str(rel), _translatable_text(file_path, translate_keys), glossary, unapproved or {}, unlisted
+        file_items = unapproved_report_items(
+            str(rel), _translatable_text(file_path, translate_keys), glossary, unapproved or {},
+            unlisted, translated,
         )
+        if any(it["term_en"] == REPORT_EN_UNNAMED for it in file_items):
+            print(f"  WARN bold Russian name missing from the report in {rel}", file=sys.stderr)
+            exit_code = 2
+        run_items += file_items
 
         if violations:
             print(f"  WARN ASCII-guard violations in {rel}:", file=sys.stderr)
@@ -698,6 +787,7 @@ def run_delta(
     manifest: dict,
     glossary: dict,
     unapproved: dict[str, str] | None = None,
+    scopes: dict[str, str] | None = None,
 ) -> int:
     """Translate only category-D files changed since `.translation-state.yaml`.
 
@@ -735,7 +825,7 @@ def run_delta(
 
     args.files = [str(f) for f in targets]
     report: list[dict[str, str]] = []
-    exit_code = run_translate(args, manifest, glossary, unapproved, report)
+    exit_code = run_translate(args, manifest, glossary, unapproved, report, scopes)
 
     rel_targets = [str(f.relative_to(repo_root)) for f in targets]
     _write_state_file(output_dir / ".translation-state.yaml", head_sha, rel_targets, report)
@@ -813,12 +903,13 @@ def main() -> int:
         print(f"GLOSSARY NOTE: {note}", file=sys.stderr)
     glossary = loaded.as_mapping()
     unapproved = loaded.unapproved_mapping()
+    scopes = loaded.scope_mapping()
 
     if args.mode == "discover":
         return run_discover(args, manifest, glossary)
     if args.mode == "delta":
-        return run_delta(args, manifest, glossary, unapproved)
-    return run_translate(args, manifest, glossary, unapproved)
+        return run_delta(args, manifest, glossary, unapproved, scopes)
+    return run_translate(args, manifest, glossary, unapproved, scopes=scopes)
 
 
 if __name__ == "__main__":

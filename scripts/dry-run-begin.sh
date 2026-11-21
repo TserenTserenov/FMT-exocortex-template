@@ -59,6 +59,15 @@ fi
 # shellcheck source=../.claude/lib/dry-run-dir.sh
 { [ -r "$DRY_RUN_LIB" ] && . "$DRY_RUN_LIB"; } || fail "$DRY_RUN_LIB missing — cannot locate dry-run state (run update.sh)"
 dry_run_resolve_paths || fail "$DRY_RUN_ERR"
+# issue #1124: only the PreToolUse hook dry-run-gate.sh blocks writes during a
+# rehearsal, and only Claude Code runs it (from .claude/settings.json). Kimi
+# Code CLI, Codex and other runtimes do not, so a rehearsal there writes for
+# real while looking protected. Refuse instead of failing open. A runtime that
+# does run the hook says so with IWE_DRY_RUN_HOOKED_RUNTIME=1; the test-mode
+# override (private dir + marker) is not a rehearsal of the real host.
+if [ "$DRY_RUN_TEST_MODE" != 1 ] && [ "${CLAUDECODE:-}" != 1 ] && [ "${IWE_DRY_RUN_HOOKED_RUNTIME:-}" != 1 ]; then
+    fail "репетиция защищена только в Claude Code: запись блокирует хук dry-run-gate.sh, а другие агенты (Kimi Code CLI, Codex и т.п.) хуки из .claude/settings.json не запускают — репетиция у них писала бы по-настоящему (issue #1124). Запустите /audit-installation из Claude Code. Если ваша среда сама вызывает .claude/hooks/dry-run-gate.sh перед каждым инструментом, подтвердите это: IWE_DRY_RUN_HOOKED_RUNTIME=1"
+fi
 DRY_DIR="$DRY_RUN_DIR"
 SENTINEL="$DRY_RUN_SENTINEL"
 LOCK_DIR="$DRY_DIR/transaction.lock"
@@ -105,10 +114,16 @@ done
 
 GID="dry-$(date +%s)-$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
 TOKEN=$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')
-TOKEN_SHA=$(printf '%s' "$TOKEN" | shasum -a 256 | awk '{print $1}')
+# sha256 and owner process facts through the library helpers (issue #1586:
+# Git Bash has no shasum and its ps has no -o).
+TOKEN_SHA=$(printf '%s' "$TOKEN" | dry_run_sha256)
+case "$TOKEN_SHA" in
+    *[!0-9a-f]*|'') fail "cannot compute sha256 of the token (got '$TOKEN_SHA')" ;;
+esac
+[ "${#TOKEN_SHA}" -eq 64 ] || fail "cannot compute sha256 of the token (got '$TOKEN_SHA')"
 OWNER_PID=$PPID
-OWNER_PID_START=$(ps -o lstart= -p "$OWNER_PID" 2>/dev/null || true)
-OWNER_PGID=$(ps -o pgid= -p "$OWNER_PID" 2>/dev/null | tr -d ' ')
+OWNER_PID_START=$(dry_run_proc_start "$OWNER_PID" || true)
+OWNER_PGID=$(dry_run_proc_pgid "$OWNER_PID" | tr -d ' ')
 case "$OWNER_PID" in ''|*[!0-9]*) fail "cannot determine owner pid" ;; esac
 case "$OWNER_PGID" in ''|*[!0-9]*|0) fail "cannot determine owner pgid (got '$OWNER_PGID')" ;; esac
 [ -n "$OWNER_PID_START" ] || fail "cannot determine owner pid start"

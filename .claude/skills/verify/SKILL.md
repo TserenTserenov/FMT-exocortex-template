@@ -52,7 +52,7 @@ bash .claude/scripts/load-extensions.sh verify before
 | `archgate` | Проверка реализации АрхГейта | Код соответствует ЭМОГССБ-оценке, принципы воплощены |
 | `capture` | Проверка capture-candidate | UL, полнота, непротиворечивость с Pack |
 | `pack` | Проверка Package-адекватности | Проверяет 11 координат E.4.DPF.DA seed-пакета (Ф1-Ф3 артефакты): SoTA, decision-record, seed-маркер, их достаточность. Используется из `/verify pack` или `pack-creator` Шаг 4 |
-| `wp` | Приёмка рабочего продукта | Критерии done из WP context file |
+| `wp` | Проверка рабочего продукта | Критерии done из WP context file |
 | `chain` | Data flow check | Прочитаны ли downstream consumers? Контракты совпадают? (CoVe stage 3) |
 | `adversarial` | Scope & bias check | Scope определён анализом или выводом? Что НЕ прочитано? (Pre-mortem) |
 | `subsection` | Проверка подраздела руководства (SS) | 🔴 v4-lint + 🟡 нарратив/дуга/практика/аналогия (G-L) по CHECKLIST-subsection-v1.md |
@@ -108,7 +108,7 @@ bash .claude/scripts/load-extensions.sh verify before
 - **Verdict**: `DPFPackageAdequacyStatus` — `admissibleForDeclaredDPFUse` / `seedOnly` / `repairBeforeDPFUse` (авто) + эскалационные `holdForPFADDecision` / `holdForCoreAmendmentDecision` / `refreshNeeded` — по координатам D1-D11, порядковая шкала 0-5 (WP-474 Ф8.1/Ф8.3, пир-сессия 2026-09-05-27)
 
 **Для `wp`:**
-- Прочитать WP context file (`{{GOVERNANCE_REPO}}/inbox/WP-{N}-*.md`)
+- Прочитать WP context file (`${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/WP-{N}-*.md`)
 - Прочитать артефакт РП
 - Передать sub-agent'у: артефакт + критерии done + чеклист wp
 - Модель sub-agent'а: по verification_class

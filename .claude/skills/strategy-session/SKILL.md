@@ -20,7 +20,7 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 # Strategy Session — диспетчер
 
-> Один skill, три режима. Выбор по факту наличия артефактов в `{{GOVERNANCE_REPO}}/` + календарной позиции сессии.
+> Один skill, три режима. Выбор по факту наличия артефактов в `${IWE_GOVERNANCE_REPO:-DS-strategy}/` + календарной позиции сессии.
 
 ## When to use
 
@@ -40,12 +40,12 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 ### Шаг 0. Рабочая копия governance-репозитория (БЛОКИРУЮЩЕЕ, ДО расширений и любой записи)
 
-> Если в установке есть `session-guard.sh` (канон под freeze), правка идёт только из изолированной копии и публикуется через `ds-publish.sh` (правило «Канон под freeze» в `{{GOVERNANCE_REPO}}/CLAUDE.md`). Если session-guard в установке нет, заморозка выключена (пустой `IWE_FROZEN_CANONICAL_PATH`) или у репозитория управления нет `origin` (установка без GitHub: `open --isolate` без `--base-sha` берёт основу командой `git fetch origin main`, а публиковать некуда), работай как раньше в найденной рабочей копии и сохраняй штатным способом. Это две явные ветки ниже, не молчаливый пропуск. ВСЕ пути записи строятся от `GOV_WT`, не от канона.
+> Если в установке есть `session-guard.sh` (канон под freeze), правка идёт только из изолированной копии и публикуется через `ds-publish.sh` (правило «Канон под freeze» в `${IWE_GOVERNANCE_REPO:-DS-strategy}/CLAUDE.md`). Если session-guard в установке нет, заморозка выключена (пустой `IWE_FROZEN_CANONICAL_PATH`) или у репозитория управления нет `origin` (установка без GitHub: `open --isolate` без `--base-sha` берёт основу командой `git fetch origin main`, а публиковать некуда), работай как раньше в найденной рабочей копии и сохраняй штатным способом. Это две явные ветки ниже, не молчаливый пропуск. ВСЕ пути записи строятся от `GOV_WT`, не от канона.
 
 ```bash
-CANON="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}"
+CANON="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 GUARD="${IWE_SCRIPTS:-}/session-guard.sh"
-[ -f "$GUARD" ] || GUARD="{{WORKSPACE_DIR}}/scripts/session-guard.sh"
+[ -f "$GUARD" ] || GUARD="${IWE_WORKSPACE:-$HOME/IWE}/scripts/session-guard.sh"
 [ -f "$GUARD" ] || GUARD="$CANON/scripts/session-guard.sh"
 [ -f "$GUARD" ] && GUARD_MODE=required || GUARD_MODE=absent
 CANON_C=$(cd -- "$CANON" 2>/dev/null && pwd -P) || { echo "ERROR: канон $CANON недоступен" >&2; exit 1; }
@@ -116,7 +116,7 @@ fi
   ```bash
   GOV_WT="<записанный абсолютный путь>"; : "${GOV_WT:?}"
   knows_branch() { grep -qE -e '^[[:space:]]*[(]?([^|)#[:space:]]+[[:space:]]*[|][[:space:]]*)*"?--branch(=[^|)[:space:]]*)?"?[[:space:]]*[|)]' "$1" 2>/dev/null; }
-  PUB="$GOV_WT/scripts/ds-publish.sh"; CANON_PUB="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/scripts/ds-publish.sh"
+  PUB="$GOV_WT/scripts/ds-publish.sh"; CANON_PUB="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/ds-publish.sh"
   if ! knows_branch "$PUB" && knows_branch "$CANON_PUB"; then PUB="$CANON_PUB"; fi
   [ -f "$PUB" ] || PUB="$CANON_PUB"
   [ -f "$PUB" ] || { echo "ERROR: публикатор ds-publish.sh не найден ни в копии, ни в каноне. Запусти update.sh (он доставляет публикатор) и повтори публикацию; коммиты остаются в копии $GOV_WT" >&2; exit 1; }
@@ -153,7 +153,7 @@ fi
 ```bash
 GOV_WT="<записанный путь>"; : "${GOV_WT:?}"
 (cd -- "$GOV_WT" || exit 1
-IWE_ROOT="${IWE_ROOT:-${IWE_WORKSPACE:-{{WORKSPACE_DIR}}}}"
+IWE_ROOT="${IWE_ROOT:-${IWE_WORKSPACE:-$HOME/IWE}}"
 case "${IWE_SESSIONS_ROOT:-}" in
   ""|/*) ;;
   *) IWE_SESSIONS_ROOT="$IWE_ROOT/$IWE_SESSIONS_ROOT" ;;
@@ -163,9 +163,9 @@ if [ -n "${IWE_SESSIONS_ROOT:-}" ] && [ ! -d "$IWE_SESSIONS_ROOT" ]; then
   exit 1
 fi
 SESSIONS_DIR=$(
-  GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-{{GOVERNANCE_REPO}}}}"
+  GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
   source "${IWE_SCRIPTS:-{{IWE_TEMPLATE}}/scripts}/lib/common.sh" 2>/dev/null \
-    || source "{{WORKSPACE_DIR}}/scripts/lib/common.sh" 2>/dev/null \
+    || source "${IWE_WORKSPACE:-$HOME/IWE}/scripts/lib/common.sh" 2>/dev/null \
     || exit 1
   iwe_sessions_dir "$GOV_WT"
 ) || SESSIONS_DIR="${IWE_SESSIONS_ROOT:-$GOV_WT/sessions}"
