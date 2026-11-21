@@ -22,11 +22,21 @@
 # Usage:
 #   bash check-repo-residue.sh              # fast scan (stashes, branches, data files)
 #   bash check-repo-residue.sh --deep       # adds orphaned-object scan (slow: git fsck per repo)
+#                                           # and looks for data files inside dependency dirs too
 #   bash check-repo-residue.sh --json       # machine-readable output
 #
+# Data files are looked for among ALL files git does not track, including those inside
+# untracked or ignored directories. The fast scan does not descend into dependency and cache
+# directories (DEPENDENCY_DIRS below: node_modules, .venv, ...) — they hold thousands of files
+# and no hand-made exports; --deep descends into them as well.
+#
 # Accepted findings live in <governance repo>/machine/repo-residue-accepted.tsv
-# (repo<TAB>class<TAB>reason<TAB>review-date), so a decision made once does not resurface
-# every week until its review date passes. The script never deletes or changes anything.
+# (repo<TAB>class<TAB>item<TAB>reason<TAB>review-date). The item is the first word(s) of the
+# finding line — branch name, stash id, file path, archive name — so accepting one finding
+# never hides a NEW finding of the same class; "*" hides the whole class on purpose. Until its
+# review date the finding does not resurface. Rows with fewer than five columns (the earlier
+# format without an item) hide nothing and are reported for migration. The script never
+# deletes or changes anything.
 #
 # Environment:
 #   IWE_ROOT                workspace scanned two levels deep (default: the IWE workspace)
@@ -57,7 +67,7 @@ for arg in "$@"; do
   case "$arg" in
     --deep) DEEP=1 ;;
     --json) JSON_OUT=1 ;;
-    -h|--help) sed -n '3,38p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '3,48p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $arg" >&2; exit 1 ;;
   esac
 done
@@ -66,17 +76,29 @@ done
 # ad-hoc backups. Matched by name only — contents are never read.
 DATA_PATTERNS='\.(dump|sql|session)$|(^|/)_backups/|(^|/)backup[^/]*\.(tar|gz|zip)$'
 
+# Dependency and cache directories the fast scan does not enter (any depth). They are rebuilt
+# by package managers, can hold hundreds of thousands of files, and listing them would make the
+# weekly run slow for no finding. --deep enters them: a full picture before deleting a copy.
+DEPENDENCY_DIRS="node_modules .venv venv .tox __pycache__ .mypy_cache .pytest_cache .ruff_cache .gradle .terraform .next"
+
+# Internal field separator of a finding: class, item, detail. Not "|" or TAB — both may occur in
+# a file name, and the item must survive intact to be compared with the accepted list.
+SEP=$'\037'
+
 FINDINGS=0
 declare -a JSON_ROWS=()
 
+# An accepted row hides exactly one finding: same repo, same class, same item. "*" in the item
+# column hides the whole class deliberately. Rows with fewer than five columns (the format
+# before items existed) hide nothing — check_expired_residue_decisions reports them instead.
 # Fields are trimmed: a stray space before the TAB would otherwise silently break
 # suppression, with no way for the user to see why an accepted finding keeps coming back.
 is_accepted() {
-  local repo="$1" class="$2"
+  local repo="$1" class="$2" item="$3"
   [ -f "$ACCEPTED_FILE" ] || return 1
-  awk -F'\t' -v r="$repo" -v c="$class" '
-    { gsub(/^[ \t]+|[ \t]+$/, "", $1); gsub(/^[ \t]+|[ \t]+$/, "", $2) }
-    $1==r && $2==c {found=1} END{exit !found}' "$ACCEPTED_FILE"
+  awk -F'\t' -v r="$repo" -v c="$class" -v i="$item" '
+    { for (k = 1; k <= NF; k++) gsub(/^[ \t\r]+|[ \t\r]+$/, "", $k) }
+    NF >= 5 && $1==r && $2==c && ($3==i || $3=="*") {found=1} END{exit !found}' "$ACCEPTED_FILE"
 }
 
 # Branch names may legally contain a double quote, and remote URLs may contain a backslash.
@@ -90,10 +112,10 @@ json_escape() {
 
 # Caller filters accepted findings (emit_findings) — no second check here.
 report() {
-  local repo="$1" class="$2" detail="$3"
+  local repo="$1" class="$2" item="$3" detail="$4"
   FINDINGS=$((FINDINGS + 1))
   if [ "$JSON_OUT" -eq 1 ]; then
-    JSON_ROWS+=("{\"repo\":\"$(json_escape "$repo")\",\"class\":\"$(json_escape "$class")\",\"detail\":\"$(json_escape "$detail")\"}")
+    JSON_ROWS+=("{\"repo\":\"$(json_escape "$repo")\",\"class\":\"$(json_escape "$class")\",\"item\":\"$(json_escape "$item")\",\"detail\":\"$(json_escape "$detail")\"}")
   else
     printf '  %-22s %s\n' "$class" "$detail"
   fi
@@ -115,17 +137,36 @@ list_repos() {
 # whose findings are all accepted prints nothing at all.
 emit_findings() {
   local scope="$1" out="$2"
-  local header_shown=0 class detail
-  while IFS='|' read -r class detail; do
+  local header_shown=0 class item detail
+  while IFS="$SEP" read -r class item detail; do
     [ -z "$class" ] && continue
-    is_accepted "$scope" "$class" && continue
+    is_accepted "$scope" "$class" "$item" && continue
     if [ "$header_shown" -eq 0 ] && [ "$JSON_OUT" -eq 0 ]; then
       echo ""
       echo "📁 $scope"
       header_shown=1
     fi
-    report "$scope" "$class" "$detail"
+    report "$scope" "$class" "$item" "$detail"
   done <<< "$out"
+}
+
+# finding <class> <item> <detail> — one line for emit_findings. The printed detail starts with
+# the item, so the user can copy it into the accepted list as it is.
+finding() {
+  printf '%s%s%s%s%s\n' "$1" "$SEP" "$2" "$SEP" "$3"
+}
+
+# Every file git does not track, NUL-separated, including files inside untracked and ignored
+# directories (plain `git status` prints only such a directory's name, which hides the files).
+# No ignore rules are applied on purpose: an ignored dump is exactly what this check is for.
+# Nested repositories come out as "dir/" and are not entered.
+list_untracked_files() {
+  local dir="$1" d
+  local -a skip=()
+  if [ "$DEEP" -eq 0 ]; then
+    for d in $DEPENDENCY_DIRS; do skip+=("--exclude=$d/"); done
+  fi
+  git -C "$dir" ls-files --others -z ${skip[@]+"${skip[@]}"} 2>/dev/null
 }
 
 scan_repo() {
@@ -137,39 +178,49 @@ scan_repo() {
     # A directory named .git is not proof of a readable repository. Without this gate every
     # git call below fails quietly and a corrupted copy reports "nothing found" — the worst
     # possible answer right before someone deletes it.
+    # Items: "-" for a finding a repository can have only once; otherwise the thing itself.
     if ! git -C "$dir" rev-parse --git-dir >/dev/null 2>&1; then
-      echo "битый-репозиторий|служебный каталог есть, но git его не читает — содержимое проверить нельзя"
+      finding "битый-репозиторий" "-" "служебный каталог есть, но git его не читает — содержимое проверить нельзя"
       exit 0
     fi
 
-    stashes=$(git -C "$dir" stash list 2>/dev/null | wc -l | tr -d ' ')
-    [ "$stashes" -gt 0 ] && echo "stash|$stashes отложенных наработок (видны только в журнале refs/stash)"
+    # One finding per stash entry, keyed by its commit id: stash@{N} numbers shift with every
+    # new stash, and two entries may share a message.
+    while IFS=$'\t' read -r ref sha subject; do
+      [ -z "$sha" ] && continue
+      sha="${sha:0:12}"
+      finding "stash" "$sha" "$sha: $ref «${subject}» (видна только в журнале refs/stash)"
+    done < <(git -C "$dir" stash list --format='%gd%x09%H%x09%gs' 2>/dev/null)
 
     # With no remote at all, --not --remotes excludes nothing and every branch looks unpublished.
     # One honest finding beats a wall of noise saying the same thing.
     if [ -z "$(git -C "$dir" remote 2>/dev/null)" ]; then
-      echo "нет-серверной-копии|удалённых репозиториев нет — всё содержимое существует только здесь"
+      finding "нет-серверной-копии" "-" "удалённых репозиториев нет — всё содержимое существует только здесь"
     else
       while IFS= read -r br; do
         [ -z "$br" ] && continue
         n=$(git -C "$dir" log --oneline "$br" --not --remotes 2>/dev/null | wc -l | tr -d ' ')
-        [ "$n" -gt 0 ] && echo "ветка-без-публикации|$br: $n коммитов нет ни в одной серверной ветке"
+        [ "$n" -gt 0 ] && finding "ветка-без-публикации" "$br" "$br: $n коммитов нет ни в одной серверной ветке"
       done < <(git -C "$dir" for-each-ref --format='%(refname:short)' refs/heads/ 2>/dev/null)
     fi
 
     if [ "$DEEP" -eq 1 ]; then
       # Older stash entries surface here too: refs/stash points only at the newest one, so the
       # rest are unreachable by definition. Same object, two classes — not a double count bug.
+      # The item is the count: there is no per-commit name, and an acceptance of "these N"
+      # must not hide new orphans, so any change of the number brings the finding back.
       orphans=$(git -C "$dir" fsck --full --no-reflogs --unreachable 2>/dev/null | awk '$2=="commit"' | wc -l | tr -d ' ')
-      [ "$orphans" -gt 0 ] && echo "оторванные-объекты|$orphans коммитов недостижимы из ссылок (обычный слепок их не берёт)"
+      [ "$orphans" -gt 0 ] && finding "оторванные-объекты" "$orphans" "$orphans коммитов недостижимы из ссылок (обычный слепок их не берёт)"
     fi
 
-    # Data outside version control. Read with -z: git quotes paths containing spaces or quotes
-    # in the default format, and awk field-splitting would drop exactly those files.
-    while IFS= read -r -d '' entry; do
-      f="${entry:3}"
-      printf '%s' "$f" | grep -qE "$DATA_PATTERNS" && echo "данные-вне-git|$f"
-    done < <(git -C "$dir" status --porcelain=v1 -z --ignored=matching 2>/dev/null)
+    # Data outside version control. NUL-separated listing: git quotes paths containing spaces or
+    # quotes otherwise. One grep for the whole repo, not one per file. A _backups directory is
+    # reported once, not file by file.
+    list_untracked_files "$dir" | tr '\0' '\n' | grep -E "$DATA_PATTERNS" \
+      | sed -E 's#^((.*/)?_backups/).*#\1#' | LC_ALL=C sort -u \
+      | while IFS= read -r f; do
+          [ -n "$f" ] && finding "данные-вне-git" "$f" "$f"
+        done
   )
 
   emit_findings "$name" "$out"
@@ -206,12 +257,15 @@ check_duplicate_clones() {
     while IFS=$'\t' read -r dir name; do
       url=$(git -C "$dir" remote get-url origin 2>/dev/null) || continue
       last_commit=$(git -C "$dir" log -1 --format=%cd --date=short 2>/dev/null || echo '?')
-      [ -n "$url" ] && printf '%s\t%s (%s)\n' "$(normalize_remote_url "$url")" "$name" "$last_commit"
-    done < <(list_repos) | sort | awk -F'\t' '
-      { urls[$1] = urls[$1] ", " $2; count[$1]++ }
-      END { for (u in urls) if (count[u] > 1) {
-              sub(/^, /, "", urls[u])
-              printf "дубль-рабочей-копии|%s: копий %d (%s)\n", u, count[u], urls[u]
+      [ -n "$url" ] && printf '%s\t%s\t%s\n' "$(normalize_remote_url "$url")" "$name" "$last_commit"
+    done < <(list_repos) | LC_ALL=C sort | awk -F'\t' -v sep="$SEP" '
+      { names[$1] = names[$1] ", " $2; dates[$1] = dates[$1] ", " $2 " " $3; count[$1]++ }
+      END { for (u in names) if (count[u] > 1) {
+              sub(/^, /, "", names[u]); sub(/^, /, "", dates[u])
+              # The item lists the copies: a third copy changes it, so an accepted pair does
+              # not hide a new duplicate.
+              item = u ": " names[u]
+              printf "дубль-рабочей-копии%s%s%s%s — копий %d, последний коммит: %s\n", sep, item, sep, item, count[u], dates[u]
             } }'
   )
   emit_findings "(машина)" "$out"
@@ -234,9 +288,9 @@ check_expired_archives() {
     if ! printf '%s' "$expires" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
       # Braces are required, not cosmetic: bash 3.2 (macOS system shell) treats the bytes of a
       # following non-ASCII character as part of the variable name and dies under set -u.
-      line="нечитаемый-срок|$dir_name: срок записан как «${expires}», ожидается ГГГГ-ММ-ДД - проверить вручную"
+      line=$(finding "нечитаемый-срок" "$dir_name" "$dir_name: срок записан как «${expires}», ожидается ГГГГ-ММ-ДД - проверить вручную")
     elif [[ "$TODAY" > "$expires" ]]; then
-      line="просроченный-архив|$dir_name: срок хранения истёк ${expires}"
+      line=$(finding "просроченный-архив" "$dir_name" "$dir_name: срок хранения истёк ${expires}")
       [ "$personal" = "true" ] && line="$line, внутри персональные данные"
     else
       continue
@@ -249,28 +303,33 @@ check_expired_archives() {
 # An accepted finding is not a permanent "never resurfaces" decision: the 4th column carries a
 # review date. This check reads the accepted list directly (not through emit_findings /
 # is_accepted — these rows ARE the accepted list, surfacing them is the point) and reports
-# every row whose review date has passed, is missing, or is unreadable.
+# every row whose review date has passed, is missing, or is unreadable — and every row in the
+# earlier four-column format (no item), which no longer hides anything until it is migrated.
+# Parsed in awk, not `read`: TAB is IFS whitespace there, so an empty column would silently
+# shift every column after it.
 check_expired_residue_decisions() {
-  local repo class reason expires line out=""
-  while IFS=$'\t' read -r repo class reason expires; do
-    [ -z "$repo" ] && continue
-    [[ "$repo" == \#* ]] && continue
-    expires="${expires%$'\r'}"
-    if [ -z "$expires" ]; then
-      line="нет-срока|$repo/$class: срок повторного решения не задан — допишите дату ГГГГ-ММ-ДД в четвёртую колонку"
-    elif ! printf '%s' "$expires" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
-      line="нечитаемый-срок|$repo/$class: срок записан как «${expires}», ожидается ГГГГ-ММ-ДД"
-    elif [[ "$TODAY" > "$expires" ]]; then
-      line="просрочено|$repo/$class: срок решения истёк ${expires} — «${reason}»"
-    else
-      continue
-    fi
-    out="${out:+$out$'\n'}$line"
-  done < "$ACCEPTED_FILE"
+  local out class item detail
+  out=$(awk -F'\t' -v today="$TODAY" -v sep="$SEP" '
+    { for (k = 1; k <= NF; k++) gsub(/^[ \t\r]+|[ \t\r]+$/, "", $k) }
+    $1 == "" || $1 ~ /^#/ { next }
+    NF < 5 {
+      key = $1 "/" $2
+      printf "старый-формат%s%s%s%s: колонок %d, нужно пять (репо, класс, что, причина, срок) — строка ничего не скрывает; впишите третьей колонкой, что именно принято (имя ветки, путь, ...), или * для всего класса\n", sep, key, sep, key, NF
+      next
+    }
+    {
+      key = $1 "/" $2 "/" $3
+      if ($5 == "")
+        printf "нет-срока%s%s%s%s: срок повторного решения не задан — допишите дату ГГГГ-ММ-ДД в пятую колонку\n", sep, key, sep, key
+      else if ($5 !~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/)
+        printf "нечитаемый-срок%s%s%s%s: срок записан как «%s», ожидается ГГГГ-ММ-ДД\n", sep, key, sep, key, $5
+      else if (today > $5)
+        printf "просрочено%s%s%s%s: срок решения истёк %s — «%s»\n", sep, key, sep, key, $5, $4
+    }' "$ACCEPTED_FILE")
   if [ -n "$out" ]; then
-    [ "$JSON_OUT" -eq 0 ] && echo "" && echo "⏰ ТРЕБУЕТ ПОВТОРНОГО РЕШЕНИЯ (срок в ${ACCEPTED_FILE} истёк или не задан)"
-    while IFS='|' read -r class detail; do
-      report "(принятые решения)" "$class" "$detail"
+    [ "$JSON_OUT" -eq 0 ] && echo "" && echo "⏰ ТРЕБУЕТ ПОВТОРНОГО РЕШЕНИЯ (срок в ${ACCEPTED_FILE} истёк, не задан или строка старого формата)"
+    while IFS="$SEP" read -r class item detail; do
+      report "(принятые решения)" "$class" "$item" "$detail"
     done <<< "$out"
   fi
 }
@@ -293,7 +352,7 @@ elif [ "$FINDINGS" -eq 0 ]; then
   echo "✅ Ничего нового: ни отложенных наработок, ни неопубликованных веток, ни данных вне git, ни дублей копий, ни просроченных архивов"
 else
   echo ""
-  echo "⚠️  Находок: ${FINDINGS}. Программа ничего не удаляет. По каждой находке — либо действие, либо строка в ${ACCEPTED_FILE} (репо<TAB>класс<TAB>причина<TAB>ГГГГ-ММ-ДД)"
+  echo "⚠️  Находок: ${FINDINGS}. Программа ничего не удаляет. По каждой находке — либо действие, либо строка в ${ACCEPTED_FILE} (репо<TAB>класс<TAB>что<TAB>причина<TAB>ГГГГ-ММ-ДД; «что» — начало строки находки до двоеточия: ветка, путь, id отложенной правки; «-» у находки, которая бывает у репо одна)"
   [ -f "$ACCEPTED_FILE" ] || echo "   Файла принятых решений ещё нет — создайте его с шапкой из seed/strategy/machine/repo-residue-accepted.tsv шаблона"
   [ "$DEEP" -eq 0 ] && echo "   Оторванные объекты не проверялись — для полной картины перед удалением копии запустите с --deep"
 fi

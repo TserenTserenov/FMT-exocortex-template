@@ -128,17 +128,102 @@ n=$(printf '%s' "$out" | grep -c "ветка-без-публикации noremot
 [ "$n" -eq 0 ] && pass "ветки этого репозитория не дублируют находку" || fail "веток продублировано: $n"
 
 echo "7. Файл принятых решений с лишним пробелом"
-printf 'spaces \tданные-вне-git\tпроверка пробела\t2030-01-01\n' > "$ACCEPTED"
+printf 'spaces \tданные-вне-git\tplain.dump \tпроверка пробела\t2030-01-01\n' > "$ACCEPTED"
 out=$(run)
 check "лишний пробел не ломает подавление" expect-absent "plain.dump" "$out"
+check "принят один файл — соседний виден" expect-found "my export.dump" "$out"
 
 echo "8. Срок повторного решения"
-printf 'spaces\tданные-вне-git\tразобрать позже\t2020-01-01\n' > "$ACCEPTED"
+printf 'spaces\tданные-вне-git\tplain.dump\tразобрать позже\t2020-01-01\n' > "$ACCEPTED"
 out=$(run)
-check "истёкший срок поднимает решение снова" expect-found "просрочено" "$out"
-printf 'spaces\tданные-вне-git\tбез даты\n' > "$ACCEPTED"
+check "истёкший срок поднимает решение снова" expect-found "просрочено.*spaces/данные-вне-git/plain.dump" "$out"
+printf 'spaces\tданные-вне-git\tplain.dump\tбез даты\t\n' > "$ACCEPTED"
 out=$(run)
 check "решение без даты не бессрочное" expect-found "нет-срока" "$out"
+
+echo "8a. Принятая находка скрывает только себя"
+mkrepo "$ROOT/repos/branches" "https://example.com/branches.git"
+commit_in "$ROOT/repos/branches" "начало"
+git -C "$ROOT/repos/branches" branch foo 2>/dev/null
+git -C "$ROOT/repos/branches" branch bar 2>/dev/null
+printf 'branches\tветка-без-публикации\tfoo\tэксперимент, решено оставить\t2030-01-01\n' > "$ACCEPTED"
+out=$(run)
+check "принятая ветка скрыта" expect-absent "foo:" "$out"
+check "новая ветка того же класса видна" expect-found "bar:" "$out"
+printf 'branches\tветка-без-публикации\tfoo\tэксперимент\t2020-01-01\n' > "$ACCEPTED"
+out=$(run)
+check "истёкшее принятие показывает ветку снова" expect-found "просрочено.*branches/ветка-без-публикации/foo" "$out"
+printf 'branches\tветка-без-публикации\t*\tархивная копия, все ветки осознанно\t2030-01-01\n' > "$ACCEPTED"
+out=$(run)
+check "звёздочка скрывает весь класс" expect-absent "bar:" "$out"
+printf 'branches\tветка-без-публикации\tстарое решение\t2030-01-01\n' > "$ACCEPTED"
+out=$(run)
+check "строка старого формата ничего не скрывает" expect-found "foo:" "$out"
+check "строка старого формата просит миграции" expect-found "старый-формат" "$out"
+
+echo "8b. Отложенные правки — по одной на запись"
+mkrepo "$ROOT/repos/stashed" "https://example.com/stashed.git"
+commit_in "$ROOT/repos/stashed" "начало"
+echo "правка 1" > "$ROOT/repos/stashed/content.txt"
+git -C "$ROOT/repos/stashed" stash -q
+first=$(git -C "$ROOT/repos/stashed" rev-parse "stash@{0}" | cut -c1-12)
+printf 'stashed\tstash\t%s\tпроверено\t2030-01-01\n' "$first" > "$ACCEPTED"
+out=$(run)
+check "принятая отложенная правка скрыта" expect-absent "$first" "$out"
+echo "правка 2" > "$ROOT/repos/stashed/content.txt"
+git -C "$ROOT/repos/stashed" stash -q
+out=$(run)
+check "новая отложенная правка видна" expect-found "stash@{0}" "$out"
+check "принятая не всплыла из-за сдвига номера" expect-absent "$first" "$out"
+
+echo "8c. Данные внутри неотслеживаемых и игнорируемых папок"
+mkrepo "$ROOT/repos/datadirs" "https://example.com/datadirs.git"
+printf 'data/\n*.sql\n' > "$ROOT/repos/datadirs/.gitignore"
+git -C "$ROOT/repos/datadirs" add .gitignore
+commit_in "$ROOT/repos/datadirs" "начало"
+mkdir -p "$ROOT/repos/datadirs/exports" "$ROOT/repos/datadirs/data" "$ROOT/repos/datadirs/data2" \
+  "$ROOT/repos/datadirs/node_modules/pkg" "$ROOT/repos/datadirs/_backups/2026"
+touch "$ROOT/repos/datadirs/exports/db.dump" "$ROOT/repos/datadirs/data/a.sql" \
+  "$ROOT/repos/datadirs/data2/b.sql" "$ROOT/repos/datadirs/node_modules/pkg/seed.sql" \
+  "$ROOT/repos/datadirs/_backups/one" "$ROOT/repos/datadirs/_backups/2026/two"
+: > "$ACCEPTED"
+out=$(run)
+check "файл в неотслеживаемой папке виден" expect-found "exports/db.dump" "$out"
+check "файл в игнорируемой папке виден" expect-found "data/a.sql" "$out"
+check "игнорируемый по маске файл виден" expect-found "data2/b.sql" "$out"
+check "папка зависимостей не обходится в быстром режиме" expect-absent "node_modules/pkg/seed.sql" "$out"
+n=$(printf '%s' "$out" | grep -c "_backups/" || true)
+[ "$n" -eq 1 ] && pass "папка _backups — одна находка" || fail "находок _backups: $n (ожидалась 1)"
+out=$(run --deep)
+check "глубокий режим заходит в папку зависимостей" expect-found "node_modules/pkg/seed.sql" "$out"
+check "глубокий режим видит то же, что быстрый" expect-found "data/a.sql" "$out"
+
+echo "8d. Отслеживаемый файл с маской данных — не находка"
+mkrepo "$ROOT/repos/tracked" "https://example.com/tracked.git"
+echo "create table t();" > "$ROOT/repos/tracked/schema.sql"
+git -C "$ROOT/repos/tracked" add schema.sql
+commit_in "$ROOT/repos/tracked" "начало"
+echo "alter table t;" >> "$ROOT/repos/tracked/schema.sql"
+out=$(run)
+check "изменённый отслеживаемый файл не считается данными вне git" expect-absent "schema.sql" "$out"
+
+echo "8e. Машинные находки принимаются поштучно"
+printf '(машина)\tдубль-рабочей-копии\tgithub.com/acme/proj: proj-https, proj-ssh\tобе нужны\t2030-01-01\n(архивы)\tпросроченный-архив\texpired-iso\tудалю в декабре\t2030-01-01\n' > "$ACCEPTED"
+out=$(run)
+check "принятый дубль скрыт" expect-absent "github.com/acme/proj:" "$out"
+check "другой дубль виден" expect-found "github.com/acme/other:" "$out"
+check "принятый архив скрыт" expect-absent "expired-iso:" "$out"
+check "другой архив виден" expect-found "bad-format:" "$out"
+mkrepo "$ROOT/repos/proj-third" "https://github.com/acme/proj"
+out=$(run)
+check "третья копия возвращает дубль" expect-found "github.com/acme/proj: proj-https, proj-ssh, proj-third" "$out"
+rm -rf "$ROOT/repos/proj-third"
+out=$(run --json)
+if printf '%s' "$out" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert all("item" in i for i in d["items"]) and d["items"]' 2>/dev/null; then
+  pass "в машинном выводе у каждой находки есть «что»"
+else
+  fail "в машинном выводе нет поля item"
+fi
 
 echo "9. Поставляемый файл принятых решений — только шапка"
 cp "$SEED_ACCEPTED" "$ACCEPTED"
