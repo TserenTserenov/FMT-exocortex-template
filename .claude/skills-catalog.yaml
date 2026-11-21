@@ -2,7 +2,7 @@
 # see DP.SC.153
 # НЕ редактировать вручную — перегенерировать через generate-skills-catalog.sh
 #
-generated: 2026-11-21T11:05:24Z
+generated: 2026-11-21T16:05:06Z
 skills_dir: .claude/skills
 
 skills:
@@ -100,7 +100,6 @@ skills:
         - /author-mode
     depends_on: []
     invoked_by:
-    - CLAUDE.md
     - author-mode
   - id: bottleneck-pick
     name: "bottleneck-pick"
@@ -163,7 +162,7 @@ skills:
   - id: day-open
     name: "day-open"
     description: "Day Open protocol. Collects yesterday's commits, issues, notes, calendar, bot QA, Scout, world events — builds DayPlan and compact dashboard."
-    version: 1.1.0
+    version: 1.2.0
     layer: L1
     status: active
     triggers:
@@ -413,6 +412,7 @@ skills:
         - /onboarding
     depends_on: []
     invoked_by:
+    - CLAUDE.md
     - diagnose
     - onboarding
   - id: org-dev
@@ -720,6 +720,7 @@ skills:
         - /wp-new
     depends_on: []
     invoked_by:
+    - CLAUDE.md
     - strategy-session
     - artifactor
     - wp-new

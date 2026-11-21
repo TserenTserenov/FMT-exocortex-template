@@ -2,7 +2,7 @@
 name: day-open
 description: "Day Open protocol. Collects yesterday's commits, issues, notes, calendar, bot QA, Scout, world events — builds DayPlan and compact dashboard."
 argument-hint: ""
-version: 1.1.0
+version: 1.2.0
 layer: L1
 status: active
 browser_safe: false
@@ -138,6 +138,18 @@ fi
 Строки, которые напечатал генератор (статусы платформы, задачи, Scout), не переписывать своими словами. По `templates.md` дописываются только содержательные разделы: план дня, разбор заметок, «Требует внимания». Если наборы секций скелета и `templates.md` расходятся, основой остаётся скелет. Предыдущий DayPlan → `archive/day-plans/`.
 **7a2.** Session Log: `<governance-repo>/sessions/YYYY-MM-DD.md`. Если существует — не перезаписывать.
 <!-- Шаблон Session Log: day-open-details.md § Шаг 7a2 -->
+**7a3.** Сверка таблицы плана дня с планом недели (выпуск 0.43). Запускать после того, как таблица «План на сегодня» дописана, и до шага 7b. Программа сама пересобирает таблицу: дела из приоритетов дня и вчерашнего переноса получают часы и пометки из плана недели; обязательные ежедневные РП остаются как есть; остальные строки остаются с пометкой «вне плана недели» или «не в приоритетах дня»; расхождения записываются строкой в «Требует внимания», а сбой — красной строкой в «🚨 Срочное». Таблицу после неё руками не переписывать, вывод программы не пересказывать:
+```bash
+GOV="<governance-repo>"
+PY=$("${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" 2>/dev/null) || PY=python3
+WEEKPLAN=$(ls -t "$GOV"/current/WeekPlan\ *.md 2>/dev/null | grep -v '(probe)' | head -1)
+SCOPE=$("$PY" "${IWE_SCRIPTS:-$HOME/IWE/scripts}/day-open-week-sync-patch.py" \
+  --dayplan "$DAYPLAN" --priorities "$GOV/current/priorities.yaml" --weekplan "$WEEKPLAN" \
+  --inbox "$GOV/inbox" --day-rhythm-config "${IWE_ROOT:-$HOME/IWE}/memory/day-rhythm-config.yaml") || true
+case "$SCOPE" in *hours-scope=week*) HOURS_SCOPE=week ;; *) HOURS_SCOPE=day ;; esac
+"$PY" "${IWE_SCRIPTS:-$HOME/IWE/scripts}/day-open-budget-patch.py" --dayplan "$DAYPLAN" \
+  --priorities "$GOV/current/priorities.yaml" --hours-scope "$HOURS_SCOPE" || true
+```
 **7b.** `bash .claude/scripts/load-extensions.sh day-open checks` → Exit 0: выполнить верификацию. БЛОКИРУЮЩЕЕ: commit запрещён до прохождения всех checks.
 **7c.** `git commit` + `git push`.
 **7d.** Compact dashboard → вывести в VS Code по шаблону «Шаблон compact dashboard» из `templates.md`.
