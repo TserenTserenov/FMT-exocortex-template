@@ -48,6 +48,10 @@
 #     entities decoded), as it sends plain text.
 #   - Direct send: through TELEGRAM_PROXY (else ALL_PROXY) when set, and only
 #     a reply with "ok":true counts as sent (a 200 with ok:false is failed).
+#   - --direct: no gateway lookup at all, one direct send (reason
+#     direct-requested in direct-send-log.tsv). For a sender whose message is
+#     about the governance repo itself being stale or stuck: that repo's
+#     gateway and sender list must not decide whether the user hears about it.
 #   - --reply-markup <json>: inline buttons. The gateway cannot carry them,
 #     so with a gateway the text goes through it WITHOUT buttons (its verdict
 #     stays final, quarantine included); only without a gateway the single
@@ -67,6 +71,7 @@ die_usage() { echo "iwe-notify: $1" >&2; exit 1; }
 source_id=""
 reply_markup=""
 html=0
+direct=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --source)
@@ -74,6 +79,7 @@ while [ $# -gt 0 ]; do
       source_id="$2"; shift 2 ;;
     --source=*) source_id="${1#--source=}"; shift ;;
     --html) html=1; shift ;;
+    --direct) direct=1; shift ;;
     --reply-markup)
       [ -n "${2:-}" ] || die_usage "--reply-markup requires a value"
       reply_markup="$2"; shift 2 ;;
@@ -159,6 +165,10 @@ send_direct() {
   [ "$outcome" = sent ]
 }
 
+if [ "$direct" -eq 1 ]; then
+  send_direct "direct-requested"
+  exit $?
+fi
 gateway="$(find_gateway)" || { send_direct "no-gateway"; exit $?; }
 if [ ! -x "$gateway" ]; then
   send_direct "gateway-not-executable"

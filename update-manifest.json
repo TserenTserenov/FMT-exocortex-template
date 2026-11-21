@@ -501,7 +501,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "f8c5466b6a24c84cd947295ac7c7d9e3a5e6d4646dd86f926d87d2478d6a8dd3"
+      "sha256": "135ace0ae8158c6400e4fc7ab69c30ba01a981dad322bdc6f13f676dff715795"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "34db32757d9b6f9533316b211bc681f65062372b717324ead92bac3f872bef91"
+      "sha256": "b53a2dd08fead1d272a2346f792d0cc5bb8887a87837df8d59c4864525492685"
     },
     {
       "path": "CLAUDE.md",
@@ -2452,6 +2452,10 @@
       "sha256": "8467c60856b3ee1c1d688757f418fc0049fa394451241631813be213254a53ff"
     },
     {
+      "path": "scripts/concept-kind.py",
+      "sha256": "293786adb3a9c46260917b98e387a44162fc7de80008e8f8646d8959e649e958"
+    },
+    {
       "path": "scripts/config/pipeline-security-whitelist.yaml",
       "sha256": "f9be277aa1602fd50d014f33d98e362e2bc2c774a4f9b161bebf0c6098e83573"
     },
@@ -2477,7 +2481,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "1e53be55f1b61c919e96202f02162eee9dd887f8139736be8b0387a387af49b7"
+      "sha256": "15dc257309a87a7a8465bdf8ff1bae1cea80c4293ac92886a2e871ecc41c08d1"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -2709,7 +2713,7 @@
     },
     {
       "path": "scripts/iwe-notify",
-      "sha256": "32044284abef78ec22b5d5ffacefada6a1ea6377a1161b3dc7f967efa36b135f"
+      "sha256": "a5caca8bea4304a6a469b28a865f9f31d499bd804764a89e1ac399c3d6dd1c15"
     },
     {
       "path": "scripts/iwe-safe-pull.sh",
@@ -2757,7 +2761,7 @@
     },
     {
       "path": "scripts/kimi-standalone-preflight.sh",
-      "sha256": "b160dc2bfd0d4ba2f3c96f892a32478d72ecc518adb5659b9f593662f3792c6e"
+      "sha256": "deffe73a1c818b2e3b69de7e32356d55ca802c76f4861cf7c6dfdd7c51c1133d"
     },
     {
       "path": "scripts/kimi-whisper-safe.sh",
@@ -3077,7 +3081,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "9d71fbe0223c3cd753d0cc55bf215ca18f141ea33f4201bc71f7883cbf46a18e"
+      "sha256": "e46fbd6e75d7d8b55c6d15ffbd4f9dd4fa15fbe8b617c46f537a72175e27c7d3"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3361,11 +3365,11 @@
     },
     {
       "path": "seed/strategy/.githooks/pre-commit",
-      "sha256": "6c54749ea157afa4f041e6ae0d726fbfc74e7040ee2e1657e0f1ab64fb727d62"
+      "sha256": "ad0d8f6d6c92d4113a0d1c69040d8ecde0924bd0f938c146218f0c0826548ffe"
     },
     {
       "path": "seed/strategy/.githooks/pre-push",
-      "sha256": "d2fc416595518b4bf1d3989308a66090f9c2a984530388114244e5d3b6ca7c5f"
+      "sha256": "3323f5971c920c13b03ffed8484b06b96c0be196139a22d8c5098fc472ac4367"
     },
     {
       "path": "seed/strategy/exocortex/agent-fault-profile/.gitignore",
@@ -3748,6 +3752,7 @@
     "scripts/tests/test_issue_1555.sh",
     "scripts/tests/test_issue_1558.sh",
     "scripts/tests/test_issue_1577_1578_isolate_root.sh",
+    "scripts/tests/test_issue_1606_name_registry.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
@@ -3837,6 +3842,8 @@
     "scripts/tests/test_issue_wp516_verify_skill.py",
     "scripts/tests/test_issues_919_920_929_day_open.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
+    "scripts/tests/test_iwe_notify_direct.sh",
+    "scripts/tests/test_kimi_standalone_preflight.sh",
     "scripts/tests/test_light_onboarding_state.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_memory_bleed_age_batch.sh",
