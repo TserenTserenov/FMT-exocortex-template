@@ -749,7 +749,7 @@
     },
     {
       "path": ".claude/skills/pack-subscribe/SKILL.md",
-      "sha256": "6e59fe6f00adaf15044960ba6b76eb7b4666c58c5279561c37adfb7c120597d3"
+      "sha256": "64c0a3de8d969d085f4b3141ac5b5660b051259a3519e82cb8c97ed08d44be91"
     },
     {
       "path": ".claude/skills/pack-subscribe/catalog.py",

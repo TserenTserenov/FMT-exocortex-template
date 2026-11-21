@@ -73,11 +73,15 @@ gates_rationale: "операционный скилл; подключает чу
 W="${IWE_WORKSPACE:-$HOME/IWE}"
 SKILL="$W/.claude/skills/pack-subscribe"
 EXT="$W/extensions/protocol-open.after.pack-subscriptions.md"
+# catalog.py needs PyYAML; the resolver finds a python3 that has it.
+PY3="$(bash "$W/.claude/lib/find-python3.sh")" || { echo "нет python3 с PyYAML — см. сообщение выше" >&2; }
 ```
+
+Если резолвер отказал — сказать пользователю его сообщение (как установить зависимость) и СТОП.
 
 ### 1. Каталог и витрина
 
-Каталог собирает один разборщик: `python3 "$SKILL/catalog.py" list --workspace "$W"`.
+Каталог собирает один разборщик: `"$PY3" "$SKILL/catalog.py" list --workspace "$W"`.
 Источники по убыванию приоритета (запись с тем же именем из более высокого источника заменяет
 нижнюю):
 
@@ -88,14 +92,14 @@ EXT="$W/extensions/protocol-open.after.pack-subscriptions.md"
 Записи с `offered: internal-only` в витрину не попадают никогда — даже если такая строка пришла из
 чужого каталога пользователя. Записи с ошибками схемы (нет полей, адрес не `https://`, имя не
 `PACK-…`) разборщик пропускает и пишет причину; проверить свой каталог целиком:
-`python3 "$SKILL/catalog.py" validate <файл>`.
+`"$PY3" "$SKILL/catalog.py" validate <файл>`.
 
 Без аргумента → показать витрину таблицей: имя, область, описание, доступ (`open` — открыт всем,
 `by-subscription` — нужно право чтения от автора), для кого, подключён ли уже. СТОП — ждать выбора.
 
 ### 2. Проверка перед подключением
 
-`python3 "$SKILL/catalog.py" show <имя> --workspace "$W"` — код выхода решает:
+`"$PY3" "$SKILL/catalog.py" show <имя> --workspace "$W"` — код выхода решает:
 
 - **3** — запись помечена `internal-only` → **«<имя> не выдаётся по подписке (внутренний пак)»**,
   СТОП. Явный запрос по точному имени это не обходит.
