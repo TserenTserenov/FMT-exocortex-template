@@ -25,6 +25,10 @@ Refs: WP-NNN
 
 ### Added
 
+- [behavior] (#1644) Раздача независимых подзадач нескольким ИИ-агентам одновременно: навык `/peer-fanout` (пробная версия 0.1.0) и программа `scripts/peer-fanout.sh`. Подзадачи пишутся строками `id<TAB>агент<TAB>текст`, все уходят агентам сразу, ответы ложатся в `out/<id>.md`, в конце печатается общая сводка `ok=N total=M`. Всем подзадачам можно назначить `claude`, отдельные Kimi или Codex не нужны. Каждая подзадача — отдельный вызов агента и тратит токены подписки; навык предупреждает об этом до запуска. Только схема раздачи; конвейер, надзиратель и рой — в 0.44. **В выпуск 0.43 входит только после живого прогона не автором шаблона на чистой установке 0.43** (`docs/PEER-FANOUT-LIVE-CHECK.md`); без такого прогона переносится в 0.44.
+  - Цель: 82 · Результат: Ц82-07
+  - Как проверить: `bash scripts/tests/peer-fanout-smoke.sh` проходит (21 проверка на заглушках агентов); живой прогон по `docs/PEER-FANOUT-LIVE-CHECK.md` даёт `exit=0`, `ok=3 total=3`, три непустых ответа, `wall_s` меньше суммы `elapsed_s`
+  - Как откатить: git revert слияния #1644; навык и программа исчезнут, остальные пир-сессии работают как раньше
 - [optional] `scripts/fetch-glossary-concepts.py`: the glossary exporter reaches the knowledge graph through the platform gateway as a registered machine client (token in `GLOSSARY_EXPORTER_MACHINE_TOKEN`), no longer through the knowledge worker's public address (#1639).
   - Цель: 84 · Результат: служебное — выгрузка терминов ходит через общий вход платформы, где действуют проверка доступа и суточный предел; снимок терминов прежний
   - Как проверить: python3 -m pytest scripts/tests -k glossary
