@@ -331,8 +331,8 @@ skills:
     - pack-creator
   - id: kimi-peer-writer
     name: "kimi-peer-writer"
-    description: "Peer-сессия DP.SC.154 где Kimi = писатель, Claude = напарник. Запускается простой фразой. Включает ОРЗ Opening и Closing, turn-loop, эскалации, Decision Gate (зафиксировать vs реализовать → ревью → проверить → задеплоить), отложенную финализацию и верификацию."
-    version: 1.3.0
+    description: "Peer-сессия DP.SC.154 где Kimi = писатель, напарник — параметр `--peer` (default Claude). Запускается простой фразой. Включает ОРЗ Opening и Closing, turn-loop, эскалации, Decision Gate (зафиксировать vs реализовать → ревью → проверить → задеплоить), отложенную финализацию и верификацию."
+    version: 1.4.2
     layer: L1
     status: active
     triggers:
@@ -411,7 +411,7 @@ skills:
   - id: peer-conversation
     name: "peer-conversation"
     description: "Многотуровый диалог писателя (Claude) с одним или несколькими напарниками (любой набор из kimi/codex/hermes/claude-headless) по задаче пилота (DP.SC.154). Ведёт turn-loop (2 участника) или round-loop (3+, WP-509), обнаруживает CONSENSUS/ESCALATE, после консенсуса — Decision Gate (зафиксировать vs реализовать → ревью → проверить → задеплоить), синтезирует report.md через Agent tool."
-    version: 1.5.5
+    version: 1.8.0
     layer: L1
     status: active
     triggers:

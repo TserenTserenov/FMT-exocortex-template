@@ -501,7 +501,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "133052a8c6d00e47fd8e7388b5353a8071344fbb4482395ddb0c686c57d005da"
+      "sha256": "f8c5466b6a24c84cd947295ac7c7d9e3a5e6d4646dd86f926d87d2478d6a8dd3"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -709,7 +709,7 @@
     },
     {
       "path": ".claude/skills/kimi-peer-writer/SKILL.md",
-      "sha256": "4b51700b52bcecd3370c99028298044e514883b7e992d4d2f1406d72892b72dd"
+      "sha256": "3cc81db38115def3dd9cac3c3635a3f40ec0c67b6845cbdddaf2108dbab67cce"
     },
     {
       "path": ".claude/skills/local-llm/SKILL.md",
@@ -749,7 +749,7 @@
     },
     {
       "path": ".claude/skills/peer-conversation/SKILL.md",
-      "sha256": "4840e2aea19989687df314e049cd0dcd67bc6efb8af997d9481f7d4015899251"
+      "sha256": "bf1a419231b854e190fc72479511bd0f3c93786eb61f926ac3d8528b22bd8b47"
     },
     {
       "path": ".claude/skills/personal-guide-render/SKILL.md",
@@ -961,7 +961,7 @@
     },
     {
       "path": ".github/workflows/notify-security.yml",
-      "sha256": "70c71202c50426dad69190818fd8744b14c9dfbbdf9d913d3f2b803ec028cf55"
+      "sha256": "b195e6a69b005acd307c23096b664f91d3f1bbaf9ec78d31f3dd395eec24e4bd"
     },
     {
       "path": ".github/workflows/notify-update.yml",
@@ -973,7 +973,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "9d8c199e2465982ebd5646d7a4f0c75e6ef96d307f8ab7edd529ae364f00cd0c"
+      "sha256": "077b2642d5479cf608cceffcd04c90c8c4cfdc1ddd3284fb9e9640a56753b36f"
     },
     {
       "path": ".gitignore",
@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "8dc489169a23fdeae45c7095d1739c1a0fcca1b91232a2708e9624f5532977b9"
+      "sha256": "34db32757d9b6f9533316b211bc681f65062372b717324ead92bac3f872bef91"
     },
     {
       "path": "CLAUDE.md",
@@ -2948,6 +2948,10 @@
       "sha256": "24842638ea5952d2e30ef68cf468c83b3a39ae41f77136a2db24f1fdbb5126f4"
     },
     {
+      "path": "scripts/security-notice-build.py",
+      "sha256": "cc127ab08893468afbdb2822ac937f498cdf8814a7908d962bd450080dc52c36"
+    },
+    {
       "path": "scripts/server-calendar.sh",
       "sha256": "59bd57f22d32553205a34fbc414854b97cea28943f8a4ac4da1db2b253140ccf"
     },
@@ -3844,6 +3848,7 @@
     "scripts/tests/test_release_notice_build.py",
     "scripts/tests/test_release_receipt.sh",
     "scripts/tests/test_residency_gate_skill_adapter.py",
+    "scripts/tests/test_security_notice_build.py",
     "scripts/tests/test_session_guard_gitbash.sh",
     "scripts/tests/test_session_guard_open_log_path.sh",
     "scripts/tests/test_session_guard_unknown_flag.sh",
