@@ -25,6 +25,10 @@ Refs: WP-NNN
 
 ### Added
 
+- [optional] `scripts/fetch-glossary-concepts.py`: the glossary exporter reaches the knowledge graph through the platform gateway as a registered machine client (token in `GLOSSARY_EXPORTER_MACHINE_TOKEN`), no longer through the knowledge worker's public address (#1639).
+  - Цель: 84 · Результат: служебное — выгрузка терминов ходит через общий вход платформы, где действуют проверка доступа и суточный предел; снимок терминов прежний
+  - Как проверить: python3 -m pytest scripts/tests -k glossary
+  - Как откатить: вернуть коммит слияния #1639 (git revert); старый сервисный секрет `GLOSSARY_EXPORTER_SERVICE_SECRET` остаётся в репозитории и в сервисе знаний до отдельной очистки
 - [optional] `scripts/iwe-notify --direct`: one direct send to Telegram without looking up the notification gateway at all (row `direct-requested` in `direct-send-log.tsv`, outcome `direct-sent` / `direct-failed` / `not-sent`). For a sender whose message is about the governance repository itself being stale or stuck, so that repository's gateway and sender list cannot decide whether the message arrives. Without the flag nothing changes. Test: `scripts/tests/test_iwe_notify_direct.sh`. (#1630)
   - Цель: 84 · Результат: служебное — уведомление о зависшем или отставшем хранилище стратегии уходит в Telegram напрямую, не через шлюз этого хранилища; без флага поведение прежнее
   - Как проверить: bash scripts/tests/test_iwe_notify_direct.sh

@@ -202,6 +202,7 @@ GRAPH_MARKERS = (
     "knowledge-mcp",
     "GLOSSARY_LIVE_LOOKUP",
     "GLOSSARY_EXPORTER_SERVICE_SECRET",
+    "GLOSSARY_EXPORTER_MACHINE_TOKEN",
     "X-IWE-Service-Auth",
     "fetch-glossary-concepts",
     "glossary_supplier",
