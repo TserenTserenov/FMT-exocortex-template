@@ -501,7 +501,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "133052a8c6d00e47fd8e7388b5353a8071344fbb4482395ddb0c686c57d005da"
+      "sha256": "f8c5466b6a24c84cd947295ac7c7d9e3a5e6d4646dd86f926d87d2478d6a8dd3"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -709,7 +709,7 @@
     },
     {
       "path": ".claude/skills/kimi-peer-writer/SKILL.md",
-      "sha256": "4b51700b52bcecd3370c99028298044e514883b7e992d4d2f1406d72892b72dd"
+      "sha256": "3cc81db38115def3dd9cac3c3635a3f40ec0c67b6845cbdddaf2108dbab67cce"
     },
     {
       "path": ".claude/skills/local-llm/SKILL.md",
@@ -749,7 +749,7 @@
     },
     {
       "path": ".claude/skills/peer-conversation/SKILL.md",
-      "sha256": "4840e2aea19989687df314e049cd0dcd67bc6efb8af997d9481f7d4015899251"
+      "sha256": "bf1a419231b854e190fc72479511bd0f3c93786eb61f926ac3d8528b22bd8b47"
     },
     {
       "path": ".claude/skills/personal-guide-render/SKILL.md",
@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "beff876ffd8ee2c8d8f20dc208d9c12fdfbbbb82bd5468b54a931d9065a59e33"
+      "sha256": "bbf400aedcae305cc6f5f0074318cf7871e94564587476d4797b34ab577746f6"
     },
     {
       "path": "CLAUDE.md",
