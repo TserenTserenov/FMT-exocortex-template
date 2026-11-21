@@ -5,6 +5,9 @@ description: |
 version: 0.6.0
 status: experimental
 layer: L3
+routing:
+  executor: sonnet
+  deterministic: false
 agents: single
 interaction: multi-step
 gates_required: []
