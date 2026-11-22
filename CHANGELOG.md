@@ -23,6 +23,13 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+### Fixed
+
+- [behavior] Translation reports match local glossary entries as whole terms in Markdown. The glossary supplies *Ceiling* for «Тупик» when it names the second practitioner state (#1645).
+  - Цель: 93 · Результат: Ц93-01, Ц93-05
+  - Как проверить: `python3 -m pytest scripts/tests/test_translate_unapproved_report.py scripts/tests/test_glossary_source.py -q`
+  - Как откатить: вернуть коммит слияния #1645 через `git revert`.
+
 ### Added
 
 - [optional] `scripts/fetch-glossary-concepts.py`: the glossary exporter reaches the knowledge graph through the platform gateway as a registered machine client (token in `GLOSSARY_EXPORTER_MACHINE_TOKEN`), no longer through the knowledge worker's public address (#1639).
