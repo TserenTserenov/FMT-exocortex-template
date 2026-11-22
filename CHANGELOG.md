@@ -36,7 +36,12 @@ Refs: WP-NNN
 
 ### Changed
 
-- [behavior] English installation scripts keep their executable bits when the translated tree is published. (#1649)
+- [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены .claude/skills/mentor-participant-brief/SKILL.md (#1650).
+  - Цель: 77 · Результат: служебное — доставка авторского источника в шаблон; пользователь получает эти файлы при следующем обновлении
+  - Как проверить: git show --stat слияния #1650 перечисляет названные файлы, CHANGELOG.md и манифест обновления
+  - Как откатить: git revert слияния #1650
+
+- [behavior] English installation scripts keep their executable bits when the translated tree is published. Full assembly preserves the Git metadata used to publish the draft. (#1649)
   - Цель: 93 · Результат: Ц93-06
   - Как проверить: pytest scripts/tests/test_assemble_distribution.py
   - Как откатить: вернуть изменение конвейера публикации из #1649.

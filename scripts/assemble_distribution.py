@@ -37,7 +37,7 @@ GENERATED = (
     "CONTRIBUTING.md", "CHANGELOG.md", "update-manifest.json",
     ".github/ISSUE_TEMPLATE/", ".github/PULL_REQUEST_TEMPLATE.md",
     ".github/workflows/no-cyrillic-gate.yml", "docs/assets/orz-cycle.svg",
-    ".translation-state.yaml", "badge-data.json", ".git/",
+    ".translation-state.yaml", "badge-data.json",
 )
 # Pipeline state kept on en-draft but never published (publish-to-iwesys
 # untracks it). Since WP-620 F4 the translation state carries Russian source
@@ -111,6 +111,17 @@ def sync_staged_modes(source: Path, output: Path) -> int:
     return len(updates)
 
 
+def distribution_files(directory: Path):
+    """Walk the distribution without reading Git's directory or worktree pointer."""
+    for path in directory.iterdir():
+        if path.name == ".git":
+            continue
+        if path.is_symlink() or path.is_file():
+            yield path
+        elif path.is_dir():
+            yield from distribution_files(path)
+
+
 def assemble(source: Path, output: Path, write: bool = True) -> dict[str, list[str]]:
     wanted = distribution_set(source)
     patterns = adapted_patterns(source)
@@ -125,15 +136,14 @@ def assemble(source: Path, output: Path, write: bool = True) -> dict[str, list[s
             target = output / path
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source / path, target)
-    for existing in sorted(p for p in output.rglob("*") if p.is_file() or p.is_symlink()):
+    for existing in sorted(distribution_files(output)):
         relative = existing.relative_to(output).as_posix()
         if relative not in wanted and not is_generated(relative):
             report["removed"].append(relative)
             if write:
                 existing.unlink()
-    for existing in sorted(p for p in output.rglob("*") if p.is_file() and ".git/" not in p.as_posix()):
-        relative = existing.relative_to(output).as_posix()
-        if relative in PIPELINE_STATE:
+                continue
+        if relative in PIPELINE_STATE or not existing.is_file():
             continue
         if CYRILLIC.search(relative) or has_cyrillic(existing):
             report["cyrillic"].append(relative)

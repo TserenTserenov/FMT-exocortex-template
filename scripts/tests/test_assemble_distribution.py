@@ -111,6 +111,29 @@ def test_check_mode_writes_nothing(tmp_path):
     assert list(out.iterdir()) == []
 
 
+def test_assembly_preserves_checkout_and_linked_worktree(tmp_path):
+    src = make_source(tmp_path / "src", {"scripts/helper.sh": "echo hello"}, ["scripts/helper.sh"])
+    repo = tmp_path / "repo"
+    linked = tmp_path / "linked"
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.org",
+                    "commit", "--no-gpg-sign", "--allow-empty", "-qm", "source"], cwd=repo, check=True)
+    subprocess.run(["git", "worktree", "add", "--detach", "-q", str(linked)], cwd=repo, check=True)
+
+    for output in (repo, linked):
+        (output / "stale.txt").write_text("old", encoding="utf-8")
+        head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=output)
+        for write in (False, True):
+            report = ad.assemble(src, output, write=write)
+            assert report["removed"] == ["stale.txt"]
+            assert report["cyrillic"] == []
+            assert subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=output) == head
+        assert not (output / "stale.txt").exists()
+        assert (output / "scripts/helper.sh").read_text(encoding="utf-8") == "echo hello"
+        subprocess.run(["git", "add", "--", "scripts/helper.sh"], cwd=output, check=True)
+        assert subprocess.check_output(["git", "show", ":scripts/helper.sh"], cwd=output) == b"echo hello"
+
+
 def test_adapted_files_are_not_copied_from_source(tmp_path):
     src = make_source(
         tmp_path / "src",
