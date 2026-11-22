@@ -119,7 +119,9 @@ skills_dir_yaml() {
 # A trailing CR is ignored, so a file converted to CRLF is still recognised.
 managed_block_installed() {
     DSH_MARKER="$MARKER" DSH_WANT="      - $1" awk '
-        BEGIN { marker = ENVIRON["DSH_MARKER"]; want = ENVIRON["DSH_WANT"] }
+        # 0.42.1 stored "--workspace /x/ws/" as "/x/ws//.claude/skills".
+        function squash(s) { gsub(/\/\/+/, "/", s); return s }
+        BEGIN { marker = ENVIRON["DSH_MARKER"]; want = squash(ENVIRON["DSH_WANT"]) }
         function close_block() {
             if (inblk && first_ok && has_path) ok = 1
             inblk = 0; inlist = 0
@@ -140,7 +142,7 @@ managed_block_installed() {
         /^[^ #]/ { close_block(); next }
         entries != 1 { next }
         /^    customSkillDirs:[ \t]*$/ { inlist = 1; next }
-        inlist && /^      - / { if ($0 == want) has_path = 1; next }
+        inlist && /^      - / { if (squash($0) == want) has_path = 1; next }
         inlist && !/^[ \t]*(#.*)?$/ { inlist = 0 }
         END { close_block(); print (ok ? "yes" : "no") }
     ' "$PATCH_FILE"

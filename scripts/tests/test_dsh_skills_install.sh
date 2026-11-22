@@ -314,13 +314,23 @@ second_run_connected "косая черта в конце" "$WS" "$DSH" "$WS/"
 grep -qF -- "$WS//" "$DSH/cordis.patch.yml" \
     && bad "косая черта в конце: в пути двойная косая" || ok "косая черта в конце: путь записан без двойной косой"
 
+# A 0.42.1 install with --workspace "/x/ws/" stored "/x/ws//.claude/skills":
+# the stripped path must still match that entry.
+WS="$WORK/ws16b"
+mk_workspace "$WS"
+DSH="$WORK/dsh16b"
+mk_dsh "$DSH" web
+printf '# IWE skills bridge: test\n- id: skill-filesystem\n  config:\n    customSkillDirs:\n      - "%s//.claude/skills"\n' "$WS" \
+    > "$DSH/cordis.patch.yml"
+second_run_connected "запись 0.42.1 с двойной косой" "$WS" "$DSH" "$WS/"
+
 # --- 17. File converted to CRLF after install --------------------------------
 WS="$WORK/ws17"
 mk_workspace "$WS"
 DSH="$WORK/dsh17"
 mk_dsh "$DSH" web
 bash "$SCRIPT" --workspace "$WS" --dsh-home "$DSH" >/dev/null 2>&1
-sed 's/$/\r/' "$DSH/cordis.patch.yml" > "$DSH/crlf" && mv "$DSH/crlf" "$DSH/cordis.patch.yml"
+awk '{ printf "%s\r\n", $0 }' "$DSH/cordis.patch.yml" > "$DSH/crlf" && mv "$DSH/crlf" "$DSH/cordis.patch.yml"
 second_run_connected "файл с CRLF" "$WS" "$DSH"
 
 # --- 18. Marker phrase on an indented line inside our block ------------------
