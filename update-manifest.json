@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2caa08b37bab24088c36e33c72c2fb7a3d35fc1c3e6f16a0721947017ff44d36"
+      "sha256": "571c04696230eabd0c5eef99bf6423d85b14bf338b26e2a9a4dd0d37fab1bfa0"
     },
     {
       "path": "CLAUDE.md",
@@ -2121,7 +2121,7 @@
     },
     {
       "path": "roles/strategist/scripts/fetch-wakatime.sh",
-      "sha256": "c92121387e82cc5a81b4032f39efa33c9c394c2c53fc154740115deaa15a1df4"
+      "sha256": "c15d43020f7859beffb9a600c273b0e5d43cb20bb8a841bac20c8e73a37f9416"
     },
     {
       "path": "roles/strategist/scripts/launchd/com.strategist.morning.plist",
@@ -2189,7 +2189,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/dt-collect.sh",
-      "sha256": "eaa45ee5b3d31fb0fc3fb68e489ab90c0809c37e14dff950182a0818a2a69297"
+      "sha256": "47cee0fa353ba8d8ba01dcf5e7b88c883b6875b71bf716baee5556fe7eb3da8b"
     },
     {
       "path": "roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist",
@@ -2525,7 +2525,7 @@
     },
     {
       "path": "scripts/day-open-multiplier-backfill-patch.py",
-      "sha256": "6390ffb5bb4f4d6aa5cf524589248ac6c5a428268412e652d1a96a87ac4b2309"
+      "sha256": "c1c74143651a73d5d732f076eda68465e762b337ba50104a3f8fa48cb23208a5"
     },
     {
       "path": "scripts/day-open-pipeline.sh",
@@ -3417,7 +3417,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-multiplier-backfill-patch.py",
-      "sha256": "4a9047131b34c7277f22217c5997e4826b96c3059393c4806873e71e534a8dcb"
+      "sha256": "42434ee82b1a7f74c52807dcc08124f6379ae98f6af6bbe338823e7b2ab63701"
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",

@@ -196,3 +196,18 @@ def test_invalid_status_bar_total_precedes_empty_date(monkeypatch, capsys, secon
     code, out, _ = run(monkeypatch, capsys, fake, today)
     assert code == 3
     assert out == f"(no WakaTime status_bar total for {today})"
+
+
+# Issue #1631: every program that calls the WakaTime API, not only this script,
+# must use the API host; corporate networks may block wakatime.com itself.
+def test_no_executable_file_calls_the_site_host_api():
+    repo = Path(__file__).resolve().parents[2]
+    offenders = [
+        str(path.relative_to(repo))
+        for pattern in ("*.py", "*.sh")
+        for path in repo.rglob(pattern)
+        if ".git" not in path.parts
+        and "tests" not in path.parts
+        and "https://wakatime.com/api/" in path.read_text(encoding="utf-8", errors="replace")
+    ]
+    assert offenders == []
