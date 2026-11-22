@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "1d486b524db94048318c293e83c8bb1950d810fd99ba97e7f7800e0f8beee9cf"
+      "sha256": "b5c46d2975bc668276da058b933d394a2a165ced8b32a7340abddbd5915e8d6f"
     },
     {
       "path": "CLAUDE.md",
@@ -3337,7 +3337,7 @@
     },
     {
       "path": "scripts/wakatime-day-total.py",
-      "sha256": "adcafcc921cd902b1f559a9dac9746b6510b3d8cf0869eb5630e118829d530af"
+      "sha256": "e3612d272cdbfee8341c39263dd69501ff2b81741adc90e2053cece5dd4b721e"
     },
     {
       "path": "scripts/week-draft-append.sh",
