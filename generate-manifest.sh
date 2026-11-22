@@ -207,6 +207,8 @@ PLATFORM_HOOKS_EXPLICIT_INCLUDE=(
     "seed/strategy/scripts/llm-proxy-launcher.sh"
     "seed/strategy/scripts/lib/common.sh"
     "seed/strategy/scripts/lib/day-open-hooks.sh"
+    # Both installed DayPlan readers import this parser from their seed copy.
+    "seed/strategy/scripts/lib/dayplan_sections.py"
     "seed/strategy/scripts/lib/find-python3.sh"
     "seed/strategy/scripts/lib/ledger-path.sh"
     "seed/strategy/scripts/lib/ledger-publish-kick.sh"

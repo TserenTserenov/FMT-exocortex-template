@@ -373,11 +373,11 @@
     },
     {
       "path": ".claude/lib/locale/en.json",
-      "sha256": "c7a18f316bd8898eedc0a8a30b2b6bcec5629372abd43da700ef764a532157b1"
+      "sha256": "689739906457c3f8245df56782babb1e27283894d2267b15ddc3481116707fe5"
     },
     {
       "path": ".claude/lib/locale/ru.json",
-      "sha256": "c3cf753864ed1cbc562dab16179459b8c33a16d5c386c9110547e2fb53af3f2b"
+      "sha256": "6803c6728c50e88f5731c6a3bee338b50e06430af1de3f469dc6fd004460bb0d"
     },
     {
       "path": ".claude/lib/log_formatter.sh",
@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d426c0a6edc58fb36090e87f0a2be551f2090ea33aa6ffc4732e8f83ec3d003c"
+      "sha256": "b824954fa04bec7f4da4dac8efcd51624c9f47b88976f3c7bc8ee253a9e7f383"
     },
     {
       "path": "CLAUDE.md",
@@ -1365,7 +1365,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "9dbf69fc130abed992d5a3e3ac78d87217e1017e2dbda54cf5219936ab61acd2"
+      "sha256": "c4106d2d6eb6119e6844f18cf53a96a2c4f80a618ab3f2abded8a93b3bda3f1d"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2521,7 +2521,7 @@
     },
     {
       "path": "scripts/day-open-llm-fill.py",
-      "sha256": "5702f670e217e8e6475525a626604cca313ade74d4eb08c14ef19fd6fc49f1af"
+      "sha256": "b2afc88377f0164f2651d4816ef926c63ae5d712ab01386880aff90d4ff6322e"
     },
     {
       "path": "scripts/day-open-multiplier-backfill-patch.py",
@@ -2537,7 +2537,7 @@
     },
     {
       "path": "scripts/day-open-priorities-patch.py",
-      "sha256": "37f61c2cd68ff29cee97652e287e2394565560265ce963e353818e92879b91eb"
+      "sha256": "55057e05f5b4a7cfc81daaeb2c0e8e39e04cebf5cdbda1ca7fdaf01cea908cbb"
     },
     {
       "path": "scripts/day-open-scaffold.sh",
@@ -2778,6 +2778,10 @@
     {
       "path": "scripts/lib/day-open-hooks.sh",
       "sha256": "d036781319493cfe1d58f369a87d0d52756cc6c7b0cdef8b5783594fd3d09ab6"
+    },
+    {
+      "path": "scripts/lib/dayplan_sections.py",
+      "sha256": "6bdfa947ce2b233f7d252f218942bc98fe7b86f66ddf8060bef4856acd2af1eb"
     },
     {
       "path": "scripts/lib/dirty-guard-lock.sh",
@@ -3413,7 +3417,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-llm-fill.py",
-      "sha256": "b1d538707efbcb5ed040f9cfe7fc603cbfb792bd25bd3daf6f675b146c47b847"
+      "sha256": "828181fcc6924258dc2af1e164c4adba52230bf16b8c3bacde8aee2827d47f5a"
     },
     {
       "path": "seed/strategy/scripts/day-open-multiplier-backfill-patch.py",
@@ -3425,7 +3429,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
-      "sha256": "c5b59d11e34d7e33b2771d24175921d8c4d7e04b568c74abd2e4fa815c479f1f"
+      "sha256": "5c826a28ba66346e104b6c50d139aa4bd84bf685b77a17e742977a28c9054f22"
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
@@ -3470,6 +3474,10 @@
     {
       "path": "seed/strategy/scripts/lib/day-open-hooks.sh",
       "sha256": "4c1881f69c04b34810164dee70316502cf9dc76ef519fe3f35df3987af59957e"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/dayplan_sections.py",
+      "sha256": "97f76e3c6127456d1600eeb68674861c010e821a4663a530f954c7efb69ff0c1"
     },
     {
       "path": "seed/strategy/scripts/lib/find-python3.sh",

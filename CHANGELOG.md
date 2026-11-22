@@ -67,6 +67,16 @@ Refs: WP-NNN
   - Как проверить: python3 -m pytest scripts/tests/test_issue_1451_wakatime_403.py -q — 18 проверок проходят
   - Как откатить: git revert слияния #1646; вернутся прежний адрес API и неверная подсказка о часовом поясе
 
+- [behavior] Day Open recognizes the plan table and attention section from the installed language catalogs. English and Russian headings route to the same plan prompt and priority check. The updater ships the shared parser with both reader copies. (#1648)
+  - Цель: 93 · Результат: Ц93-06
+  - Как проверить: `bash scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh`
+  - Как откатить: вернуть изменение читателей и каталогов вместе.
+
+- [behavior] English installation scripts keep their executable bits when the translated tree is published. Full assembly preserves the Git metadata used to publish the draft. (#1649)
+  - Цель: 93 · Результат: Ц93-06
+  - Как проверить: pytest scripts/tests/test_assemble_distribution.py
+  - Как откатить: вернуть изменение конвейера публикации из #1649.
+
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены scripts/lib/process-identity.sh (#1638).
   - Цель: 77 · Результат: служебное — доставка авторского источника в шаблон; пользователь получает эти файлы при следующем обновлении
   - Как проверить: git show --stat слияния #1638 перечисляет названные файлы, CHANGELOG.md и манифест обновления
