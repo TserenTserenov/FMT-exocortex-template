@@ -14,6 +14,11 @@
 #      left untouched and the run says so — the user's choice wins.
 #   5. --dry-run writes nothing.
 #   6. Missing --workspace is a usage error (exit 1).
+#   7-14. Issue #1623: the marker text alone is not a bridge; our entry for another
+#      path is a conflict, not a duplicate; two installers at once give one entry; a
+#      busy lock is a bounded, clear refusal; permissions and a missing trailing
+#      newline survive the atomic write; a symlinked layer stays a symlink;
+#      a bad lock wait or an uncreatable lock is refused at once.
 set -uo pipefail
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -111,6 +116,164 @@ out=$(bash "$SCRIPT" --workspace "$WS" --dsh-home "$DSH" --dry-run 2>&1)
 status=$?
 [ "$status" -eq 0 ] && ok "dry-run: код 0" || bad "dry-run: код $status"
 [ ! -f "$DSH/cordis.patch.yml" ] && ok "dry-run: файл не создан" || bad "dry-run: файл создан"
+
+# --- 7. Marker text in a user comment is not a bridge (#1623) --------------
+WS="$WORK/ws7"
+mk_workspace "$WS"
+DSH="$WORK/dsh7"
+mk_dsh "$DSH" web
+printf -- '# note: IWE skills bridge is planned, not installed\n- id: other\n  config: {}\n' > "$DSH/cordis.patch.yml"
+out=$(bash "$SCRIPT" --workspace "$WS" --dsh-home "$DSH" 2>&1)
+status=$?
+PATCH="$DSH/cordis.patch.yml"
+[ "$status" -eq 0 ] && ok "метка в комментарии: код 0" || bad "метка в комментарии: код $status ($out)"
+grep -qF -- "$WS/.claude/skills" "$PATCH" && grep -q 'customSkillDirs' "$PATCH" \
+    && ok "метка в комментарии: запись всё же добавлена" || bad "метка в комментарии: записи нет (ложное «уже подключено»)"
+[ "$(grep -c 'id: skill-filesystem' "$PATCH")" = "1" ] \
+    && ok "метка в комментарии: запись одна" || bad "метка в комментарии: число записей не 1"
+# Second run (every later update): our block comes after the user's comment.
+before=$(cksum "$PATCH")
+out=$(bash "$SCRIPT" --workspace "$WS" --dsh-home "$DSH" 2>&1)
+status=$?
+[ "$status" -eq 0 ] && ok "метка в комментарии, второй запуск: код 0" || bad "метка в комментарии, второй запуск: код $status"
+printf '%s' "$out" | grep -q 'уже подключены' \
+    && ok "метка в комментарии, второй запуск: «уже подключены»" || bad "метка в комментарии, второй запуск: $out"
+[ "$before" = "$(cksum "$PATCH")" ] \
+    && ok "метка в комментарии, второй запуск: файл не тронут" || bad "метка в комментарии, второй запуск: файл изменён"
+[ "$(grep -c 'id: skill-filesystem' "$PATCH")" = "1" ] \
+    && ok "метка в комментарии, второй запуск: блок не продублирован" || bad "метка в комментарии, второй запуск: блок продублирован"
+
+# --- 7b. Phrase in a comment, the user's own customSkillDirs elsewhere -------
+# Not our block: the comment is followed by another entry, so it stays a conflict.
+WS="$WORK/ws7b"
+mk_workspace "$WS"
+DSH="$WORK/dsh7b"
+mk_dsh "$DSH" web
+SKILLS_JSON=$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$WS/.claude/skills")
+printf -- '# IWE skills bridge mentioned here\n- id: other\n  config: {}\n- id: skill-filesystem\n  config:\n    customSkillDirs:\n      - %s\n' "$SKILLS_JSON" > "$DSH/cordis.patch.yml"
+before=$(cksum "$DSH/cordis.patch.yml")
+out=$(bash "$SCRIPT" --workspace "$WS" --dsh-home "$DSH" 2>&1)
+printf '%s' "$out" | grep -q 'customSkillDirs уже задан' \
+    && ok "метка не над нашей записью: конфликт, а не «подключено»" || bad "метка не над нашей записью: $out"
+[ "$before" = "$(cksum "$DSH/cordis.patch.yml")" ] \
+    && ok "метка не над нашей записью: файл не тронут" || bad "метка не над нашей записью: файл изменён"
+
+# --- 8. Our entry for another workspace path: conflict, file untouched ------
+WS_A="$WORK/ws8a"; WS_B="$WORK/ws8b"
+mk_workspace "$WS_A"; mk_workspace "$WS_B"
+DSH="$WORK/dsh8"
+mk_dsh "$DSH" web
+bash "$SCRIPT" --workspace "$WS_A" --dsh-home "$DSH" >/dev/null 2>&1
+before=$(cksum "$DSH/cordis.patch.yml")
+out=$(bash "$SCRIPT" --workspace "$WS_B" --dsh-home "$DSH" 2>&1)
+status=$?
+[ "$status" -eq 0 ] && ok "запись для другого пути: код 0" || bad "запись для другого пути: код $status"
+[ "$before" = "$(cksum "$DSH/cordis.patch.yml")" ] \
+    && ok "запись для другого пути: файл не тронут" || bad "запись для другого пути: файл изменён"
+printf '%s' "$out" | grep -q 'customSkillDirs уже задан' \
+    && ok "запись для другого пути: сказано словами" || bad "запись для другого пути: молчит"
+[ "$(grep -c 'IWE skills bridge' "$DSH/cordis.patch.yml")" = "1" ] \
+    && ok "запись для другого пути: блок не продублирован" || bad "запись для другого пути: блок продублирован"
+
+# --- 9. Two installers at once: exactly one entry, valid YAML ---------------
+WS="$WORK/ws9"
+mk_workspace "$WS"
+DSH="$WORK/dsh9"
+mk_dsh "$DSH" web
+bash "$SCRIPT" --workspace "$WS" --dsh-home "$DSH" >/dev/null 2>&1 &
+pid_a=$!
+bash "$SCRIPT" --workspace "$WS" --dsh-home "$DSH" >/dev/null 2>&1 &
+pid_b=$!
+wait "$pid_a"; status_a=$?
+wait "$pid_b"; status_b=$?
+PATCH="$DSH/cordis.patch.yml"
+{ [ "$status_a" -eq 0 ] && [ "$status_b" -eq 0 ]; } \
+    && ok "два запуска сразу: оба код 0" || bad "два запуска сразу: коды $status_a/$status_b"
+[ "$(grep -c 'id: skill-filesystem' "$PATCH")" = "1" ] \
+    && ok "два запуска сразу: запись одна" || bad "два запуска сразу: записей не одна"
+[ ! -e "$PATCH.lock" ] && ok "два запуска сразу: замок снят" || bad "два запуска сразу: замок остался"
+if python3 -c 'import yaml' >/dev/null 2>&1; then
+    python3 -c 'import sys, yaml; d = yaml.safe_load(open(sys.argv[1], encoding="utf-8")); assert isinstance(d, list) and len(d) == 1, d' "$PATCH" \
+        && ok "два запуска сразу: YAML разбирается" || bad "два запуска сразу: YAML сломан"
+else
+    echo "  ○ два запуска сразу: разбор YAML пропущен (нет PyYAML)"
+fi
+
+# --- 10. Busy lock: bounded wait, clear refusal, foreign lock kept ----------
+WS="$WORK/ws10"
+mk_workspace "$WS"
+DSH="$WORK/dsh10"
+mk_dsh "$DSH" web
+printf -- '- id: other\n  config: {}\n' > "$DSH/cordis.patch.yml"
+mkdir "$DSH/cordis.patch.yml.lock"
+before=$(cksum "$DSH/cordis.patch.yml")
+out=$(IWE_DSH_LOCK_WAIT_SEC=1 bash "$SCRIPT" --workspace "$WS" --dsh-home "$DSH" 2>&1)
+status=$?
+[ "$status" -eq 2 ] && ok "занятый замок: код 2" || bad "занятый замок: код $status"
+printf '%s' "$out" | grep -q 'cordis.patch.yml.lock' \
+    && ok "занятый замок: назван путь замка" || bad "занятый замок: путь не назван"
+[ "$before" = "$(cksum "$DSH/cordis.patch.yml")" ] \
+    && ok "занятый замок: файл не тронут" || bad "занятый замок: файл изменён"
+[ -d "$DSH/cordis.patch.yml.lock" ] \
+    && ok "занятый замок: чужой замок не удалён" || bad "занятый замок: чужой замок удалён"
+
+# --- 11. Existing file: no trailing newline, permissions, no leftovers ------
+WS="$WORK/ws11"
+mk_workspace "$WS"
+DSH="$WORK/dsh11"
+mk_dsh "$DSH" web
+printf -- '- id: other\n  config: {}' > "$DSH/cordis.patch.yml"   # no trailing newline
+chmod 600 "$DSH/cordis.patch.yml"
+bash "$SCRIPT" --workspace "$WS" --dsh-home "$DSH" >/dev/null 2>&1
+PATCH="$DSH/cordis.patch.yml"
+[ -n "$(find "$PATCH" -perm 600)" ] && ok "права файла сохранены (600)" || bad "права файла изменились"
+[ -f "$PATCH.bak-iwe-skills" ] && ok "резервная копия создана" || bad "резервной копии нет"
+[ -z "$(find "$DSH" -maxdepth 1 \( -name '*tmp*' -o -name '*lock*' \))" ] \
+    && ok "временных файлов и замка не осталось" || bad "остались временные файлы: $(find "$DSH" -maxdepth 1 -type f)"
+grep -q '^- id: skill-filesystem' "$PATCH" && ok "запись начинается с новой строки" || bad "запись склеилась с предыдущей строкой"
+
+# --- 12. Patch layer is a symlink: it stays one, the real file is updated ---
+WS="$WORK/ws12"
+mk_workspace "$WS"
+DSH="$WORK/dsh12"
+mk_dsh "$DSH" web
+mkdir -p "$WORK/dotfiles"
+printf -- '- id: other\n  config: {}\n' > "$WORK/dotfiles/real.yml"
+ln -s "$WORK/dotfiles/real.yml" "$DSH/cordis.patch.yml"
+bash "$SCRIPT" --workspace "$WS" --dsh-home "$DSH" >/dev/null 2>&1
+[ -L "$DSH/cordis.patch.yml" ] && ok "символическая ссылка: осталась ссылкой" || bad "символическая ссылка: заменена обычным файлом"
+grep -qF -- "$WS/.claude/skills" "$WORK/dotfiles/real.yml" \
+    && ok "символическая ссылка: запись попала в настоящий файл" || bad "символическая ссылка: настоящий файл не обновлён"
+
+# --- 13. Lock wait that is not a number: immediate refusal -----------------
+WS="$WORK/ws13"
+mk_workspace "$WS"
+DSH="$WORK/dsh13"
+mk_dsh "$DSH" web
+out=$(IWE_DSH_LOCK_WAIT_SEC=abc timeout 20 bash "$SCRIPT" --workspace "$WS" --dsh-home "$DSH" 2>&1)
+status=$?
+[ "$status" -eq 1 ] && ok "нечисловое ожидание замка: код 1" || bad "нечисловое ожидание замка: код $status"
+printf '%s' "$out" | grep -q "abc" && ok "нечисловое ожидание замка: значение названо" || bad "нечисловое ожидание замка: $out"
+[ ! -f "$DSH/cordis.patch.yml" ] && ok "нечисловое ожидание замка: файл не создан" || bad "нечисловое ожидание замка: файл создан"
+
+# --- 14. Lock cannot be created (read-only DSH home): refuse at once ---------
+if [ "$(id -u)" -ne 0 ]; then
+    WS="$WORK/ws14"
+    mk_workspace "$WS"
+    DSH="$WORK/dsh14"
+    mk_dsh "$DSH" web
+    printf -- '- id: other\n  config: {}\n' > "$DSH/cordis.patch.yml"
+    chmod 555 "$DSH"
+    start=$(date +%s)
+    out=$(timeout 20 bash "$SCRIPT" --workspace "$WS" --dsh-home "$DSH" 2>&1)
+    status=$?
+    elapsed=$(( $(date +%s) - start ))
+    chmod 755 "$DSH"
+    [ "$status" -eq 2 ] && ok "замок не создать: код 2" || bad "замок не создать: код $status"
+    [ "$elapsed" -lt 5 ] && ok "замок не создать: отказ сразу, без ожидания" || bad "замок не создать: ждал $elapsed с"
+    printf '%s' "$out" | grep -q 'не удалось создать замок' \
+        && ok "замок не создать: причина названа" || bad "замок не создать: $out"
+fi
 
 # --- 6. Usage error ---------------------------------------------------------
 bash "$SCRIPT" --dsh-home "$WORK/dsh6" >/dev/null 2>&1
