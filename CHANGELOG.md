@@ -36,7 +36,12 @@ Refs: WP-NNN
 
 ### Changed
 
-- [behavior] Day Open recognizes the plan table and attention section from the installed language catalogs. English and Russian headings route to the same plan prompt and priority check. (#1648)
+- [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены .claude/skills/mentor-participant-brief/SKILL.md (#1650).
+  - Цель: 77 · Результат: служебное — доставка авторского источника в шаблон; пользователь получает эти файлы при следующем обновлении
+  - Как проверить: git show --stat слияния #1650 перечисляет названные файлы, CHANGELOG.md и манифест обновления
+  - Как откатить: git revert слияния #1650
+
+- [behavior] Day Open recognizes the plan table and attention section from the installed language catalogs. English and Russian headings route to the same plan prompt and priority check. The updater ships the shared parser with both reader copies. (#1648)
   - Цель: 93 · Результат: Ц93-06
   - Как проверить: `bash scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh`
   - Как откатить: вернуть изменение читателей и каталогов вместе.
