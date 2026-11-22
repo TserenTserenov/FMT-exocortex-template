@@ -167,7 +167,7 @@ def fetch_wakatime_hours(target_date, env_file):
     if not api_key:
         return None, "no-api-key"
 
-    url = f"https://wakatime.com/api/v1/users/current/summaries?start={target_date}&end={target_date}"
+    url = f"https://api.wakatime.com/api/v1/users/current/summaries?start={target_date}&end={target_date}"
     auth = base64.b64encode(f"{api_key}:".encode()).decode()
     req = urllib.request.Request(url, headers={"Authorization": f"Basic {auth}", "Accept": "application/json"})
     try:
