@@ -40,6 +40,10 @@ Refs: WP-NNN
   - Цель: 77 · Результат: служебное — доставка авторского источника в шаблон; пользователь получает эти файлы при следующем обновлении
   - Как проверить: git show --stat слияния #1650 перечисляет названные файлы, CHANGELOG.md и манифест обновления
   - Как откатить: git revert слияния #1650
+- [behavior] (#1646) Сводка WakaTime для закрытия дня (`scripts/wakatime-day-total.py`) использует адрес `api.wakatime.com`, как и официальный клиент: раньше в сетях без доступа к основному сайту сводка не загружалась (#1631, #1637). Пустой день в запасном ответе `status_bar` больше не выдаётся за конфликт часовых поясов (#1632).
+  - Цель: 84 · Результат: служебное — часы работы загружаются в ограниченных сетях, а при нулевой активности пользователь видит правильную причину
+  - Как проверить: python3 -m pytest scripts/tests/test_issue_1451_wakatime_403.py -q — 18 проверок проходят
+  - Как откатить: git revert слияния #1646; вернутся прежний адрес API и неверная подсказка о часовом поясе
 
 - [behavior] Day Open recognizes the plan table and attention section from the installed language catalogs. English and Russian headings route to the same plan prompt and priority check. The updater ships the shared parser with both reader copies. (#1648)
   - Цель: 93 · Результат: Ц93-06
