@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "91d90966aedf449246a98cd81af23cd6d4a65678110cbc15a2f31ae8fe91aa25"
+      "sha256": "b44a924fdf624768d445f47aa24d13e0ab71283a5b9f1e1f4155a55ab4081828"
     },
     {
       "path": "CLAUDE.md",
@@ -3533,7 +3533,7 @@
     },
     {
       "path": "setup/install-dsh-skills.sh",
-      "sha256": "de803efc89b4cbb5c70958ac73d986fcfce714cbc4a67e45490c749e401f1e27"
+      "sha256": "324f7ada2a092ad079aaf239fb189fbf460afb56bdaf868b07055d939053b521"
     },
     {
       "path": "setup/install-iwe-paths.sh",

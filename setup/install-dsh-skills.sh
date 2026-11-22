@@ -66,6 +66,11 @@ fi
 say() { $QUIET || echo "$@"; }
 
 WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
+# "--workspace /x/ws/" and "--workspace /x/ws" are the same workspace and must
+# give the same stored path, or the second form would look like a conflict.
+while [ "${#WORKSPACE_DIR}" -gt 1 ] && [ "${WORKSPACE_DIR%/}" != "$WORKSPACE_DIR" ]; do
+    WORKSPACE_DIR="${WORKSPACE_DIR%/}"
+done
 DSH_HOME_DIR="${DSH_HOME_ARG:-${DSH_HOME:-$HOME/.dsh}}"
 DSH_HOME_DIR="${DSH_HOME_DIR/#\~/$HOME}"
 
@@ -103,32 +108,40 @@ skills_dir_yaml() {
 }
 
 # Prints "yes" when some occurrence of the marker opens a managed block of ours.
-# A block starts at a marker line and ends at the next marker line, at the second
-# top-level entry ("- " at the start of a line) or at a non-indented line that is
-# not a comment. It is ours when its first top-level entry is exactly
-# "- id: skill-filesystem" and that entry lists customSkillDirs with this
-# workspace's path, written as the installer writes it. Every occurrence counts:
-# a user comment repeating the phrase may come before our block (#1623).
+# A block starts at a comment line (column 0) carrying the marker and ends at the
+# next such line, at the second top-level entry ("- " at the start of a line) or
+# at a non-indented line that is not a comment. It is ours when its first
+# top-level entry is exactly "- id: skill-filesystem" and the customSkillDirs list
+# of that entry holds this workspace's path, written as the installer writes it.
+# Every occurrence counts: a user comment repeating the phrase may come before
+# our block (#1623). Values go through ENVIRON, not "awk -v": -v would expand the
+# backslash escapes json.dumps writes for non-ASCII, quotes and backslashes.
+# A trailing CR is ignored, so a file converted to CRLF is still recognised.
 managed_block_installed() {
-    awk -v marker="$MARKER" -v want="      - $1" '
+    DSH_MARKER="$MARKER" DSH_WANT="      - $1" awk '
+        BEGIN { marker = ENVIRON["DSH_MARKER"]; want = ENVIRON["DSH_WANT"] }
         function close_block() {
-            if (inblk && first_ok && has_key && has_path) ok = 1
-            inblk = 0
+            if (inblk && first_ok && has_path) ok = 1
+            inblk = 0; inlist = 0
         }
-        index($0, marker) {
+        { sub(/\r$/, "") }
+        /^#/ && index($0, marker) {
             close_block()
-            inblk = 1; entries = 0; first_ok = 0; has_key = 0; has_path = 0
+            inblk = 1; entries = 0; first_ok = 0; has_path = 0
             next
         }
-        inblk && /^- / {
+        !inblk { next }
+        /^- / {
             entries++
             if (entries > 1) { close_block(); next }
             first_ok = ($0 == "- id: skill-filesystem")
             next
         }
-        inblk && /^[^ #]/ { close_block(); next }
-        inblk && entries == 1 && /^    customSkillDirs:[ \t]*$/ { has_key = 1 }
-        inblk && entries == 1 && $0 == want { has_path = 1 }
+        /^[^ #]/ { close_block(); next }
+        entries != 1 { next }
+        /^    customSkillDirs:[ \t]*$/ { inlist = 1; next }
+        inlist && /^      - / { if ($0 == want) has_path = 1; next }
+        inlist && !/^[ \t]*(#.*)?$/ { inlist = 0 }
         END { close_block(); print (ok ? "yes" : "no") }
     ' "$PATCH_FILE"
 }
@@ -208,9 +221,14 @@ trap cleanup EXIT
 
 waited=0
 while ! mkdir "$LOCK_DIR" 2>/dev/null; do
-    # mkdir failed for another reason (read-only directory, dangling symlink):
-    # waiting would not help and "busy" would be the wrong diagnosis.
-    if [ ! -d "$LOCK_DIR" ]; then
+    # mkdir failed for another reason (read-only directory): waiting would not
+    # help and "busy" would be the wrong diagnosis. The directory, not the lock,
+    # is checked: another run may remove its lock between our mkdir and here.
+    if { [ -e "$LOCK_DIR" ] || [ -L "$LOCK_DIR" ]; } && [ ! -d "$LOCK_DIR" ]; then
+        echo "ERROR: DSH: на месте замка $LOCK_DIR лежит не каталог — уберите его и повторите." >&2
+        exit 2
+    fi
+    if [ ! -d "$LOCK_DIR" ] && [ ! -w "$(dirname "$LOCK_DIR")" ]; then
         echo "ERROR: DSH: не удалось создать замок $LOCK_DIR (нет прав на запись в $(dirname "$LOCK_DIR")?)." >&2
         exit 2
     fi
