@@ -25,12 +25,22 @@ Refs: WP-NNN
 
 ### Fixed
 
+- [behavior] The glossary supplier now opens a GitHub issue on failure and comments on it when the same run fails again. The issue lookup passes its exact run key to standalone `jq`. (#1647)
+  - Цель: 93 · Результат: Ц93-02
+  - Как проверить: `python3 -m pytest scripts/tests/test_glossary_source.py -k failure`; получение уведомления проверяется при реальном сбое.
+  - Как откатить: вернуть коммит слияния #1647 через `git revert`.
+
 - [behavior] Translation reports match local glossary entries as whole terms in Markdown. The glossary supplies *Ceiling* for «Тупик» when it names the second practitioner state (#1645).
   - Цель: 93 · Результат: Ц93-01, Ц93-05
   - Как проверить: `python3 -m pytest scripts/tests/test_translate_unapproved_report.py scripts/tests/test_glossary_source.py -q`
   - Как откатить: вернуть коммит слияния #1645 через `git revert`.
 
 ### Added
+
+- [optional] The glossary supplier can explain the outcome for each requested concept code. Run `python3 scripts/glossary_supplier.py coverage` for the published snapshot. Use `--expected FILE` for selected codes, and `--input FILE` for the corresponding verified graph walk. New passports authenticate the entire input walk. The nightly run also saves a 30-day coverage artifact for previously published codes, current public snapshot codes and the public controls, even when the snapshot is unchanged. Each record contains a code and its outcome and reason. The raw graph walk stays on the runner. (#1647)
+  - Цель: 93 · Результат: Ц93-02
+  - Как проверить: python3 -m pytest scripts/tests/test_glossary_supplier.py -k coverage
+  - Как откатить: вернуть изменение команды coverage в scripts/glossary_supplier.py и соответствующие проверки.
 
 - [optional] `scripts/fetch-glossary-concepts.py`: the glossary exporter reaches the knowledge graph through the platform gateway as a registered machine client (token in `GLOSSARY_EXPORTER_MACHINE_TOKEN`), no longer through the knowledge worker's public address (#1639).
   - Цель: 84 · Результат: служебное — выгрузка терминов ходит через общий вход платформы, где действуют проверка доступа и суточный предел; снимок терминов прежний

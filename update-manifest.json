@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "679f814cbb935980699614a49ce972b5fc35f055dbd81840d8cca7e36b87e5f8"
+      "sha256": "e3e19ed18fd9db4fcfcaa507f32a4dd13abfbcd5414d1ed150dbccb5983cdfa3"
     },
     {
       "path": "CLAUDE.md",
@@ -3569,7 +3569,7 @@
     },
     {
       "path": "translation-manifest.yaml",
-      "sha256": "37428b723b773bf50315ffb5c82dc815202b197c616bbc2f3c513cdd191548d3"
+      "sha256": "fee09736bf9743dc7fb77e68727f4f54b3fb7c7223aca40165e36adb122b651e"
     },
     {
       "path": "translation/en-doc-style.md",
@@ -3686,6 +3686,7 @@
     "scripts/tests/test_extractor_notify_repeat.sh",
     "scripts/tests/test_fetch_glossary_concepts.py",
     "scripts/tests/test_generate_manifest_deprecated_excluded.sh",
+    "scripts/tests/test_glossary_run_coverage.py",
     "scripts/tests/test_glossary_source.py",
     "scripts/tests/test_glossary_supplier.py",
     "scripts/tests/test_governance_ambiguity.sh",
