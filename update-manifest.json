@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "4c339a57876c69f3ce3ef6e74c748dc2d15f72e636e4935a4bf0d98716dfce22"
+      "sha256": "571c04696230eabd0c5eef99bf6423d85b14bf338b26e2a9a4dd0d37fab1bfa0"
     },
     {
       "path": "CLAUDE.md",
@@ -2337,7 +2337,7 @@
     },
     {
       "path": "scripts/canon-reconcile-published.sh",
-      "sha256": "1cb2b88c436ce491d9cddfe0454c3cdd3feb5c3dcd7ae9e83c3884d292a2d2d5"
+      "sha256": "7e5b6c93adce6e19dc14546be0fb12c5cbd0d54e51f7e6af8e843dcc4b8b3b41"
     },
     {
       "path": "scripts/changelog-append.sh",
@@ -3757,6 +3757,7 @@
     "scripts/tests/test_issue_1558.sh",
     "scripts/tests/test_issue_1577_1578_isolate_root.sh",
     "scripts/tests/test_issue_1606_name_registry.sh",
+    "scripts/tests/test_issue_1625_runtime_warning.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
