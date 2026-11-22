@@ -107,6 +107,30 @@ def test_report_names_local_candidates_and_model_choices_but_not_glossary_terms(
     ]
 
 
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("Можно работать и доработать перевод.", []),
+        ("**РАБОТА**, затем «работа».", [("Работа", "Work")]),
+        ("_Работа_ завершена.", [("Работа", "Work")]),
+        ("_Текущая работа_ завершена.", [("Работа", "Work")]),
+        ("служебный_Работа_архив", []),
+        ("Слово в коде: `Работа`. Можно работать.", []),
+        ("Появился «ИИ+» и пропал.", [("ИИ+", "AI+")]),
+        ("Синк команды прошёл.", [("Синк команды", "team sync")]),
+        ("План задачи согласован.", []),
+    ],
+)
+def test_local_candidates_match_whole_terms(source, expected):
+    candidates = {
+        "Работа": "Work",
+        "ИИ+": "AI+",
+        "Синк команды": "team sync",
+        "План задач": "Task plan",
+    }
+    assert translate.local_terms_used(source, candidates) == expected
+
+
 def test_bold_role_omitted_by_the_model_is_still_reported():
     """Acceptance of iwesys/iwe-dev CONTRIBUTING.md: three role names were silent."""
     source = (

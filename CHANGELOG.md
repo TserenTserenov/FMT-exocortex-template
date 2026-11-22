@@ -23,6 +23,13 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+### Fixed
+
+- [behavior] Translation reports match local glossary entries as whole terms in Markdown. The glossary supplies *Ceiling* for «Тупик» when it names the second practitioner state (#1645).
+  - Цель: 93 · Результат: Ц93-01, Ц93-05
+  - Как проверить: `python3 -m pytest scripts/tests/test_translate_unapproved_report.py scripts/tests/test_glossary_source.py -q`
+  - Как откатить: вернуть коммит слияния #1645 через `git revert`.
+
 ### Added
 
 - [optional] `scripts/fetch-glossary-concepts.py`: the glossary exporter reaches the knowledge graph through the platform gateway as a registered machine client (token in `GLOSSARY_EXPORTER_MACHINE_TOKEN`), no longer through the knowledge worker's public address (#1639).
@@ -35,6 +42,11 @@ Refs: WP-NNN
   - Как откатить: git revert слияния #1630
 
 ### Changed
+
+- [behavior] (#1652) Хост API WakaTime (`api.wakatime.com` вместо `wakatime.com`) теперь во всех программах шаблона, которые обращаются к API, а не только в подсчёте часов закрытия дня (его поправил #1646, обращение #1631): сбор для стратега (`roles/strategist/scripts/fetch-wakatime.sh`) и цифрового двойника (`roles/synchronizer/scripts/dt-collect.sh`, авторский источник — DS-ai-systems #47), дозапись множителя открытия дня (`scripts/day-open-multiplier-backfill-patch.py` и копия в `seed/strategy/`), напоминание помидора (`setup/optional/pomodoro-alert.py`). В корпоративных сетях сайт `wakatime.com` бывает закрыт, а хост API доступен. Новая проверка следит, чтобы старый хост API не вернулся ни в одну программу шаблона. Ссылки для человека (панель, ключ, OAuth) остались на сайте. Проверено на заглушках, без запроса из корпоративной сети (WP-7 Ф317).
+  - Цель: 84 · Результат: служебное — данные WakaTime для стратега, двойника и напоминаний доходят из сетей, где закрыт сайт
+  - Как проверить: `python3 -m pytest scripts/tests/test_issue_1451_wakatime_403.py` — 19 проверок проходят; новая проверка падает на 0.42.1 и на main до этого запроса
+  - Как откатить: git revert слияния этого запроса; эти пять программ снова пойдут на `wakatime.com`
 
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены .claude/skills/mentor-participant-brief/SKILL.md (#1650).
   - Цель: 77 · Результат: служебное — доставка авторского источника в шаблон; пользователь получает эти файлы при следующем обновлении
@@ -58,6 +70,10 @@ Refs: WP-NNN
   - Цель: 84 · Результат: служебное — семафоры сессий получают дополнительное поле для будущей более надёжной проверки «владелец жив/мёртв»; само решение о смерти владельца этой правкой не меняется
   - Как проверить: открыть сессию (`session-guard.sh open ...`) с библиотекой на месте — семафор содержит непустую строку `pid_start_id:`; без библиотеки — поведение прежнее
   - Как откатить: git revert этого коммита
+- [behavior] (#1653) Сверка главной копии с опубликованной (`scripts/canon-reconcile-published.sh`) больше не пишет «IWE_RUNTIME used as a directory (legacy caller)» при обычной установке (обращение #1625). Файл `.iwe-paths`, который создаёт `setup/install-iwe-paths.sh`, сам задаёт `IWE_RUNTIME` как каталог `$IWE_WORKSPACE/.iwe-runtime`, поэтому предупреждение выводилось при каждой публикации через `ds-publish.sh`, хотя вызов был штатным. Теперь штатное значение (с точностью до завершающих `/`) предупреждения не вызывает, любой другой абсолютный каталог в `IWE_RUNTIME` по-прежнему предупреждает. Порядок выбора каталога (`IWE_RUNTIME_DIR`, затем абсолютный `IWE_RUNTIME`, затем `$IWE_WORKSPACE/.iwe-runtime`) и содержимое `.iwe-paths` не менялись: задавать там `IWE_RUNTIME_DIR` нельзя, у этой переменной высший приоритет, и она увела бы проверки и скрипты с другой рабочей папкой в настоящий каталог выполнения (WP-7 Ф317).
+  - Цель: 84 · Результат: служебное — публикация изменений не выводит ложное предупреждение об устаревшем вызове
+  - Как проверить: `bash scripts/tests/test_issue_1625_runtime_warning.sh` — 3 проверки проходят; на 0.42.1 падают 2
+  - Как откатить: git revert слияния этого запроса; предупреждение вернётся
 
 - [optional] Снимок терминов графа понятий для перевода шаблона на английский обновлён поставщиком терминов перевода (`translation/glossary-snapshot.csv`; WP-617, #1616).
   - Цель: 93 · Результат: служебное — словарь перевода обновлён из графа понятий; у пользователя шаблона поведение не меняется
