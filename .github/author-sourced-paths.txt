@@ -1,3 +1,4 @@
+CLAUDE.md
 .claude/rules/formatting.md
 .claude/rules/role-prefixes.md
 .claude/rules/wp-scope.md
@@ -6,20 +7,7 @@
 .claude/skills/kimi-peer-writer/SKILL.md
 .claude/skills/mentor-participant-brief/SKILL.md
 .claude/skills/peer-conversation/SKILL.md
-CLAUDE.md
 memory/MEMORY.md
-memory/agent-architecture-framework.md
-memory/agent-vendor-connect-pattern.md
-memory/checklists.md
-memory/hard-distinctions.md
-memory/navigation.md
-memory/protocol-close.md
-memory/protocol-month-close.md
-memory/protocol-open.md
-memory/protocol-work.md
-memory/repo-type-rules.md
-memory/roles.md
-memory/sota-reference.md
 roles/strategist/prompts/day-close.md
 roles/strategist/prompts/day-plan.md
 roles/strategist/prompts/note-review.md
@@ -46,7 +34,6 @@ scripts/lib/dirty-guard-lock.sh
 scripts/lib/governance-repo-path.sh
 scripts/lib/language-check.py
 scripts/lib/peer-adapter-common.sh
-scripts/lib/process-identity.sh
 scripts/lib/session-index-draft.sh
 scripts/memory-bleed.sh
 scripts/peer-adapter-filter.py
@@ -57,5 +44,5 @@ scripts/server-calendar.sh
 scripts/session-dir-reserve.sh
 scripts/session-manifest-write.sh
 scripts/test-wp-inbox.sh
-scripts/wp-inbox.sh
 scripts/wp499-agent-coordination-test.sh
+scripts/wp-inbox.sh

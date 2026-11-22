@@ -17,9 +17,9 @@ Never runs in translate-sync.yml: publication reads files only (decision D').
     * a local row the snapshot now covers with the same English name is removed,
       unless it is stricter than the tier the graph gives (it then only raises the tier).
 
-    Writes nothing when neither the snapshot rows nor the local glossary changed
-    (a new ``as_of`` alone is not a change). Otherwise writes the files, checks that
-    scripts/glossary_source.py loads them and writes the merge-request description.
+    Leaves the tracked files untouched when the snapshot and local glossary are unchanged.
+    An optional public coverage report always describes the current run, even in this case.
+    A changed candidate must load through scripts/glossary_source.py before publication.
 
 ``changelog``
     Adds the [Unreleased] entry the changelog gate requires, referencing the merge request.
@@ -33,10 +33,12 @@ import hashlib
 import importlib.util
 import io
 import json
+import re
 import sys
 import tempfile
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 import yaml
@@ -54,6 +56,33 @@ EXPORTER_PATH = SCRIPTS / "export-glossary-snapshot.py"
 CHANGELOG_MARKER = "WP-617, #"
 # GitHub rejects a pull request body over 65 536 characters; a long list is cut, the files hold the rest.
 MAX_LISTED_ROWS = 100
+PUBLIC_OUTCOMES = {
+    "доступно переводчику": "available",
+    "не прошло проверку": "failed_validation",
+    "исключено политикой": "excluded_by_policy",
+    "нет на входе": "absent_from_input",
+}
+PUBLIC_REASONS = {
+    "совпадает со словарём переводчика": "consumer_match",
+    "общее имя нескольких кодов": "shared_name",
+    "русское имя без кириллицы": "no_cyrillic",
+    "расходятся английские имена": "conflicting_english_names",
+    "кода нет в данном обходе": "code_not_returned",
+    "конфликт с ручным словарём": "conflict_local",
+    **{
+        key: key
+        for key in (
+            "status",
+            "level",
+            "domain",
+            "kind",
+            "not-publishable",
+            "equals-code",
+            "looks-like-code",
+            "too-long",
+        )
+    },
+}
 
 
 def _load_exporter():
@@ -208,16 +237,72 @@ def render_body(diff: dict, conflicts: list[dict], dropped: list[str], old_meta:
     return "\n".join(lines) + "\n"
 
 
-def _check_loads(manifest: dict, staged_snapshot: Path, staged_local: Path) -> None:
-    """The merge request must not break translation: same loader, same rules, run on the staged files."""
-    staged_manifest = {
+def _staged_manifest(manifest: dict, staged_snapshot: Path, staged_local: Path) -> dict:
+    return {
         **manifest,
-        "glossary": {**manifest["glossary"], "snapshot": staged_snapshot.name, "local": staged_local.name},
+        "glossary": {
+            **manifest["glossary"],
+            "snapshot": staged_snapshot.name,
+            "local": staged_local.name,
+        },
     }
-    load_glossary(staged_manifest, staged_snapshot.parent)
 
 
-def refresh(root: Path, payload: dict, allowlist_path: Path, announced_meta: dict | None = None) -> Refresh:
+@dataclass(frozen=True)
+class RunCoverageOutput:
+    path: Path
+    run_id: int
+    run_attempt: int
+
+    def write(self, decisions: list[dict], meta: dict) -> None:
+        if min(self.run_id, self.run_attempt) < 1:
+            raise SupplierError("coverage run id and attempt must be positive integers")
+        as_of = meta["as_of"]
+        if not re.fullmatch(
+            r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?(?:Z|[+-][0-9]{2}:[0-9]{2})",
+            as_of,
+        ):
+            raise SupplierError("coverage needs an ISO 8601 timestamp with a timezone")
+        datetime.fromisoformat(as_of)
+        rows = []
+        for decision in decisions:
+            # Explicit public vocabulary: future exporter diagnostics may contain raw data.
+            try:
+                outcome = PUBLIC_OUTCOMES[decision["result"]]
+                reason = PUBLIC_REASONS[decision["reason"]]
+            except KeyError as exc:
+                raise SupplierError(
+                    "coverage produced an unsupported public disposition"
+                ) from exc
+            rows.append(
+                {"code": decision["code"], "outcome": outcome, "reason": reason}
+            )
+        report = {
+            "schema": "glossary-run-coverage/1",
+            "run_id": self.run_id,
+            "run_attempt": self.run_attempt,
+            "as_of": as_of,
+            "input_sha256": meta["input_sha256"],
+            "snapshot_sha256": meta["output_sha256"],
+            "rows": rows,
+        }
+        with tempfile.TemporaryDirectory(dir=self.path.parent) as tmp:
+            staged = Path(tmp) / "coverage.json"
+            staged.write_text(
+                json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            staged.replace(self.path)
+
+
+def refresh(
+    root: Path,
+    payload: dict,
+    allowlist_path: Path,
+    announced_meta: dict | None = None,
+    *,
+    coverage_output: RunCoverageOutput | None = None,
+) -> Refresh:
     """Rebuild snapshot and local glossary; write them only if they changed and still load.
 
     ``announced_meta`` is the passport the pilot last saw in an open merge request; without it, main's.
@@ -266,9 +351,31 @@ def refresh(root: Path, payload: dict, allowlist_path: Path, announced_meta: dic
             and new_local_text == local_text
             and conflicts == old_meta.get("conflict_local", [])
         )
+        manifest_next = _staged_manifest(manifest, staged, staged_local)
+        if coverage_output is not None:
+            # Only codes already public or selected by the verified public snapshot may leave the runner.
+            configured = cfg.get("expected_public_codes", [])
+            if not isinstance(configured, list) or any(
+                not isinstance(code, str)
+                or not re.fullmatch(r"[\w-]+(?:\.[\w-]+)+", code)
+                for code in configured
+            ):
+                raise SupplierError(
+                    "expected_public_codes must be a list of public concept codes"
+                )
+            expected = (
+                set(configured)
+                .union(row["code"] for row in old_rows)
+                .union(row["code"] for row in included)
+            )
+            decisions = _coverage_rows(
+                manifest_next, staged.parent, sorted(expected), payload, allowlist_path
+            )
+            coverage_output.write(decisions, meta)
         if unchanged:
             return Refresh(changed=False, conflicts=conflicts)
-        _check_loads(manifest, staged, staged_local)
+        if coverage_output is None:
+            load_glossary(manifest_next, staged.parent)
         staged.replace(snapshot_path)
         staged.with_suffix(".meta.json").replace(meta_path)
         staged_local.replace(local_path)
@@ -310,9 +417,40 @@ def _cmd_refresh(args: argparse.Namespace) -> int:
         announced = None
         if args.announced_meta and args.announced_meta.is_file():
             announced = json.loads(args.announced_meta.read_text(encoding="utf-8"))
-        result = refresh(args.root, payload, args.allowlist, announced)
-    except (OSError, json.JSONDecodeError, yaml.YAMLError, KeyError, EXPORTER.SnapshotError, GlossaryError, SupplierError) as exc:
-        print(f"glossary-supplier: {exc}", file=sys.stderr)
+        coverage_output = None
+        coverage_args = (args.coverage_out, args.run_id, args.run_attempt)
+        if any(value is not None for value in coverage_args):
+            if any(value is None for value in coverage_args):
+                raise SupplierError(
+                    "--coverage-out, --run-id and --run-attempt must be given together"
+                )
+            coverage_output = RunCoverageOutput(*coverage_args)
+        result = refresh(
+            args.root,
+            payload,
+            args.allowlist,
+            announced,
+            coverage_output=coverage_output,
+        )
+    except (
+        OSError,
+        ValueError,
+        TypeError,
+        LookupError,
+        AttributeError,
+        yaml.YAMLError,
+        EXPORTER.SnapshotError,
+        GlossaryError,
+        SupplierError,
+    ) as exc:
+        if args.coverage_out is None:
+            print(f"glossary-supplier: {exc}", file=sys.stderr)
+        else:
+            # Exporter/loader exceptions may contain the raw name or code of an unpublished concept.
+            print(
+                "glossary-supplier: refresh failed; no run coverage can be published",
+                file=sys.stderr,
+            )
         return 2
     if result.changed:
         args.body_out.write_text(result.body, encoding="utf-8")
@@ -323,7 +461,11 @@ def _cmd_refresh(args: argparse.Namespace) -> int:
 
 
 def _input_dispositions(
-    payload: dict, meta: dict, allowlist_path: Path, snapshot: dict, held: set[str]
+    payload: dict,
+    meta: dict,
+    allowlist_path: Path,
+    snapshot: dict,
+    local_rows: list[dict],
 ) -> dict:
     """Classify only a walk corresponding to the accepted snapshot."""
     rows = payload["rows"]
@@ -344,6 +486,12 @@ def _input_dispositions(
         )
     allowlist = EXPORTER.load_allowlist(allowlist_path)
     included, _, _ = EXPORTER.build_rows(payload, allowlist)
+    conflicts = local_conflicts(included, local_rows)
+    if conflicts != meta.get("conflict_local", []):
+        raise SupplierError(
+            "input and local glossary do not reproduce the conflict decisions in the passport"
+        )
+    held = {_key(item["term_ru"]) for item in conflicts}
     projected = {
         row["code"]: row for row in included if _key(row["term_ru"]) not in held
     }
@@ -369,6 +517,16 @@ def coverage_rows(
     manifest = yaml.safe_load(
         (root / "translation-manifest.yaml").read_text(encoding="utf-8")
     )
+    return _coverage_rows(manifest, root, expected, payload, allowlist)
+
+
+def _coverage_rows(
+    manifest: dict,
+    root: Path,
+    expected: list[str] | None,
+    payload: dict | None,
+    allowlist: Path,
+) -> list[dict]:
     path = root / manifest["glossary"]["snapshot"]
     meta = json.loads(path.with_suffix(".meta.json").read_text(encoding="utf-8"))
     if hashlib.sha256(path.read_bytes()).hexdigest() != meta["output_sha256"]:
@@ -376,9 +534,19 @@ def coverage_rows(
     snapshot = {row["code"]: row for row in read_rows(path)}
     if len(snapshot) != meta["included"]:
         raise SupplierError("snapshot concept count differs from its passport")
-    held = {_key(item["term_ru"]) for item in meta.get("conflict_local", [])}
+    conflicts = meta.get("conflict_local", [])
+    held = {_key(item["term_ru"]) for item in conflicts}
+    held_codes = {item["code"] for item in conflicts}
     incoming = (
-        _input_dispositions(payload, meta, allowlist, snapshot, held) if payload is not None else None
+        _input_dispositions(
+            payload,
+            meta,
+            allowlist,
+            snapshot,
+            read_rows(root / manifest["glossary"]["local"]),
+        )
+        if payload is not None
+        else None
     )
     consumer = {
         _key(term.term_ru): term.term_en for term in load_glossary(manifest, root).terms
@@ -400,6 +568,8 @@ def coverage_rows(
                     if names[_key(ru)] > 1
                     else "совпадает со словарём переводчика"
                 )
+        elif incoming is None and code in held_codes:
+            status, reason = "исключено политикой", "конфликт с ручным словарём"
         elif incoming is None:
             status, reason = "не установлено", "нет в снимке, вход обхода не приложен"
         elif code not in incoming:
@@ -493,6 +663,11 @@ def main(argv: list[str] | None = None) -> int:
     p_refresh.add_argument("--input", required=True, type=Path, help="вывод fetch-glossary-concepts.py")
     p_refresh.add_argument("--allowlist", type=Path, default=SCRIPTS.parent / "translation" / "glossary-snapshot-allowlist.yaml")
     p_refresh.add_argument("--body-out", required=True, type=Path)
+    p_refresh.add_argument(
+        "--coverage-out", type=Path, help="JSON с публичными результатами этого прогона"
+    )
+    p_refresh.add_argument("--run-id", type=int, help="GitHub Actions run ID")
+    p_refresh.add_argument("--run-attempt", type=int, help="GitHub Actions run attempt")
     p_refresh.add_argument(
         "--announced-meta", type=Path, help="паспорт снимка из открытого запроса: о его конфликтах пилот уже знает"
     )

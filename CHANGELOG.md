@@ -23,9 +23,21 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+### Fixed
+
+- [behavior] The glossary supplier now opens a GitHub issue on failure and comments on it when the same run fails again. The issue lookup passes its exact run key to standalone `jq`. (#1647)
+  - Цель: 93 · Результат: Ц93-02
+  - Как проверить: `python3 -m pytest scripts/tests/test_glossary_source.py -k failure`; получение уведомления проверяется при реальном сбое.
+  - Как откатить: вернуть коммит слияния #1647 через `git revert`.
+
+- [behavior] Translation reports match local glossary entries as whole terms in Markdown. The glossary supplies *Ceiling* for «Тупик» when it names the second practitioner state (#1645).
+  - Цель: 93 · Результат: Ц93-01, Ц93-05
+  - Как проверить: `python3 -m pytest scripts/tests/test_translate_unapproved_report.py scripts/tests/test_glossary_source.py -q`
+  - Как откатить: вернуть коммит слияния #1645 через `git revert`.
+
 ### Added
 
-- [optional] The glossary supplier can explain the outcome for each requested concept code. Run `python3 scripts/glossary_supplier.py coverage` for the published snapshot. Use `--expected FILE` for selected codes, and `--input FILE` for the corresponding verified graph walk. New passports authenticate the entire input walk. The report goes to standard output. (#1647)
+- [optional] The glossary supplier can explain the outcome for each requested concept code. Run `python3 scripts/glossary_supplier.py coverage` for the published snapshot. Use `--expected FILE` for selected codes, and `--input FILE` for the corresponding verified graph walk. New passports authenticate the entire input walk. The nightly run also saves a 30-day coverage artifact for previously published codes, current public snapshot codes and the public controls, even when the snapshot is unchanged. Each record contains a code and its outcome and reason. The raw graph walk stays on the runner. (#1647)
   - Цель: 93 · Результат: Ц93-02
   - Как проверить: python3 -m pytest scripts/tests/test_glossary_supplier.py -k coverage
   - Как откатить: вернуть изменение команды coverage в scripts/glossary_supplier.py и соответствующие проверки.
@@ -41,6 +53,20 @@ Refs: WP-NNN
 
 ### Changed
 
+- [behavior] (#1652) Хост API WakaTime (`api.wakatime.com` вместо `wakatime.com`) теперь во всех программах шаблона, которые обращаются к API, а не только в подсчёте часов закрытия дня (его поправил #1646, обращение #1631): сбор для стратега (`roles/strategist/scripts/fetch-wakatime.sh`) и цифрового двойника (`roles/synchronizer/scripts/dt-collect.sh`, авторский источник — DS-ai-systems #47), дозапись множителя открытия дня (`scripts/day-open-multiplier-backfill-patch.py` и копия в `seed/strategy/`), напоминание помидора (`setup/optional/pomodoro-alert.py`). В корпоративных сетях сайт `wakatime.com` бывает закрыт, а хост API доступен. Новая проверка следит, чтобы старый хост API не вернулся ни в одну программу шаблона. Ссылки для человека (панель, ключ, OAuth) остались на сайте. Проверено на заглушках, без запроса из корпоративной сети (WP-7 Ф317).
+  - Цель: 84 · Результат: служебное — данные WakaTime для стратега, двойника и напоминаний доходят из сетей, где закрыт сайт
+  - Как проверить: `python3 -m pytest scripts/tests/test_issue_1451_wakatime_403.py` — 19 проверок проходят; новая проверка падает на 0.42.1 и на main до этого запроса
+  - Как откатить: git revert слияния этого запроса; эти пять программ снова пойдут на `wakatime.com`
+
+- [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены .claude/skills/mentor-participant-brief/SKILL.md (#1650).
+  - Цель: 77 · Результат: служебное — доставка авторского источника в шаблон; пользователь получает эти файлы при следующем обновлении
+  - Как проверить: git show --stat слияния #1650 перечисляет названные файлы, CHANGELOG.md и манифест обновления
+  - Как откатить: git revert слияния #1650
+- [behavior] (#1646) Сводка WakaTime для закрытия дня (`scripts/wakatime-day-total.py`) использует адрес `api.wakatime.com`, как и официальный клиент: раньше в сетях без доступа к основному сайту сводка не загружалась (#1631, #1637). Пустой день в запасном ответе `status_bar` больше не выдаётся за конфликт часовых поясов (#1632).
+  - Цель: 84 · Результат: служебное — часы работы загружаются в ограниченных сетях, а при нулевой активности пользователь видит правильную причину
+  - Как проверить: python3 -m pytest scripts/tests/test_issue_1451_wakatime_403.py -q — 18 проверок проходят
+  - Как откатить: git revert слияния #1646; вернутся прежний адрес API и неверная подсказка о часовом поясе
+
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены scripts/lib/process-identity.sh (#1638).
   - Цель: 77 · Результат: служебное — доставка авторского источника в шаблон; пользователь получает эти файлы при следующем обновлении
   - Как проверить: git show --stat слияния #1638 перечисляет названные файлы, CHANGELOG.md и манифест обновления
@@ -49,6 +75,10 @@ Refs: WP-NNN
   - Цель: 84 · Результат: служебное — семафоры сессий получают дополнительное поле для будущей более надёжной проверки «владелец жив/мёртв»; само решение о смерти владельца этой правкой не меняется
   - Как проверить: открыть сессию (`session-guard.sh open ...`) с библиотекой на месте — семафор содержит непустую строку `pid_start_id:`; без библиотеки — поведение прежнее
   - Как откатить: git revert этого коммита
+- [behavior] (#1653) Сверка главной копии с опубликованной (`scripts/canon-reconcile-published.sh`) больше не пишет «IWE_RUNTIME used as a directory (legacy caller)» при обычной установке (обращение #1625). Файл `.iwe-paths`, который создаёт `setup/install-iwe-paths.sh`, сам задаёт `IWE_RUNTIME` как каталог `$IWE_WORKSPACE/.iwe-runtime`, поэтому предупреждение выводилось при каждой публикации через `ds-publish.sh`, хотя вызов был штатным. Теперь штатное значение (с точностью до завершающих `/`) предупреждения не вызывает, любой другой абсолютный каталог в `IWE_RUNTIME` по-прежнему предупреждает. Порядок выбора каталога (`IWE_RUNTIME_DIR`, затем абсолютный `IWE_RUNTIME`, затем `$IWE_WORKSPACE/.iwe-runtime`) и содержимое `.iwe-paths` не менялись: задавать там `IWE_RUNTIME_DIR` нельзя, у этой переменной высший приоритет, и она увела бы проверки и скрипты с другой рабочей папкой в настоящий каталог выполнения (WP-7 Ф317).
+  - Цель: 84 · Результат: служебное — публикация изменений не выводит ложное предупреждение об устаревшем вызове
+  - Как проверить: `bash scripts/tests/test_issue_1625_runtime_warning.sh` — 3 проверки проходят; на 0.42.1 падают 2
+  - Как откатить: git revert слияния этого запроса; предупреждение вернётся
 
 - [optional] Снимок терминов графа понятий для перевода шаблона на английский обновлён поставщиком терминов перевода (`translation/glossary-snapshot.csv`; WP-617, #1616).
   - Цель: 93 · Результат: служебное — словарь перевода обновлён из графа понятий; у пользователя шаблона поведение не меняется

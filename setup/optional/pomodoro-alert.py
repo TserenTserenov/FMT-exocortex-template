@@ -107,7 +107,7 @@ def get_api_key() -> str:
 def fetch_durations(auth_header: dict) -> list:
     """Fetch today's durations from WakaTime API."""
     today = time.strftime("%Y-%m-%d")
-    url = f"https://wakatime.com/api/v1/users/current/durations?date={today}"
+    url = f"https://api.wakatime.com/api/v1/users/current/durations?date={today}"
     req = Request(url, headers=auth_header)
     with urlopen(req, timeout=10) as resp:
         return json.loads(resp.read())["data"]

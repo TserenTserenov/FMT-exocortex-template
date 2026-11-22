@@ -717,7 +717,7 @@
     },
     {
       "path": ".claude/skills/mentor-participant-brief/SKILL.md",
-      "sha256": "0a67bbb906f2ef4ecec34a1ce57ef5420f492c21ee1063794dbea2114c234b1d"
+      "sha256": "af7bb60c0df34cfea3fd2cbc56c93914accbc9c51d6e0edb7d4adc0ea1b38ec3"
     },
     {
       "path": ".claude/skills/month-close/SKILL.md",
@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "0848704296fe2d9af056b97072a52ae068ce7e7f311f94459ee4c6809a019193"
+      "sha256": "d426c0a6edc58fb36090e87f0a2be551f2090ea33aa6ffc4732e8f83ec3d003c"
     },
     {
       "path": "CLAUDE.md",
@@ -2121,7 +2121,7 @@
     },
     {
       "path": "roles/strategist/scripts/fetch-wakatime.sh",
-      "sha256": "c92121387e82cc5a81b4032f39efa33c9c394c2c53fc154740115deaa15a1df4"
+      "sha256": "c15d43020f7859beffb9a600c273b0e5d43cb20bb8a841bac20c8e73a37f9416"
     },
     {
       "path": "roles/strategist/scripts/launchd/com.strategist.morning.plist",
@@ -2189,7 +2189,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/dt-collect.sh",
-      "sha256": "eaa45ee5b3d31fb0fc3fb68e489ab90c0809c37e14dff950182a0818a2a69297"
+      "sha256": "47cee0fa353ba8d8ba01dcf5e7b88c883b6875b71bf716baee5556fe7eb3da8b"
     },
     {
       "path": "roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist",
@@ -2337,7 +2337,7 @@
     },
     {
       "path": "scripts/canon-reconcile-published.sh",
-      "sha256": "1cb2b88c436ce491d9cddfe0454c3cdd3feb5c3dcd7ae9e83c3884d292a2d2d5"
+      "sha256": "7e5b6c93adce6e19dc14546be0fb12c5cbd0d54e51f7e6af8e843dcc4b8b3b41"
     },
     {
       "path": "scripts/changelog-append.sh",
@@ -2525,7 +2525,7 @@
     },
     {
       "path": "scripts/day-open-multiplier-backfill-patch.py",
-      "sha256": "6390ffb5bb4f4d6aa5cf524589248ac6c5a428268412e652d1a96a87ac4b2309"
+      "sha256": "c1c74143651a73d5d732f076eda68465e762b337ba50104a3f8fa48cb23208a5"
     },
     {
       "path": "scripts/day-open-pipeline.sh",
@@ -3337,7 +3337,7 @@
     },
     {
       "path": "scripts/wakatime-day-total.py",
-      "sha256": "adcafcc921cd902b1f559a9dac9746b6510b3d8cf0869eb5630e118829d530af"
+      "sha256": "e3612d272cdbfee8341c39263dd69501ff2b81741adc90e2053cece5dd4b721e"
     },
     {
       "path": "scripts/week-draft-append.sh",
@@ -3417,7 +3417,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-multiplier-backfill-patch.py",
-      "sha256": "4a9047131b34c7277f22217c5997e4826b96c3059393c4806873e71e534a8dcb"
+      "sha256": "42434ee82b1a7f74c52807dcc08124f6379ae98f6af6bbe338823e7b2ab63701"
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
@@ -3561,7 +3561,7 @@
     },
     {
       "path": "translation-manifest.yaml",
-      "sha256": "37428b723b773bf50315ffb5c82dc815202b197c616bbc2f3c513cdd191548d3"
+      "sha256": "fee09736bf9743dc7fb77e68727f4f54b3fb7c7223aca40165e36adb122b651e"
     },
     {
       "path": "translation/en-doc-style.md",
@@ -3678,6 +3678,7 @@
     "scripts/tests/test_extractor_notify_repeat.sh",
     "scripts/tests/test_fetch_glossary_concepts.py",
     "scripts/tests/test_generate_manifest_deprecated_excluded.sh",
+    "scripts/tests/test_glossary_run_coverage.py",
     "scripts/tests/test_glossary_source.py",
     "scripts/tests/test_glossary_supplier.py",
     "scripts/tests/test_governance_ambiguity.sh",
@@ -3757,6 +3758,7 @@
     "scripts/tests/test_issue_1558.sh",
     "scripts/tests/test_issue_1577_1578_isolate_root.sh",
     "scripts/tests/test_issue_1606_name_registry.sh",
+    "scripts/tests/test_issue_1625_runtime_warning.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
