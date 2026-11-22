@@ -523,6 +523,7 @@ jobs:
           git config user.name "canon-sync[bot]"
           git config user.email "canon-sync[bot]@users.noreply.github.com"
           git add -A
+          python3 "$GITHUB_WORKSPACE/scripts/assemble_distribution.py" --sync-staged-modes "$GITHUB_WORKSPACE" .
           if git diff --cached --quiet; then
             echo "No translation changes to commit."
             exit 0
