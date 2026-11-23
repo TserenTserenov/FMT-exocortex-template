@@ -26,6 +26,7 @@ Refs: WP-NNN
 ### Fixed
 
 - [behavior] `scripts/iwe-notify` is again a byte-for-byte copy of the author's canon: direct send (`--direct`) and the outcome line from iwe-local-config PR #257 are carried over. (#1660)
+  - Цель: 84 · Результат: служебное — программа отправки в шаблоне и на сервере снова совпадает с главной версией, проверка доставки расширений её пропускает.
   - Как проверить: `bash scripts/tests/iwe-notify-smoke.sh` в iwe-local-config; обе копии должны совпасть с каноном (41 проверка, 0 падений).
   - Как откатить: вернуть коммит слияния #1660 через `git revert`.
 
