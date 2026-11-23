@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "b824954fa04bec7f4da4dac8efcd51624c9f47b88976f3c7bc8ee253a9e7f383"
+      "sha256": "9bd2d251c30e68bd5f442a817191d6aa2b983dff1218dd2cbb0b9ac04ccf506a"
     },
     {
       "path": "CLAUDE.md",
@@ -2713,7 +2713,7 @@
     },
     {
       "path": "scripts/iwe-notify",
-      "sha256": "a5caca8bea4304a6a469b28a865f9f31d499bd804764a89e1ac399c3d6dd1c15"
+      "sha256": "92d98cd78b48f364978fb03ccb01423ddf079e25cd982939705fbb098b727025"
     },
     {
       "path": "scripts/iwe-safe-pull.sh",
