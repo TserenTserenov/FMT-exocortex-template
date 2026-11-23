@@ -74,8 +74,23 @@ if [[ "$MODE" != "settings-json" ]]; then
         [[ "$fname" == "validate-fmt-scripts.sh" ]] && continue
         checked=$((checked + 1))
 
+        # Path-based exemptions, computed ONCE before both checks below.
+        # issue #1662: Check 1 ($HOME literal) had no exemption at all, while Check 2
+        # (governance repo name) had one since #446/#450/#499/#759. --files mode exposed
+        # the gap: a staged fixture under scripts/tests/ was blocked, although the
+        # whole-directory scan never descends into scripts/tests/ and so never sees it.
+        # One flag for both checks keeps the exemption classes in sync.
+        skip_hardcode_check=0
+        case "$f" in
+            scripts/tests/*|*/scripts/tests/*) skip_hardcode_check=1 ;;  # issues #446/#450: fixtures of the scripts/tests/ convention
+            setup/test-*|*/setup/test-*|setup/smoke-test-*|*/setup/smoke-test-*) skip_hardcode_check=1 ;;  # issue #499: setup/ test harnesses by naming convention
+            setup/validate-template.sh|*/setup/validate-template.sh) skip_hardcode_check=1 ;;  # WP-544 D28: the file itself scans the repo for author-specific literals
+            .claude/hooks/tests/*|*/.claude/hooks/tests/*) skip_hardcode_check=1 ;;  # issue #759: hook-test fixtures
+            scripts/check-shipped-config-secrets.sh|*/scripts/check-shipped-config-secrets.sh) skip_hardcode_check=1 ;;  # same class as #499: the scanner's own regex list is the subject of its check, not a hardcode
+        esac
+
         # Check 1: absolute personal path (resolved $HOME, not a variable)
-        if grep -qE "(^|[^[:alnum:]_])${AUTHOR_HOME_ESCAPED}(/|[^[:alnum:]_]|\$)" "$f" 2>/dev/null; then
+        if [ "$skip_hardcode_check" != "1" ] && grep -qE "(^|[^[:alnum:]_])${AUTHOR_HOME_ESCAPED}(/|[^[:alnum:]_]|\$)" "$f" 2>/dev/null; then
             echo "  ❌ $fname: содержит '$AUTHOR_HOME'" >&2
             grep -nE "(^|[^[:alnum:]_])${AUTHOR_HOME_ESCAPED}(/|[^[:alnum:]_]|\$)" "$f" | head -3 | sed 's/^/     /' >&2
             errors=$((errors + 1))
@@ -119,13 +134,6 @@ if [[ "$MODE" != "settings-json" ]]; then
         # Therefore the exception here is the same unconditional path-based one as for
         # scripts/tests/* (issues #446/#450): the whole directory is test
         # scaffolding by convention, its contents are not scanned.
-        skip_hardcode_check=0
-        case "$f" in
-            scripts/tests/*|*/scripts/tests/*) skip_hardcode_check=1 ;;  # issues #446/#450: фикстуры конвенции scripts/tests/ — не сканировать. Уже, чем */tests/* — другие tests/-каталоги репо (.claude/skills/*/tests/, guide-kit/tests/) продолжают проверяться как обычно.
-            setup/test-*|*/setup/test-*|setup/smoke-test-*|*/setup/smoke-test-*) skip_hardcode_check=1 ;;  # issue #499: setup/ test harnesses by naming convention — their fail messages and grep patterns CONTAIN the literal as the subject of their own check; a class-based path exception (not a per-line heuristic), the rest of setup/ is scanned as before.
-            setup/validate-template.sh|*/setup/validate-template.sh) skip_hardcode_check=1 ;;  # WP-544 D28: same class as #499 — this file itself scans the repo for author-specific literals (check [1/5]) via a string array in a for loop; its own pattern list is the subject of the check, not a hardcode. Do not quote the literals verbatim in this comment — [1/5] in validate-fmt-scripts.sh itself would catch it.
-            .claude/hooks/tests/*|*/.claude/hooks/tests/*) skip_hardcode_check=1 ;;  # issue #759: hook-test fixtures — same class as scripts/tests/.
-        esac
         if [ "$skip_hardcode_check" != "1" ]; then
         if grep -q "$AUTHOR_GOV_REPO" "$f" 2>/dev/null; then
             bad_lines=$(grep -n "$AUTHOR_GOV_REPO" "$f" \
