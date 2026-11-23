@@ -2713,7 +2713,7 @@
     },
     {
       "path": "scripts/iwe-notify",
-      "sha256": "92d98cd78b48f364978fb03ccb01423ddf079e25cd982939705fbb098b727025"
+      "sha256": "a107e7b59df14fd308f06c337c9a3f40b33a4e888b49ff3216a7a412c8cb56b8"
     },
     {
       "path": "scripts/iwe-safe-pull.sh",
