@@ -189,7 +189,7 @@
     },
     {
       "path": ".claude/hooks/secret-file-read-block.sh",
-      "sha256": "1680968fa2110916e7e2137d5a0f44566c2128bd68694a4cf4e10ed03d2c58ce"
+      "sha256": "665cbe42116eb2100db1b5b33caa93dd56bfb8f03ddac1a00391f938583ff7df"
     },
     {
       "path": ".claude/hooks/secret-leak-block.sh",
@@ -298,6 +298,10 @@
     {
       "path": ".claude/hooks/tests/test-issue-1411-stop-gate-blocked-skill.sh",
       "sha256": "44c48bd637afb690d0a2e75c9be8882e65ba5ac42fccb8ba23edb7b81419166b"
+    },
+    {
+      "path": ".claude/hooks/tests/test-issue-1657-secret-file-read-block-kimi-envelope.sh",
+      "sha256": "a4d5ffa2e5988ff9c0f37aac30f09396287d0db0c30781b3d6491455e9825863"
     },
     {
       "path": ".claude/hooks/tests/test-memory-write-permission.sh",
@@ -1001,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "5383adf68e798e3c8666fd810c25eddca15c25e395444d0674811937d265ef4d"
+      "sha256": "626b7a9ab6a1ebbe7b3bd3550230d1f77d6379317816e9c88be90a622dcde262"
     },
     {
       "path": "CLAUDE.md",
@@ -3101,7 +3105,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "e46fbd6e75d7d8b55c6d15ffbd4f9dd4fa15fbe8b617c46f537a72175e27c7d3"
+      "sha256": "7cde0c8b84ff201245bc21ecee02a2d51f57d1341ed02d8f847dd6ad3e06a6dd"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
