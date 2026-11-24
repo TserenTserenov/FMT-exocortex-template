@@ -965,15 +965,15 @@
     },
     {
       "path": ".github/workflows/notify-update.yml",
-      "sha256": "fce71ac341f2d93a9011553745da09a56e1fe2ad5e2dce2e91773793f53d889a"
+      "sha256": "b32a078ea37df8c2dcee586407bd8a977f6fedb677dd3e582bee24753daade04"
     },
     {
       "path": ".github/workflows/post-release-audit.yml",
-      "sha256": "292e625f1c79c9f0ba836bde66c9af8336573d1d5ebd541e1c6e8aa1a51c7829"
+      "sha256": "f82b1aae6a2f7740c8dc0e8dcc7bc212ede8e58c41dd19eb93e4ac84e4cfb9fc"
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "077b2642d5479cf608cceffcd04c90c8c4cfdc1ddd3284fb9e9640a56753b36f"
+      "sha256": "fb9e78f90b052967f0c7ddbc6df47c1b3bbe1f62c078855d5beff9d7c87af2a7"
     },
     {
       "path": ".gitignore",
@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "34afd30ee6b1ca0a2096ec58a8a91904ed9485ca36696c8b7815981ab07bb4fe"
+      "sha256": "edee489078c603b83aeb83e216cfad85676a86e0504f3de0c4aa3918cfeade90"
     },
     {
       "path": "CLAUDE.md",
@@ -1093,7 +1093,7 @@
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
-      "sha256": "d40d54bdeffa0931263be28a1cf351959976d0a3f720b4d9bb19443046123419"
+      "sha256": "31716f6824e0053bd70d62eb8385c31b8ee98b749d502e2358c9d147e8f9bc0d"
     },
     {
       "path": "docs/RESIDENCY-GATE-USAGE.md",
@@ -2413,7 +2413,7 @@
     },
     {
       "path": "scripts/check-release-branch-base.sh",
-      "sha256": "1b5bd16ed3c7e39dd161023d5e062b9e9a088eac137587717ea06e58d644a132"
+      "sha256": "eebaa7377465141240806397c9fb3ec1b8bd6dd6800baeacfbfcab04744fe228"
     },
     {
       "path": "scripts/check-script-collisions.sh",
@@ -2953,7 +2953,7 @@
     },
     {
       "path": "scripts/release-receipt.sh",
-      "sha256": "ab48eb0c98a37ccfea9db8f5807666db994a05e4d6757c0bd28de72dbad98e68"
+      "sha256": "07fbd0c4d2bcdc3b3197207c54b18140072c08739f4b705e776b82c77bcf839d"
     },
     {
       "path": "scripts/restore-from-exocortex.sh",
@@ -3101,7 +3101,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "e46fbd6e75d7d8b55c6d15ffbd4f9dd4fa15fbe8b617c46f537a72175e27c7d3"
+      "sha256": "9023b199cf48d2ce2192165993a5a98827ba50972a95e2687663b28413faa76e"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3665,6 +3665,7 @@
     "scripts/tests/test-wp529-f261-changelog-append-fields.sh",
     "scripts/tests/test-wp529-f261-release-branch-base.sh",
     "scripts/tests/test-wp529-f261-rollback-by-installed-version.sh",
+    "scripts/tests/test-wp529-f268-release-from-branch.sh",
     "scripts/tests/test-wp529-f270-clone-memory-backup.sh",
     "scripts/tests/test-wp529-f270-core-mode-feeders.sh",
     "scripts/tests/test-wp529-f270-exec-bit.sh",

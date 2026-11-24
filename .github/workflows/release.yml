@@ -1,159 +1,203 @@
 name: Release
 
-# Triggered by Validate Template finishing green on main: if the manifest
-# version at the validated commit is new (no matching tag), create a git tag
-# v{version} and a GitHub release using the matching CHANGELOG section.
+# WP-529 Ф268 (24.11.2026): release from the release branch, main never stops.
 #
-# WP-7 Ф62 (10.08.2026): previously triggered directly on `push:
-# paths:[update-manifest.json]`, independent of CI — a release could ship
-# while CI was still running or had already failed. Switched to workflow_run
-# so a release only happens after Validate Template reports success FOR THAT
-# EXACT COMMIT (github.event.workflow_run.head_sha) — no polling, no manual
-# SHA matching, the link comes straight from the triggering event.
+# The release tag vX.Y.Z goes on the checked candidate itself — the commit of the
+# highest vX.Y.Z-rc.N on release/vX.Y.Z — not on a merge commit in main. The release PR
+# (release/vX.Y.Z -> main, opened at cut) is merged AFTER the release and brings the
+# version, the CHANGELOG section and the branch fixes back to main.
 #
-# Manual trigger: workflow_dispatch with explicit version input lets maintainers
-# re-tag or create a release for an already-pushed version.
+# Trigger: the Release Lead's decision, as a manual run with an explicit version:
+#   gh workflow run release.yml --ref main -f version=X.Y.Z
+# Before Ф268 the decision was the merge of the release PR, and Validate Template on the
+# merge commit triggered this workflow (workflow_run). There is no merge before the
+# release any more, and every rc commit gets a green Validate run long before the
+# candidate is checked by testers and red team: an automatic trigger on that run would
+# release every candidate unchecked. The run therefore stays manual, and the link to the
+# check is kept by requiring a green Validate Template run (push or workflow_dispatch)
+# on release/vX.Y.Z for exactly the candidate commit.
+#
+# Refusals (no tag, no release):
+#   - no candidate vX.Y.Z-rc.N at all (WP-529 Ф240);
+#   - the tip of release/vX.Y.Z is not the latest candidate (commits after the last rc
+#     would reach main with the release PR as "released" without being checked);
+#   - an explicit sha that is not the latest candidate's commit;
+#   - the tree differs from the candidate's tree (WP-529 Ф239), or the manifest on the
+#     candidate carries another version;
+#   - no green Validate Template run for the candidate commit on the release branch.
+# "Latest" mark: only when vX.Y.Z is the highest stable version among all release tags,
+# so a fix release of an older line never sends update.sh users back (release channel
+# reads releases/latest).
 
 on:
-  workflow_run:
-    workflows: ["Validate Template"]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release (e.g. 0.35.5). Leave empty to read from manifest."
-        required: false
-        default: ""
+        description: "Версия выпуска X.Y.Z: метка встанет на последний кандидат vX.Y.Z-rc.N ветки release/vX.Y.Z"
+        required: true
       sha:
-        description: "Commit to tag (the validated bump commit). Leave empty to tag the dispatch ref tip."
+        description: "Необязательно: полный SHA последнего кандидата для сверки (пусто — берётся по метке rc)"
         required: false
         default: ""
 
 permissions:
   contents: write
+  # Read the Validate Template runs of the candidate; dispatch the post-release audit.
+  actions: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    # workflow_run fires for EVERY completed run of Validate Template
-    # (push, pull_request, schedule, workflow_dispatch) — gate on conclusion
-    # and on it being either a push or an explicit workflow_dispatch (the
-    # only way the release-candidate.yml bot commit gets validated at all, since
-    # GitHub's anti-recursion policy blocks its own push from auto-triggering
-    # Validate Template — see that workflow's `on:` comment). schedule/PR runs
-    # never carry a version bump worth releasing; excluding them isn't a
-    # safety measure, just avoids a pointless "tag already exists" no-op.
-    if: >
-      github.repository == 'TserenTserenov/FMT-exocortex-template' &&
-      (github.event_name == 'workflow_dispatch' ||
-       (github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.head_branch == 'main' &&
-        (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')))
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template'
+    env:
+      VERSION: ${{ github.event.inputs.version }}
+      EXPECTED_SHA: ${{ github.event.inputs.sha }}
+      DISPATCH_REF: ${{ github.ref_name }}
+      REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          # workflow_run: pin to the exact commit Validate Template just
-          # verified — this is what makes the gate actually mean something.
-          # workflow_dispatch with explicit sha (the release-PR flow closes the
-          # chain this way): pin to that validated commit — a bare ref tip
-          # could have moved past what Validate saw.
-          # workflow_dispatch without sha (manual override): github.sha is the
-          # ref that was dispatched against, same as before this change.
-          ref: ${{ github.event.inputs.sha || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || github.sha }}
-          fetch-depth: 0  # full history to check existing tags
+          fetch-depth: 0  # full history and tags: candidates, previous releases
 
-      # WP-529 Ф261 (finding 7 of the 10.11 pipeline review): a manual run with an explicit
-      # sha used to tag any commit, including one outside main (a branch tip, a fork commit).
-      # A release is only ever a commit of main.
-      - name: Check the release commit belongs to main
+      - name: Check the version and the dispatch ref
         run: |
-          git fetch -q origin main
-          if ! git merge-base --is-ancestor HEAD origin/main; then
-            echo "::error::Коммит $(git rev-parse HEAD) не входит в основную ветку — выпускается только коммит main."
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version должна быть вида X.Y.Z, получено: '$VERSION'"
             exit 1
           fi
-
-      - name: Determine version
-        id: version
-        run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION=$(grep -m1 '"version"' update-manifest.json \
-              | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
-          fi
-          if [ -z "$VERSION" ]; then
-            echo "FAIL: could not determine version from manifest"
-            exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          # The workflow file of the dispatched ref runs: only protected refs may carry it.
+          case "$DISPATCH_REF" in
+            main|"release/v$VERSION") ;;
+            *)
+              echo "::error::Выпуск запускается с main или release/v$VERSION, получено: '$DISPATCH_REF'."
+              exit 1
+              ;;
+          esac
 
       - name: Check if tag already exists
         id: tag_check
         run: |
-          if git rev-parse "refs/tags/v${{ steps.version.outputs.version }}" > /dev/null 2>&1; then
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Tag v${{ steps.version.outputs.version }} already exists — skipping release."
+            echo "Метка v$VERSION уже есть — выпуск пропущен."
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Verify release tree matches the release candidate (WP-529 Ф239)
-        # Тождество «проверенного кандидата» и «выпускаемого релиза» — по
-        # содержимому (дереву), не по SHA коммита: релизный тег встаёт на
-        # merge-коммит, которого в момент проверки кандидата ещё не было.
-        # Расхождение = релиз ушёл бы НЕ тем, что проверяли тестировщики —
-        # блокируем. Нет кандидата для версии — тоже блокируем (WP-529 Ф240):
-        # выпуск без проверенного кандидата и есть то, от чего защищает шаг.
-        # Срочный выпуск идёт тем же путём: next-rc на ветке выпуска — один запуск.
+      - name: Check out the latest release candidate (WP-529 Ф239, Ф240, Ф268)
+        id: rc
         if: steps.tag_check.outputs.exists == 'false'
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          git fetch --tags origin
-          RC_TAGS=$(git tag -l "v${VERSION}-rc.*")
-          if [ -z "$RC_TAGS" ]; then
+          BRANCH="release/v$VERSION"
+          if ! git fetch -q --tags origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"; then
+            echo "::error::Ветки $BRANCH нет. Выпуск идёт только с ветки выпуска: Release Candidate, режим cut."
+            exit 1
+          fi
+          RC_LATEST=$(git tag -l "v${VERSION}-rc.*" | grep -E "^v${VERSION//./\\.}-rc\.[0-9]+$" | sort -V | tail -1 || true)
+          if [ -z "$RC_LATEST" ]; then
             echo "::error::Для v$VERSION нет кандидата (метки v$VERSION-rc.N). Релиз остановлен: выпуск идёт только через проверенного кандидата — запустите Release Candidate в режиме next-rc на ветке выпуска."
             exit 1
           fi
-          RC_LATEST=$(printf '%s\n' "$RC_TAGS" | sort -V | tail -1)
+          RC_COMMIT=$(git rev-parse "${RC_LATEST}^{commit}")
+          BRANCH_TIP=$(git rev-parse "refs/remotes/origin/$BRANCH")
+          if [ -n "$EXPECTED_SHA" ] && [ "$EXPECTED_SHA" != "$RC_COMMIT" ]; then
+            echo "::error::Указанный коммит $EXPECTED_SHA — не последний кандидат $RC_LATEST ($RC_COMMIT). Релиз остановлен."
+            exit 1
+          fi
+          if [ "$BRANCH_TIP" != "$RC_COMMIT" ]; then
+            echo "::error::Вершина $BRANCH ($BRANCH_TIP) — не последний кандидат $RC_LATEST ($RC_COMMIT): на ветке есть непроверенные коммиты. Поставьте новый кандидат (next-rc) и проверьте его, либо уберите эти коммиты с ветки."
+            exit 1
+          fi
+          git checkout -q --detach "$RC_COMMIT"
           RC_TREE=$(git rev-parse "${RC_LATEST}^{tree}")
           HEAD_TREE=$(git rev-parse "HEAD^{tree}")
-          echo "rc=$RC_LATEST rc_tree=$RC_TREE head_tree=$HEAD_TREE" >> "$GITHUB_STEP_SUMMARY"
+          echo "rc=$RC_LATEST rc_commit=$RC_COMMIT rc_tree=$RC_TREE head_tree=$HEAD_TREE" >> "$GITHUB_STEP_SUMMARY"
           if [ "$RC_TREE" != "$HEAD_TREE" ]; then
             echo "::error::Дерево релиза v$VERSION ($HEAD_TREE) не совпадает с деревом кандидата $RC_LATEST ($RC_TREE). Релиз остановлен: кандидат проверялся не на этом содержимом — опубликуйте новый rc и проверьте заново."
             exit 1
           fi
-          echo "Дерево релиза совпадает с кандидатом $RC_LATEST."
+          MANIFEST=$(grep -m1 '"version"' update-manifest.json \
+            | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
+          if [ "$MANIFEST" != "$VERSION" ]; then
+            echo "::error::На кандидате $RC_LATEST в update-manifest.json версия '$MANIFEST', а выпускается $VERSION. Релиз остановлен."
+            exit 1
+          fi
+          echo "rc_tag=$RC_LATEST" >> "$GITHUB_OUTPUT"
+          echo "rc_commit=$RC_COMMIT" >> "$GITHUB_OUTPUT"
+          echo "Выпускается кандидат $RC_LATEST ($RC_COMMIT)."
+
+      - name: Check that Validate Template passed on the candidate commit
+        if: steps.tag_check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RC_TAG: ${{ steps.rc.outputs.rc_tag }}
+          RC_COMMIT: ${{ steps.rc.outputs.rc_commit }}
+        run: |
+          RUNS=$(gh api "repos/$REPO/actions/workflows/validate-template.yml/runs?head_sha=$RC_COMMIT&per_page=100")
+          GREEN=$(printf '%s' "$RUNS" | jq --arg branch "release/v$VERSION" \
+            '[.workflow_runs[] | select(.head_branch == $branch and .conclusion == "success" and (.event == "push" or .event == "workflow_dispatch"))] | length')
+          if [ "$GREEN" -eq 0 ]; then
+            echo "::error::Для кандидата $RC_TAG ($RC_COMMIT) нет успешной проверки Validate Template на ветке release/v$VERSION. Запустите её: gh workflow run validate-template.yml --ref release/v$VERSION — и повторите выпуск после зелёного результата."
+            exit 1
+          fi
+          echo "Validate Template на $RC_COMMIT: успешных запусков — $GREEN."
 
       - name: Extract CHANGELOG section for this version
         if: steps.tag_check.outputs.exists == 'false'
-        id: changelog
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           # Extract the block between "## [$VERSION]" and the next "## [" header.
-          BODY=$(awk "/^## \[$VERSION\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          BODY=$(awk -v ver="$VERSION" 'index($0, "## [" ver "]") == 1 {found=1; next} found && /^## \[/ {exit} found {print}' CHANGELOG.md)
           if [ -z "$BODY" ]; then
             BODY="Release $VERSION — see CHANGELOG.md for details."
           fi
           # Write to a file to preserve newlines through GitHub Actions output.
-          echo "$BODY" > /tmp/release_body.md
+          printf '%s\n' "$BODY" > "$RUNNER_TEMP/release_body.md"
           echo "Release notes extracted for $VERSION"
+
+      - name: Decide the latest mark
+        id: latest
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          HIGHEST=$( { git tag -l 'v[0-9]*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true
+                       echo "v$VERSION"; } | sort -V | tail -1)
+          if [ "$HIGHEST" = "v$VERSION" ]; then
+            echo "latest=true" >> "$GITHUB_OUTPUT"
+            echo "v$VERSION — наибольшая версия: выпуск получит пометку «последний»."
+          else
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+            echo "v$VERSION ниже уже выпущенной $HIGHEST: пометка «последний» остаётся у $HIGHEST."
+          fi
 
       - name: Create tag and GitHub release
         if: steps.tag_check.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RC_TAG: ${{ steps.rc.outputs.rc_tag }}
+          LATEST: ${{ steps.latest.outputs.latest }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           TAG="v$VERSION"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Release $TAG"
-          git push origin "$TAG"
+          git tag -a "$TAG" -m "Release $TAG (candidate $RC_TAG)" HEAD
+          git push origin "refs/tags/$TAG"
           gh release create "$TAG" \
+            --verify-tag \
             --title "IWE Template $TAG" \
-            --notes-file /tmp/release_body.md \
-            --latest
-          echo "Created release $TAG"
+            --notes-file "$RUNNER_TEMP/release_body.md" \
+            --latest="$LATEST"
+          echo "Created release $TAG on $(git rev-parse HEAD) (latest=$LATEST)"
+
+      # A tag pushed with GITHUB_TOKEN starts no workflow; workflow_dispatch is the exception.
+      # The audit reminder is automatic for x.y.0 only, as before (post-release-audit.yml).
+      - name: Request the post-release audit (x.y.0)
+        if: steps.tag_check.outputs.exists == 'false' && endsWith(github.event.inputs.version, '.0')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh workflow run post-release-audit.yml --ref main -f version="$VERSION"; then
+            echo "::warning::Напоминание об аудите для v$VERSION не запрошено — запустите post-release-audit.yml вручную."
+          fi

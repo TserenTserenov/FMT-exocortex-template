@@ -46,6 +46,7 @@ ADDITIONAL_ISSUE_TESTS=(
     "scripts/tests/test-wp529-f261-rollback-by-installed-version.sh"
     "scripts/tests/test-wp529-f261-release-branch-base.sh"
     "scripts/tests/test-wp529-f261-changelog-append-fields.sh"
+    "scripts/tests/test-wp529-f268-release-from-branch.sh"
     ".claude/hooks/tests/test-issue-1411-stop-gate-blocked-skill.sh"
     "scripts/tests/test_kimi_standalone_preflight.sh"
 )

@@ -13,6 +13,11 @@ name: Post-Release Adversarial Audit
 #      bumps patch — this filter keeps routine patch releases from creating
 #      an issue, but catches any minor/major bump (they are always deliberate, not auto-cron).
 #      A sensitive patch release gets the same venue via workflow_dispatch.
+#   3. WP-529 Ф268: release.yml dispatches this workflow for x.y.0 right after it tags the
+#      release on the release branch (a tag pushed with GITHUB_TOKEN starts no workflow).
+#      The push trigger stays as a fallback: it fires when the release PR comes back to
+#      main; the issue is not duplicated (see below). Both read the prompt at the release
+#      tag and skip a version that has no tag.
 #
 # Goal: create a reminder with an adversarial prompt → the author runs it in a Claude session
 # → finds classes of regressions that detectors do not catch.
@@ -53,16 +58,40 @@ jobs:
     if: github.repository == 'TserenTserenov/FMT-exocortex-template'
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0  # tags: the reminder is built from the release tag, not from main
       - name: Determine version
         id: ver
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            VER="$INPUT_VERSION"
           else
             VER=$(grep -m1 '"version"' update-manifest.json \
               | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
-            echo "version=$VER" >> $GITHUB_OUTPUT
           fi
+          if [[ ! "$VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Версия должна быть вида X.Y.Z, получено: '$VER'"
+            exit 1
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+      # WP-529 Ф268: the release is tagged on its release branch before its PR comes back to
+      # main, so the reminder reads the prompt at the release tag. No tag = not released: an
+      # untagged version on main (or a typo in a manual run) gets no reminder.
+      - name: Read the audit prompt at the release tag
+        id: tag
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          if ! git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "SKIP: метки v$VERSION нет — версия не выпущена, напоминание не создаётся."
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git show "v$VERSION:setup/release-audit-prompt.md" > "$RUNNER_TEMP/release-audit-prompt.md"
+          echo "released=true" >> "$GITHUB_OUTPUT"
       - name: Skip routine patch bumps on auto-trigger (patch != 0)
         id: gate
         if: github.event_name != 'workflow_dispatch'
@@ -76,14 +105,16 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
       - name: Create or update audit reminder issue
-        if: github.event_name == 'workflow_dispatch' || steps.gate.outputs.skip != 'true'
+        if: steps.tag.outputs.released == 'true' && (github.event_name == 'workflow_dispatch' || steps.gate.outputs.skip != 'true')
         id: issue
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          PROMPT_FILE: ${{ runner.temp }}/release-audit-prompt.md
         with:
           script: |
             const fs = require('fs');
             const version = '${{ steps.ver.outputs.version }}';
-            const promptBody = fs.readFileSync('setup/release-audit-prompt.md', 'utf8');
+            const promptBody = fs.readFileSync(process.env.PROMPT_FILE, 'utf8');
 
             const title = `Post-release adversarial audit: v${version}`;
             const body = `> **Напоминание об аудите.** Для v${version} нужен adversarial audit субагентом или внешним пилотом.

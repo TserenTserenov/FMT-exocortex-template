@@ -1,7 +1,9 @@
 name: Notify Template Update
 
-# Daily at 7:28 MSK (4:28 UTC) checks commits from the last 24h
+# Daily at 7:28 MSK (4:28 UTC) checks release tags created in the last 24h
 # and sends the release announcement to subscribers via the @aist_me_bot webhook.
+# WP-529 Ф268: the version sections are read from CHANGELOG.md at the release tag
+# (the release PR reaches main only after the release).
 # WP-529: the announcement text is built and checked by scripts/release-notice-build.py
 # (model → checks → editor → one correction → otherwise a short announcement).
 # The ready text is saved as an artifact and goes to the author as a preview;
@@ -36,109 +38,98 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 0  # the full history is needed for git log
+          fetch-depth: 0  # the full history and the release tags are needed
 
-      - name: Check for recent commits
+      # WP-529 Ф268: a release is tagged on its release branch, and its release PR comes back to
+      # main only later. So the announcement starts from the release tags created in the last
+      # 24 hours (tag date, not the date in the CHANGELOG header, which is the cut day) and reads
+      # each version section from CHANGELOG.md AT ITS TAG, not from main.
+      - name: Find releases to announce
         id: check
         env:
           FORCE_VERSION: ${{ inputs.version }}
         run: |
-          COMMITS=$(git log --since="24 hours ago" --oneline 2>/dev/null)
-          if [ -z "$COMMITS" ] && [ -z "$FORCE_VERSION" ]; then
-            echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            echo "No commits in the last 24 hours"
+          if [ -n "$FORCE_VERSION" ]; then
+            if ! printf '%s' "$FORCE_VERSION" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+              echo "::error::version must look like 0.42.0"
+              exit 1
+            fi
+            # Historical tags exist both with and without the leading 'v'.
+            if git rev-parse -q --verify "refs/tags/v$FORCE_VERSION" >/dev/null; then
+              TAGS="v$FORCE_VERSION"
+            elif git rev-parse -q --verify "refs/tags/$FORCE_VERSION" >/dev/null; then
+              TAGS="$FORCE_VERSION"
+            else
+              echo "::error::Метки v$FORCE_VERSION нет — версия не выпущена, анонсировать нечего."
+              exit 1
+            fi
           else
-            COMMIT_COUNT=$(echo "$COMMITS" | wc -l | tr -d ' ')
-            echo "has_changes=true" >> "$GITHUB_OUTPUT"
-            echo "commit_count=$COMMIT_COUNT" >> "$GITHUB_OUTPUT"
-            echo "$COMMIT_COUNT commits found"
+            SINCE=$(( $(date -u +%s) - 86400 ))
+            TAGS=$(git for-each-ref --format='%(refname:short) %(creatordate:unix)' 'refs/tags/v*' \
+              | awk -v since="$SINCE" '$1 ~ /^v[0-9]+\.[0-9]+\.[0-9]+$/ && $2 >= since {print $1}' \
+              | sort -rV)
           fi
-
-      - name: Extract changelog entries for recent dates
-        if: steps.check.outputs.has_changes == 'true'
-        id: changelog
-        env:
-          FORCE_VERSION: ${{ inputs.version }}
-        run: |
-          # Явно названная версия (ручной запуск) берёт свой раздел независимо от даты заголовка:
-          # выпуск 0.42.0 вышел 16.11, а заголовок раздела датирован днём нарезки (10.11) — окно
-          # «сегодня и вчера» его не видело и подписчики остались бы без анонса.
-          if [ -n "$FORCE_VERSION" ] && ! printf '%s' "$FORCE_VERSION" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
-            echo "::error::version must look like 0.42.0"
-            exit 1
-          fi
-          if [ ! -f CHANGELOG.md ]; then
-            echo "entry=Нет CHANGELOG.md" >> "$GITHUB_OUTPUT"
+          if [ -z "$TAGS" ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No release tags in the last 24 hours"
             exit 0
           fi
+          printf '%s\n' "$TAGS" > /tmp/release_tags.txt
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          echo "Releases to announce: $(tr '\n' ' ' < /tmp/release_tags.txt)"
 
-          # Собираем ВСЕ версии за последние 24ч (сегодня + вчера)
-          TODAY=$(date -u +%Y-%m-%d)
-          YESTERDAY=$(date -u -d "yesterday" +%Y-%m-%d 2>/dev/null || date -u -v-1d +%Y-%m-%d)
-
-          # Первая (самая новая) РЕАЛЬНО ВЫПУЩЕННАЯ версия — для заголовка
-          # (см. блок ниже: заголовок тоже не имеет права опережать тег).
-          VERSION=""
-
-          # 2026-08-22 (live: анонс v0.38.7 ушёл 32 подписчикам, пока тега и
-          # GitHub Release не существовало): дайджест обязан опираться на факт
-          # выпуска, не на заголовок CHANGELOG. Секции версий без существующего
-          # git-тега (v<ver> или <ver>) исключаются из рассылки целиком.
-          git tag > /tmp/existing_tags.txt
-          while IFS= read -r hdr; do
-            ver=$(printf '%s' "$hdr" | sed -E 's/^\[([^]]+)\].*/\1/')
-            if grep -qx "v$ver" /tmp/existing_tags.txt || grep -qx "$ver" /tmp/existing_tags.txt; then
-              VERSION="$hdr"
-              break
+      - name: Extract changelog entries at the release tags
+        if: steps.check.outputs.has_changes == 'true'
+        id: changelog
+        run: |
+          : > /tmp/changelog_entry.txt
+          : > /tmp/changelog_version.txt
+          while IFS= read -r TAG; do
+            VER="${TAG#v}"
+            if ! git show "$TAG:CHANGELOG.md" > /tmp/changelog_at_tag.md 2>/dev/null; then
+              echo "::warning::В метке $TAG нет CHANGELOG.md — версия пропущена."
+              continue
             fi
-          done < <(grep '^## \[' CHANGELOG.md | sed 's/## //')
-          if [ -n "$FORCE_VERSION" ]; then
-            VERSION=$(grep -m1 "^## \[$FORCE_VERSION\]" CHANGELOG.md | sed 's/## //')
-          fi
-
-          # Все записи с датами today или yesterday
-          # Собираем все блоки между ## [...] заголовками, фильтруя по дате
-          python3 -c "
+            python3 - "$VER" /tmp/changelog_at_tag.md >> /tmp/changelog_entry.txt <<'PY'
           import sys
-          today = '$TODAY'
-          yesterday = '$YESTERDAY'
-          force = '$FORCE_VERSION'
-          entries = []
-          current_block = []
-          current_date = None
-          tags = set(open('/tmp/existing_tags.txt').read().split())
-          def released(ver):
-              # Unreleased-секция и версии без тега не анонсируются;
-              # исторические теги встречаются и с 'v', и без.
-              if not ver or ver.lower() == 'unreleased':
-                  return False
-              return ('v' + ver) in tags or ver in tags
-          current_ver = None
-          with open('CHANGELOG.md') as f:
+          ver, path = sys.argv[1], sys.argv[2]
+          inside = False
+          block = []
+          with open(path, encoding='utf-8') as f:
               for line in f:
                   if line.startswith('## ['):
-                      if current_block and (current_date in (today, yesterday) or (force and current_ver == force)) and released(current_ver):
-                          entries.extend(current_block)
-                      current_block = []
-                      # Extract date from '## [0.8.7] — 2026-03-17'
-                      parts = line.split('—')
-                      current_date = parts[-1].strip() if len(parts) > 1 else ''
-                      current_ver = line.split('[', 1)[-1].split(']', 1)[0].strip()
-                  elif current_date is not None:
-                      current_block.append(line)
-              # Last block
-              if current_block and (current_date in (today, yesterday) or (force and current_ver == force)) and released(current_ver):
-                  entries.extend(current_block)
-          # Полный текст: обрыв на 50 строках выбрасывал пункты из анонса (WP-529).
-          print(''.join(entries).strip())
-          " > /tmp/changelog_entry.txt
+                      if inside:
+                          break
+                      inside = line.split('[', 1)[-1].split(']', 1)[0].strip() == ver
+                      continue
+                  if inside:
+                      block.append(line)
+          # Full text: cutting at 50 lines dropped items from the announcement (WP-529).
+          text = ''.join(block).strip()
+          if text:
+              print(text)
+          PY
+            # The newest release names the announcement: "[X.Y.Z] — date" as in the header.
+            if [ ! -s /tmp/changelog_version.txt ]; then
+              grep -m1 "^## \[$VER\]" /tmp/changelog_at_tag.md | sed 's/## //' > /tmp/changelog_version.txt || true
+            fi
+          done < /tmp/release_tags.txt
 
-          echo "$VERSION" > /tmp/changelog_version.txt
+          # Files of the announced releases: from the previous stable release to the newest tag.
+          NEWEST=$(head -1 /tmp/release_tags.txt)
+          OLDEST=$(tail -1 /tmp/release_tags.txt)
+          PREV=$( { git tag -l 'v[0-9]*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -vxF "$OLDEST" || true
+                    echo "$OLDEST"; } | sort -V | grep -B1 -xF "$OLDEST" | head -1)
+          if [ -n "$PREV" ] && [ "$PREV" != "$OLDEST" ]; then
+            git diff --name-only "$PREV" "$NEWEST" > /tmp/changed_files.txt
+          else
+            git show --name-only --pretty=format: "$NEWEST" > /tmp/changed_files.txt
+          fi
 
-          # Проверяем, есть ли содержательные записи changelog за эти даты
+          # Проверяем, есть ли содержательные записи changelog у этих выпусков
           # Пустой файл или только пробелы/переводы строк = нет changelog
           if [ ! -s /tmp/changelog_entry.txt ]; then
-            echo "No changelog entries for $TODAY or $YESTERDAY — skipping notification"
+            echo "No changelog entries for $(tr '\n' ' ' < /tmp/release_tags.txt)— skipping notification"
             echo "has_changelog=false" >> "$GITHUB_OUTPUT"
           else
             # Проверяем, что changelog содержит хотя бы один буллет-пункт (- или *)
@@ -161,8 +152,8 @@ jobs:
 
           CHANGELOG=$(cat /tmp/changelog_entry.txt)
 
-          # Список файлов, изменённых за 24ч
-          CHANGED_FILES=$(git log --since="24 hours ago" --name-only --pretty=format: | sort -u | grep -v '^$')
+          # Список файлов выпуска (собран на предыдущем шаге по меткам, WP-529 Ф268)
+          CHANGED_FILES=$(sort -u /tmp/changed_files.txt | grep -v '^$' || true)
 
           # Паттерны значимых изменений (в changelog-тексте)
           SIGNIFICANT_PATTERNS="skill|роль|протокол|Added|Добавлено|install|update\.sh|setup|SETUP-GUIDE|LEARNING-PATH|скилл|новый|new"

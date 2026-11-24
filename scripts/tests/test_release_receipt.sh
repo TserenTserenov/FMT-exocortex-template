@@ -180,6 +180,13 @@ release_run_is false "pull_request" "${RELEASE_ENV[@]}" GITHUB_EVENT_NAME=pull_r
 release_run_is false "schedule" "${RELEASE_ENV[@]}" GITHUB_EVENT_NAME=schedule
 release_run_is false "push to another branch" "${RELEASE_ENV[@]}" GITHUB_REF_NAME=feature
 release_run_is false "push in a fork" "${RELEASE_ENV[@]}" GITHUB_REPOSITORY=someone/FMT-exocortex-template
+# WP-529 Ф268: the release is made from its release branch, so a run there is a release run.
+release_run_is true "push to a release branch, version not tagged" "${RELEASE_ENV[@]}" GITHUB_REF_NAME=release/v9.9.1
+release_run_is true "workflow_dispatch on a release branch" "${RELEASE_ENV[@]}" \
+  GITHUB_EVENT_NAME=workflow_dispatch GITHUB_REF_NAME=release/v9.9.1
+release_run_is false "pull_request into a release branch" "${RELEASE_ENV[@]}" \
+  GITHUB_EVENT_NAME=pull_request GITHUB_REF_NAME=release/v9.9.1
+release_run_is false "push to a branch that only starts with release" "${RELEASE_ENV[@]}" GITHUB_REF_NAME=release-notes
 
 macos_receipt() {
   local out=$1 macos=$2
@@ -223,6 +230,7 @@ fi
 # publishable, but listed as skipped and printed as «пропущено», not success.
 git -C "$FX" tag v9.9.1
 release_run_is false "push to main, version already tagged" "${RELEASE_ENV[@]}"
+release_run_is false "push to a release branch, version already tagged" "${RELEASE_ENV[@]}" GITHUB_REF_NAME=release/v9.9.1
 OUT_R3="$TMP/receipt-nonrelease-macos-skipped.json"
 if ! macos_receipt "$OUT_R3" skipped "${RELEASE_ENV[@]}" > "$TMP/r3.log"; then
   echo "FAIL: non-release push with skipped macOS job was blocked" >&2

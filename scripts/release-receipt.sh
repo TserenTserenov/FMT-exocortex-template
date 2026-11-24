@@ -18,9 +18,10 @@
 # job, produces false. The script exits 1 so branch protection can require
 # this receipt instead of enumerating every individual job (Phase 2).
 #
-# Release run = the run whose green result makes release.yml publish a new
-# release: same repository, a push or workflow_dispatch run on main, and no
-# tag v<manifest version> yet (release.yml's job `if:` plus its tag check).
+# Release run = the run whose green result release.yml requires before it
+# publishes a new release: same repository, a push or workflow_dispatch run on
+# a release branch release/v* (WP-529 Ф268) or on main, and no tag
+# v<manifest version> yet.
 # `--release-run` prints that decision (true/false) so the macOS job can be
 # scheduled with the same rule the receipt enforces.
 #
@@ -41,11 +42,12 @@ RECEIPT="${RELEASE_RECEIPT_OUT:-$SCRIPT_DIR/release-receipt.json}"
 
 [ -f "$MANIFEST" ] || { echo "ERROR: $MANIFEST не найден"; exit 2; }
 
-# The repository whose main branch release.yml publishes from (its job `if:`).
+# The repository release.yml publishes from (its job `if:`).
 RELEASE_REPOSITORY="TserenTserenov/FMT-exocortex-template"
 
 # Prints true when this run is the one release.yml would turn into a release.
-# Mirrors release.yml: repository gate, event push|workflow_dispatch on main,
+# Mirrors release.yml: repository gate, event push|workflow_dispatch on a
+# release branch or main,
 # version read from the manifest the same way, release only if the tag
 # v<version> does not exist yet. Anything that cannot be determined (no
 # version, git unavailable) answers true: the stricter gate applies.
@@ -56,7 +58,12 @@ is_release_run() {
     push|workflow_dispatch) ;;
     *) echo false; return ;;
   esac
-  [ "${GITHUB_REF_NAME:-}" = main ] || { echo false; return; }
+  # WP-529 Ф268: a release is cut from its release branch, so a run on release/v* is a
+  # release run too; main stays one for releases made under the old order.
+  case "${GITHUB_REF_NAME:-}" in
+    main|release/v*) ;;
+    *) echo false; return ;;
+  esac
   version=$(grep -m1 '"version"' "$MANIFEST" \
     | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
   if [ -z "$version" ] || ! git -C "$SCRIPT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
