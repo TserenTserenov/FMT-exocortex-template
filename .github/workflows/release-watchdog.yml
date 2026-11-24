@@ -5,7 +5,10 @@ name: Release Watchdog
 # из 27.09 провисел два дня: автоназначение reviewer не сработало как сигнал.
 # Этот workflow ежедневно ищет открытые PR из веток release/* старше
 # STALE_HOURS и заводит по одному обращению (issue) на PR+head-коммит -
-# GitHub присылает пилоту уведомление. Он не часть создания релиза: падение
+# GitHub присылает пилоту уведомление. С WP-529 Ф268 запрос release/vX.Y.Z
+# открыт всю проверку и вливается после выхода: пока метки vX.Y.Z нет, сторож
+# молчит, а после неё напоминает об обратном слиянии (MERGE_BACK_HOURS).
+# Он не часть создания релиза: падение
 # сторожа не влияет на выпуск, а выпуск не зависит от сторожа.
 #
 # Канал в бота (Telegram) - отдельный шаг ниже, он выключен, пока в
@@ -30,6 +33,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       STALE_HOURS: "12"
+      MERGE_BACK_HOURS: "24"
     steps:
       - name: Close notices for PRs that are no longer open
         run: |
@@ -43,26 +47,70 @@ jobs:
             fi
           done
 
+      # WP-529 Ф268: a release PR release/vX.Y.Z -> main is opened at cut and stays open
+      # for the whole check; it is merged back only after the release. So no notice while
+      # vX.Y.Z is not tagged (the release is still being checked). Once the tag exists, the
+      # PR open MERGE_BACK_HOURS after the tag is the real stall: main lacks the version and
+      # the CHANGELOG section, and the next cut refuses. One issue per PR and version, edited
+      # in place on later runs. Other release/* heads keep the STALE_HOURS rule.
       - name: Notify about stale release PRs
         id: notify
         run: |
           gh label create release-pr-waiting --description "Release PR is waiting for the pilot" --color FBCA04 2>/dev/null || true
           NOW=$(date -u +%s)
           FOUND=""
-          while IFS=$'\t' read -r PR SHA CREATED URL; do
-            AGE_H=$(( (NOW - $(date -u -d "$CREATED" +%s)) / 3600 ))
+          REPO="$GITHUB_REPOSITORY"
+          ISSUES=$(gh issue list --label release-pr-waiting --state all --limit 200 --json number,title,state)
+
+          # tag_time <tag>: unix time the tag was made; empty when the tag does not exist.
+          tag_time() {
+            local ref sha
+            ref=$(gh api "repos/$REPO/git/ref/tags/$1" 2>/dev/null) || return 0
+            sha=$(printf '%s' "$ref" | jq -r '.object.sha')
+            if [ "$(printf '%s' "$ref" | jq -r '.object.type')" = tag ]; then
+              gh api "repos/$REPO/git/tags/$sha" | jq -r '.tagger.date | fromdateiso8601'
+            else
+              gh api "repos/$REPO/git/commits/$sha" | jq -r '.committer.date | fromdateiso8601'
+            fi
+          }
+
+          while IFS=$'\t' read -r PR HEAD BASE SHA CREATED_AT URL; do
+            if [[ "$HEAD" =~ ^release/v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+              VER="${BASH_REMATCH[1]}"
+              TAG_AT=$(tag_time "v$VER")
+              if [ -z "$TAG_AT" ]; then
+                echo "PR #$PR: выпуск v$VER ещё проверяется (метки нет) — напоминание не нужно."
+                continue
+              fi
+              [ "$BASE" = main ] || continue
+              AGE_H=$(( (NOW - TAG_AT) / 3600 ))
+              [ "$AGE_H" -ge "$MERGE_BACK_HOURS" ] || continue
+              KEY="PR #$PR v$VER"
+              TITLE="Обратное слияние просрочено: $KEY не влит в main уже ${AGE_H} ч после выпуска"
+              BODY="Выпуск v$VER вышел (метка поставлена ${AGE_H} ч назад), а его запрос $URL (release/v$VER → main) всё ещё открыт. Пока он не влит, в main нет номера версии и раздела CHANGELOG этого выпуска, и следующая нарезка (Release Candidate, режим cut) откажет. Влейте его; конфликты с правками main сводит Разработчик. Обращение закроется само после слияния или закрытия PR."
+              ISSUE=$(printf '%s' "$ISSUES" | jq -r --arg key "$KEY" \
+                '[.[] | select(.state == "OPEN" and (.title | contains($key)))][0].number // empty')
+              if [ -n "$ISSUE" ]; then
+                gh issue edit "$ISSUE" --title "$TITLE" --body "$BODY"
+              else
+                gh issue create --label release-pr-waiting --title "$TITLE" --body "$BODY"
+              fi
+              FOUND="${FOUND}${PR} "
+              continue
+            fi
+            AGE_H=$(( (NOW - $(printf '%s' "$CREATED_AT" | jq -Rr 'fromdateiso8601')) / 3600 ))
             [ "$AGE_H" -ge "$STALE_HOURS" ] || continue
             KEY="PR #$PR @${SHA:0:7}"
-            EXISTING=$(gh issue list --label release-pr-waiting --state all --limit 200 --json title \
-              --jq "[.[] | select(.title | contains(\"$KEY\"))] | length")
+            EXISTING=$(printf '%s' "$ISSUES" | jq --arg key "$KEY" '[.[] | select(.title | contains($key))] | length')
             if [ "$EXISTING" -eq 0 ]; then
               gh issue create --label release-pr-waiting \
                 --title "Релизный $KEY ждёт слияния уже ${AGE_H} ч" \
                 --body "Открытый релизный PR: $URL (коммит ${SHA:0:7}, возраст ${AGE_H} ч). Проверьте статус release-receipt и сливайте, если он зелёный. Обращение закроется само после слияния или закрытия PR."
             fi
             FOUND="${FOUND}${PR} "
-          done < <(gh pr list --state open --json number,headRefName,headRefOid,createdAt,url \
-            --jq '.[] | select(.headRefName | startswith("release/")) | "\(.number)\t\(.headRefOid)\t\(.createdAt)\t\(.url)"')
+          done < <(gh pr list --state open --limit 200 --json number,headRefName,baseRefName,headRefOid,createdAt,url \
+            | jq -r '.[] | select(.headRefName | startswith("release/"))
+                | [.number, .headRefName, .baseRefName, .headRefOid, .createdAt, .url] | @tsv')
           echo "found=${FOUND}" >> "$GITHUB_OUTPUT"
 
       - name: Send notice to the pilot channel (optional, fail-open)

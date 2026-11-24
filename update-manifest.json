@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "edee489078c603b83aeb83e216cfad85676a86e0504f3de0c4aa3918cfeade90"
+      "sha256": "aa3dd00b9d91d2856b6a4b7e65244241cfaf1e546cabf58877ab3f73094dc3ff"
     },
     {
       "path": "CLAUDE.md",
@@ -3101,7 +3101,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "9023b199cf48d2ce2192165993a5a98827ba50972a95e2687663b28413faa76e"
+      "sha256": "9798a76d690aa56da7f70fb52375145e691dcf818ba8652022fd30137fc17c5e"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3666,6 +3666,7 @@
     "scripts/tests/test-wp529-f261-release-branch-base.sh",
     "scripts/tests/test-wp529-f261-rollback-by-installed-version.sh",
     "scripts/tests/test-wp529-f268-release-from-branch.sh",
+    "scripts/tests/test-wp529-f268-release-watchdog.sh",
     "scripts/tests/test-wp529-f270-clone-memory-backup.sh",
     "scripts/tests/test-wp529-f270-core-mode-feeders.sh",
     "scripts/tests/test-wp529-f270-exec-bit.sh",
