@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "fe3c4a2cb9016636d2d897e84c4c465cd0265119cbaca91772a61cae4a72fa28"
+      "sha256": "b534f30c0922b451bfdebcd07f17a413602e35b8bfdbb1e0e846cecc9551b972"
     },
     {
       "path": "CLAUDE.md",
@@ -3101,7 +3101,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "e46fbd6e75d7d8b55c6d15ffbd4f9dd4fa15fbe8b617c46f537a72175e27c7d3"
+      "sha256": "e58a6938d23e82d1d2da977bbc6c1e0bd86eb457690de63ab6ccc3a27f1dddf0"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3366,6 +3366,10 @@
     {
       "path": "scripts/week-report-ensure.sh",
       "sha256": "08ebe1a872d0a02fbdd5ba92115773b919181eda541816286f9f4920e62b2024"
+    },
+    {
+      "path": "scripts/wp-inbox-close-gate.sh",
+      "sha256": "9d8625533ffc69b34a8e42c0c8f634c595ad3c705e684b8049b6ac236f46c1b6"
     },
     {
       "path": "scripts/wp-inbox.sh",
@@ -3906,6 +3910,7 @@
     "scripts/tests/test_validate_skill_hook_claims_path.sh",
     "scripts/tests/test_wp568_strategist_auth_and_retry_message.sh",
     "scripts/tests/test_wp_inbox_bundle_signal.sh",
+    "scripts/tests/wp-inbox-close-gate-smoke.sh",
     "scripts/tests/wp-sync-bundle-origin-pinned-smoke.sh",
     "scripts/translate.py",
     "scripts/verify-template-integrity.sh",
