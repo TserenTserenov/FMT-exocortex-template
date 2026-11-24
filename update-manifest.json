@@ -561,7 +561,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "bda852f86c80b8ec5318d075d79a273abba0c28bed3d9d303f964b3bd88cf012"
+      "sha256": "4306bd2ab14ddc16291f7c4dc099aa459e3ea198cf1e11cd6bc3fbfb54a95253"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "5383adf68e798e3c8666fd810c25eddca15c25e395444d0674811937d265ef4d"
+      "sha256": "8908bbde9eedfb4701de9ffd35069b6ae8e45e710119b98eaee5128d6dec4a3f"
     },
     {
       "path": "CLAUDE.md",
@@ -3085,7 +3085,7 @@
     },
     {
       "path": "scripts/tests/fixtures/python-resolver-baseline.txt",
-      "sha256": "5df435357fbf68c2c2dba999d825f99dfa955f0a485c0a253b699f62d90850ce"
+      "sha256": "29128aa9d23bedb5da4c22b6f10c9b11c0a7a5c121ccecfe4dc86033e2d6f957"
     },
     {
       "path": "scripts/tests/lib/capture_fixture.sh",
