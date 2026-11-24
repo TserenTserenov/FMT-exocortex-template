@@ -47,6 +47,11 @@ Refs: WP-NNN
 
 ### Added
 
+- [optional] Почтальон: `scripts/postman.py deliver --to WP-N --from "..." --pointer "..." --summary "..."` кладёт заявку в ящик другого РП по адресной книге (`scripts/postman-address-book.yaml`, проверка и разбор адреса — `scripts/postman-address-book.py`). Повтор той же записи вторую не создаёт; закрытый РП получает исход «отвергнуто» с адресом списка отложенного. Правило в инструкциях агента ссылается на эту команду, а в шаблоне её не было (WP-418 Ф14). (#1662)
+  - Цель: 10 · Результат: служебное — сессия одного РП передаёт заявку в ящик другого без ручной правки чужих файлов.
+  - Как проверить: `python3 scripts/tests/test-postman.py` и `python3 scripts/tests/test-postman-address-book.py` — обе печатают «все проверки прошли».
+  - Как откатить: вернуть коммит слияния этого PR через `git revert`.
+
 - [optional] The glossary supplier can explain the outcome for each requested concept code. Run `python3 scripts/glossary_supplier.py coverage` for the published snapshot. Use `--expected FILE` for selected codes, and `--input FILE` for the corresponding verified graph walk. New passports authenticate the entire input walk. The nightly run also saves a 30-day coverage artifact for previously published codes, current public snapshot codes and the public controls, even when the snapshot is unchanged. Each record contains a code and its outcome and reason. The raw graph walk stays on the runner. (#1647)
   - Цель: 93 · Результат: Ц93-02
   - Как проверить: python3 -m pytest scripts/tests/test_glossary_supplier.py -k coverage
