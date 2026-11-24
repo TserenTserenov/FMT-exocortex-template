@@ -1,5 +1,174 @@
-files_translated: []
-last_run_utc: '2026-11-23T18:25:47Z'
-last_synced_sha: 0f54420e77654521787bab2aaf4a2356e0c36e7f
+files_translated:
+- docs/AGENT-VENDOR-SETUP.md
+last_run_utc: '2026-11-24T07:41:26Z'
+last_synced_sha: 5eedc87405ade9ca2a44e95e2eeff4e6557656c5
 schema_version: 1
-unapproved_terms: []
+unapproved_terms:
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: local-glossary
+  term_en: Closing
+  term_ru: Закрытие
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: local-glossary
+  term_en: Constraint
+  term_ru: Ограничение
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: local-glossary
+  term_en: Opening
+  term_ru: Открытие
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: local-glossary
+  term_en: Priority
+  term_ru: Приоритет
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: local-glossary
+  term_en: Repository
+  term_ru: Репозиторий
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: local-glossary
+  term_en: Session
+  term_ru: Сессия
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: local-glossary
+  term_en: Script
+  term_ru: Скрипт
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: local-glossary
+  term_en: Template
+  term_ru: Шаблон
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: local-glossary
+  term_en: Step
+  term_ru: Шаг
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: local-glossary
+  term_en: Work
+  term_ru: Работа
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: local-glossary
+  term_en: Verification
+  term_ru: Проверка
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: daemon
+  term_ru: демон
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: peer session
+  term_ru: пир-сессия
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: adapter
+  term_ru: адаптер
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: child process
+  term_ru: дочерний процесс
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: peer adapter
+  term_ru: пир-адаптер
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: lock gateway
+  term_ru: шлюз блокировок
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: lock manager
+  term_ru: менеджер блокировок
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: lock
+  term_ru: блокировка
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: tier
+  term_ru: тир
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: any
+  term_ru: любого
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: the primary agent is being replaced
+  term_ru: основной агент меняется
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: an agent is being added alongside an already-working one
+  term_ru: агент добавляется рядом
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: the agent itself
+  term_ru: сам агент
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: Step A. Choose a new agent.
+  term_ru: Шаг А. Выбрать нового агента.
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: Step B. Open the IWE folder with the new agent, without making changes.
+  term_ru: Шаг Б. Открыть папку IWE новым агентом без правок.
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: Step C. Make it the primary agent.
+  term_ru: Шаг В. Сделать его основным.
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: What works only in Claude Code.
+  term_ru: Что работает только в Claude Code.
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: Step D. For the first week, manually verify that the Day Open and Day Close
+    were completed by the new vendor's agent.
+  term_ru: Шаг Г. Первую неделю перепроверять открытие и закрытие дня агентом другого
+    вендора.
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: 'Verification:'
+  term_ru: 'Проверка:'
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: 'Important:'
+  term_ru: 'Важно:'
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: the second and subsequent agents
+  term_ru: второго и последующих
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: 'General registration syntax (replace placeholders for the specific agent):'
+  term_ru: 'Общий синтаксис регистрации (замените плейсхолдеры под конкретный агент):'
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: Three verified examples
+  term_ru: Три реально проверенных примера
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: does not support MCP as a client
+  term_ru: не поддерживает MCP как клиент
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: default system browser
+  term_ru: браузер по умолчанию
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: Before connecting the agent, make sure you are already signed in to your
+    Aisystant account in the default browser.
+  term_ru: Прежде чем подключать агента — убедитесь, что в браузере по умолчанию вы
+    уже залогинены в свой аккаунт Aisystant.
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: 'The security trade-off must be made explicitly:'
+  term_ru: 'Решение по безопасности принимается явно:'
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: The agent sees AGENTS.md
+  term_ru: Агент видит AGENTS.md
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: If gateway coordination is configured
+  term_ru: Если координация через шлюз настроена
+- file: docs/AGENT-VENDOR-SETUP.md
+  source: model
+  term_en: A real file edit with a lock
+  term_ru: Реальная правка файла с блокировкой
