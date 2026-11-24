@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "aa3dd00b9d91d2856b6a4b7e65244241cfaf1e546cabf58877ab3f73094dc3ff"
+      "sha256": "f05483b6fad0afeb102c507d358ba5c2ff958da3b0abfc83460613fe09aab657"
     },
     {
       "path": "CLAUDE.md",
@@ -1093,7 +1093,7 @@
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
-      "sha256": "31716f6824e0053bd70d62eb8385c31b8ee98b749d502e2358c9d147e8f9bc0d"
+      "sha256": "f405db85e1674d5fe8009142ad9472709f312eb0f13c1bf07ed679dfdbc674b9"
     },
     {
       "path": "docs/RESIDENCY-GATE-USAGE.md",
@@ -2416,6 +2416,10 @@
       "sha256": "eebaa7377465141240806397c9fb3ec1b8bd6dd6800baeacfbfcab04744fe228"
     },
     {
+      "path": "scripts/check-release-merge-back.py",
+      "sha256": "5f71c7ab653d86d672ae3fa4696f9a4850de457c9a3e44a04d0d0bbc2fc9a778"
+    },
+    {
       "path": "scripts/check-script-collisions.sh",
       "sha256": "7cdf22d4b83e752188a437200fbc873b5456faac20f2a7605fa7153696210b36"
     },
@@ -3101,7 +3105,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "9798a76d690aa56da7f70fb52375145e691dcf818ba8652022fd30137fc17c5e"
+      "sha256": "a3de43e635d7b12956e4e71773d5abb2d1292def5c1feb45b2ae4b93d7b15f7a"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3665,6 +3669,7 @@
     "scripts/tests/test-wp529-f261-changelog-append-fields.sh",
     "scripts/tests/test-wp529-f261-release-branch-base.sh",
     "scripts/tests/test-wp529-f261-rollback-by-installed-version.sh",
+    "scripts/tests/test-wp529-f268-merge-back-changelog.sh",
     "scripts/tests/test-wp529-f268-release-from-branch.sh",
     "scripts/tests/test-wp529-f268-release-watchdog.sh",
     "scripts/tests/test-wp529-f270-clone-memory-backup.sh",

@@ -9,7 +9,9 @@ name: Changelog Gate
 #
 # Исключения:
 #   - PR из веток release/* (ветка выпуска переносит записи из
-#     [Unreleased] в версию, новой записи в нём быть не должно);
+#     [Unreleased] в версию, новой записи в нём быть не должно); для них
+#     вместо этого работает задача release-merge-back (WP-529 Ф268): раздел
+#     версии после слияния должен совпасть с вышедшим;
 #   - метка no-changelog, поставленная участником из NO_CHANGELOG_ALLOWED.
 #     Ограничение: все агенты пилота работают под его учёткой, поэтому
 #     allowlist отсекает только посторонних актёров (боты, чужие аккаунты),
@@ -80,3 +82,27 @@ jobs:
       - name: Require handoff fields in new entries
         if: steps.release.outputs.skip == 'false' && steps.label.outputs.exempt == 'false'
         run: python3 scripts/check-changelog-fields.py --ref "$HEAD_SHA" --only-added "$BASE_SHA"
+
+  # WP-529 Ф268: the release PR release/vX.Y.Z -> main is merged after the release. Git merges
+  # it cleanly even when entries added to main after the cut slide under "## [X.Y.Z]" (the
+  # version header sits right under [Unreleased] on the branch) — they would silently leave
+  # [Unreleased] and the next release. This job checks the merge result GitHub tests for the PR:
+  # the version section must equal the released one (tag vX.Y.Z, or the last rc before it).
+  release-merge-back:
+    runs-on: ubuntu-latest
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template' && startsWith(github.event.pull_request.head.ref, 'release/v')
+    env:
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0  # tags: the released section is read at vX.Y.Z or the last rc
+
+      - name: Check the released section survives the merge
+        run: |
+          VERSION="${HEAD_REF#release/v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Ветка $HEAD_REF — не ветка выпуска vX.Y.Z, проверка не применяется."
+            exit 0
+          fi
+          python3 scripts/check-release-merge-back.py --version "$VERSION" --ref HEAD
