@@ -1001,7 +1001,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "67290d6e5b5cdd8f189c2ddef482d10c3558836afe096cfbb27062236afc2435"
+      "sha256": "97ec3970c011c2257e84c369f7633773f438da917e02cb3bb387679f07d4e6f2"
     },
     {
       "path": "CLAUDE.md",
@@ -1025,7 +1025,7 @@
     },
     {
       "path": "docs/AGENT-VENDOR-SETUP.md",
-      "sha256": "2583c96debeb50fbdaee393c2b80da3dbce50ff59fe37436fa1fec13d479cbf8"
+      "sha256": "e5d2b1b7ffa24be14234501a3f38779bfc065bb8b139bd15ab861eaee8f59c43"
     },
     {
       "path": "docs/BRANCH-PROTECTION-EMERGENCY.md",
