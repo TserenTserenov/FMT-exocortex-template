@@ -205,7 +205,7 @@ fi
 # `cd <dir> && git commit` is not recognised (the payload cwd is the cwd before the
 # command), so it stays blocked; the agent uses `git -C`.
 local_outside_commit_only() {
-  local cmd="$NORMALIZED_COMMAND" parts part kind args dir top top_real common common_real root_real p n=0 cwd
+  local cmd="$NORMALIZED_COMMAND" parts part kind args quoted dir top top_real common common_real root_real p n=0 cwd
   # The whole command must be a plain chain of `git -C <dir> add|commit ...` joined by ` && `
   # (rc.2 red team and code audit: the exemption used to judge only the matched fragment, so an
   # earlier `export GIT_DIR=...;`, a shell function named git, `cd <IWE repo> && git -C . commit`
@@ -225,14 +225,16 @@ local_outside_commit_only() {
     # add is never gated and the commit below is checked on its own
     [ "$kind" = commit ] || continue
     n=$((n + 1))
-    # a path may carry one pair of surrounding quotes and no other quote character
+    # a path may carry one pair of surrounding quotes and no other quote character; the shell
+    # does not expand `~` inside quotes, so a quoted tilde path is a literal relative path
+    quoted=0
     case "$dir" in
-      \"*\") dir=${dir#\"}; dir=${dir%\"} ;;
-      \'*\') dir=${dir#\'}; dir=${dir%\'} ;;
+      \"*\") dir=${dir#\"}; dir=${dir%\"}; quoted=1 ;;
+      \'*\') dir=${dir#\'}; dir=${dir%\'}; quoted=1 ;;
     esac
     case "$dir" in
       *'"'*|*"'"*|*'*'*|*'?'*|*'['*|'') return 1 ;;
-      '~'/*) dir="$HOME/${dir#\~/}" ;;
+      '~'*) [ "$quoted" = 0 ] && [[ "$dir" == '~/'* ]] || return 1; dir="$HOME/${dir#\~/}" ;;
       /*) ;;
       *)
         cwd=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null)
@@ -338,6 +340,7 @@ if [ "$AGENT_KEYED" = 1 ]; then
 else
   echo "[session-open-gate] session=$SESSION_ID_SAFE no semaphore with both harness_session_id: $SESSION_ID and a wp: field or an allowed housekeeping reason (${SESSION_DIR}/${SEM_GLOB}) — blocking direct git commit/push" >&2
 fi
+echo "[session-open-gate] Личный репозиторий вне папки IWE и без remote сохраняется без сессии только простой командой: git -C <абсолютный путь> commit -m \"одна строка\" (при необходимости git -C <путь> add … && git -C <путь> commit …); цепочки с ;, |, подстановками, переносами и многострочные сообщения этим исключением не покрываются." >&2
 
 cat >&2 <<EOF
 🚫 Session Open Gate (WP-561/S-68): прямой git commit/push без привязки к РП заблокирован.

@@ -449,6 +449,10 @@ expect "outside commit piped blocked"                         2 "git -C $OUTSIDE
 expect "quote inside the path blocked"                        2 "git -C $OUTSIDE\"/\"x commit -m x"
 expect "add then commit chain with && still passes"           0 "git -C $OUTSIDE add f && git -C $OUTSIDE commit -m x"
 expect "outside commit with a semicolon message blocked"      2 "git -C $OUTSIDE commit -m 'a; b'"
+# a quoted tilde is not expanded by the shell: git would receive a literal relative path (rc.3 audit)
+expect "quoted tilde path blocked"                            2 "git -C '~/personal' commit -m x"
+expect "double-quoted tilde path blocked"                     2 "git -C \"~/personal\" commit -m x"
+expect "tilde user path blocked"                              2 "git -C ~other/personal commit -m x"
 expect "variable in path stays blocked"                       2 'git -C $HOME/x commit -m x'
 # a repository with a remote (a clone of a real project) stays guarded
 git -C "$OUTSIDE" remote add origin https://example.invalid/x.git

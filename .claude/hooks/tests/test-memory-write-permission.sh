@@ -94,6 +94,13 @@ expect_allow "ordinary name containing git is fine" "$(call auto Write "$WS/memo
 
 # --- not approved: sensitive places inside memory keep their own confirmation
 expect_silent "git hook inside memory" "$(call auto Write "$WS/memory/.git/hooks/pre-commit")"
+# a link named .git inside memory, pointing to an ordinary folder: after resolving the name is gone,
+# but the written path still names it (rc.3 audit finding)
+rmdir "$MEM/.git/hooks" 2>/dev/null; rmdir "$MEM/.git" 2>/dev/null
+mkdir -p "$MEM/plain/hooks"
+ln -s "$MEM/plain" "$MEM/.git"
+expect_silent "link named .git to an ordinary folder" "$(call auto Write "$WS/memory/.git/hooks/pre-commit")"
+rm -f "$MEM/.git"; mkdir -p "$MEM/.git/hooks"
 expect_silent "dot-claude inside memory" "$(call auto Write "$WS/memory/.claude/settings.json")"
 expect_silent "dot-github inside memory" "$(call auto Write "$WS/memory/.github/workflows/x.yml")"
 expect_silent "dot-ssh inside memory" "$(call auto Write "$WS/memory/.ssh/authorized_keys")"

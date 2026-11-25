@@ -125,7 +125,7 @@
     },
     {
       "path": ".claude/hooks/memory-write-permission.sh",
-      "sha256": "60301a980c28e3aebfadaaa2a91866cc0d378b4d4f7e175faa6fbdb3f1c2c0e6"
+      "sha256": "3ab74ec1d2b79ee8882e12574fa6329896381f9945c626467aba1fc2e31b8757"
     },
     {
       "path": ".claude/hooks/pack-creator-spf-guard.sh",
@@ -205,7 +205,7 @@
     },
     {
       "path": ".claude/hooks/session-open-gate.sh",
-      "sha256": "8d9998e36fd6919ef9e50f72127a535425956c04db1379607b3b5c9c3ec718d5"
+      "sha256": "2e3d870f4c0eaecd65fbc6d5fa4039e291d0a371d677f63d105e1c6dd7f54318"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -305,7 +305,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-memory-write-permission.sh",
-      "sha256": "e1c7901a5ae5c8504c57ef40762e0fe43b5f4e15c98061c23b6fa5c13a7547fa"
+      "sha256": "1c6aee25c5a0f16c04f6f93ce94f11c7b2b0f1dc9964a49aa38dfdd80d296ce4"
     },
     {
       "path": ".claude/hooks/tests/test-protocol-artifact-validate-mandatory-fail-closed.sh",
@@ -329,7 +329,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-session-open-gate.sh",
-      "sha256": "8e9501e3d6f403f5ea92e0c8926e151178e2e4bfc7d253c2d892c6f67eadabf7"
+      "sha256": "27b4c021bb70c3692791575ec4e4494961ec8b761108ae7c4bcabe206e9c4706"
     },
     {
       "path": ".claude/hooks/tests/test_issue_1184_stop_gate_block_once.sh",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "af0b336988cd1f8628756420a074ad1a9cb42e1be1519d7feaf3045a8ad2cadf"
+      "sha256": "bcbc783e46e3720117f4fe9c3a134b978e8e67100ade6e16f00bf71125798634"
     },
     {
       "path": "CLAUDE.md",

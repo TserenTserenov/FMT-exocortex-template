@@ -101,7 +101,10 @@ def main():
         return
     # Sensitive places inside memory keep their own confirmation (hidden files and
     # folders, .git/.claude/.github/.ssh/.gnupg): approving them here would drop it.
-    for part in real[len(memory) + 1 :].split(os.sep):
+    # Both the path as written and the resolved path are checked: a link inside memory
+    # (for example `.git` pointing to an ordinary folder) would hide the name after resolving.
+    written = os.path.normpath(target)[len(os.path.normpath(link)) + 1 :]
+    for part in written.split(os.sep) + real[len(memory) + 1 :].split(os.sep):
         if part.startswith(".") or part.lower() in SENSITIVE:
             return
     json.dump(ALLOW, sys.stdout)
