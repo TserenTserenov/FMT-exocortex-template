@@ -195,7 +195,7 @@ def test_program_checks_reject_unknown_source_and_long_message():
     items = GOOD_ITEMS[:3] + [dict(GOOD_ITEMS[3], source_index=99, text="x" * 400)]
     problems = rnb.program_problems(items, ENTRIES, "y" * (rnb.MAX_MESSAGE_CHARS + 1))
     assert any("нет записи с номером 99" in p for p in problems)
-    assert any("длиннее 300" in p for p in problems)
+    assert any(f"длиннее {rnb.MAX_ITEM_TEXT_CHARS}" in p for p in problems)
     assert any("сообщение длиннее" in p for p in problems)
 
 
@@ -269,6 +269,7 @@ def test_no_salvage_below_minimum():
     verdict = editor_ok()
     verdict["ok"] = False
     verdict["items"][0].update(supported=False)
+    verdict["items"][1].update(supported=False)
     client = FakeClient(response({"items": GOOD_ITEMS}), response(verdict),
                         response({"items": GOOD_ITEMS}), response(verdict))
 
@@ -284,3 +285,65 @@ def test_successful_record_is_serialisable():
 
 def test_editor_prompt_allows_simplification():
     assert "Упрощение и опущенные подробности — не проблема" in rnb.EDITOR_PROMPT
+
+
+# --- Vendor-style notice (pilot decision 25.11.2026): a one-sentence summary of the release theme,
+# 3-5 short items, no commands or file names in the text for users.
+
+SUMMARY = "Этот выпуск посвящён исправлению ошибок и повышению надёжности."
+
+
+def test_summary_is_rendered_after_the_header():
+    message = rnb.render("0.42.2", GOOD_ITEMS[:3], SUMMARY)
+    head, lead = message.split("\n\n")[:2]
+    assert "0.42.2" in head
+    assert lead == SUMMARY
+
+
+def test_notice_without_summary_has_no_empty_lead():
+    message = rnb.render("0.42.2", GOOD_ITEMS[:3])
+    assert "\n\n\n" not in message
+
+
+@pytest.mark.parametrize("text", [
+    "Команда git -C путь commit больше не просит номер РП.",
+    "Запустите `bash update.sh` для обновления.",
+    "Файл session-open-gate.sh теперь проще.",
+    "Флаг --yes подключает настройки.",
+])
+def test_commands_and_file_names_are_rejected(text):
+    items = [dict(GOOD_ITEMS[0], text=text)] + GOOD_ITEMS[1:3]
+    problems = rnb.program_problems(items, ENTRIES, "x", SUMMARY)
+    assert any("команда или имя файла" in p for p in problems)
+
+
+def test_technical_summary_and_long_summary_are_rejected():
+    assert any("сводка: команда" in p for p in rnb.program_problems(GOOD_ITEMS[:3], ENTRIES, "x", "Правка bash update.sh --yes."))
+    assert any("сводка длиннее" in p for p in rnb.program_problems(GOOD_ITEMS[:3], ENTRIES, "x", "я" * (rnb.MAX_SUMMARY_CHARS + 1)))
+
+
+def test_built_notice_carries_the_summary_when_the_editor_confirms_it():
+    verdict = editor_ok()
+    verdict.update(summary_ok=True, summary_problems=[])
+    client = FakeClient(response({"summary": SUMMARY, "items": GOOD_ITEMS}), response(verdict))
+    record = rnb.build("0.42.2", ENTRIES, client)
+    assert record["kind"] == "built"
+    assert SUMMARY in record["message_html"]
+
+
+def test_editor_rejecting_the_summary_sends_it_back_once_then_notice_is_short():
+    verdict = editor_ok()
+    verdict.update(ok=False, summary_ok=False, summary_problems=["выпуск назван исправительным, а записей-исправлений меньше половины"])
+    client = FakeClient(response({"summary": SUMMARY, "items": GOOD_ITEMS}), response(verdict),
+                        response({"summary": SUMMARY, "items": GOOD_ITEMS}), response(verdict))
+    record = rnb.build("0.42.2", ENTRIES, client)
+    assert record["attempts"][0]["editor_remarks"][0].startswith("сводка:")
+    assert record["attempts"][0]["summary_ok"] is False
+    assert SUMMARY not in record["message_html"]
+
+
+def test_message_stays_short_for_five_items():
+    items = [dict(GOOD_ITEMS[i % 4], source_index=i % 4 + 1) for i in range(rnb.MAX_ITEMS)]
+    items = [dict(it, source_index=n) for n, it in enumerate(items, 1)]
+    message = rnb.render("0.42.2", items, SUMMARY)
+    assert len(message) < rnb.MAX_MESSAGE_CHARS
