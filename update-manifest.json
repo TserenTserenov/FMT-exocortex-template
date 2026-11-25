@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "0668a8961525296232143e7f78c0391c3e2a48098a3398eb2277eca2d301a495"
+      "sha256": "ba54a71f72fa9d91b266e19fc77d5574ca932eb89eb83f352f0c867437eff45f"
     },
     {
       "path": "CLAUDE.md",
@@ -2936,18 +2936,6 @@
       "sha256": "c2d80d278ad6b8706013ef1790ce0c69669e74bfebe8d8baa3117118fe70c85c"
     },
     {
-      "path": "scripts/postman-address-book.py",
-      "sha256": "6f778f732e1e4dc73e244535e6e324f85ece38b54ef3618bb6bef482899b27da"
-    },
-    {
-      "path": "scripts/postman-address-book.yaml",
-      "sha256": "26bc76ef4cb6534c0c0a3649cd05aee7fc98eb78c4fe43cc42353ebc4d88f6ef"
-    },
-    {
-      "path": "scripts/postman.py",
-      "sha256": "09b16be29c13d47641d1c4a2d64fc455cc475e7743704c030dde5665d32bbca1"
-    },
-    {
       "path": "scripts/pre-commit-secret-scan.sh",
       "sha256": "b91187a8be7ca0dc653fc0dc904397bea5c82153b885a664c9fad8953d7baa09"
     },
@@ -3659,8 +3647,6 @@
     "scripts/tests/test-issue-1581-close-note-commit.sh",
     "scripts/tests/test-iwe-audit-fpf-copy.sh",
     "scripts/tests/test-peer-session-finalize-index-lock.sh",
-    "scripts/tests/test-postman-address-book.py",
-    "scripts/tests/test-postman.py",
     "scripts/tests/test-rt4-copied-files-no-install-placeholders.sh",
     "scripts/tests/test-setup-extractor-feeders-linux-env.sh",
     "scripts/tests/test-setup-git-identity-precheck.sh",
