@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "b89b1961ad7051f1eb168005afaa67d180ad9334538bad172a2916bf9baaaf81"
+      "sha256": "0668a8961525296232143e7f78c0391c3e2a48098a3398eb2277eca2d301a495"
     },
     {
       "path": "CLAUDE.md",
@@ -2937,7 +2937,7 @@
     },
     {
       "path": "scripts/postman-address-book.py",
-      "sha256": "ed0b61cc866d4097c7a7ddfabfe23469a6345f3111513ed76ddb45198269803d"
+      "sha256": "6f778f732e1e4dc73e244535e6e324f85ece38b54ef3618bb6bef482899b27da"
     },
     {
       "path": "scripts/postman-address-book.yaml",
