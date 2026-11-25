@@ -125,7 +125,7 @@
     },
     {
       "path": ".claude/hooks/memory-write-permission.sh",
-      "sha256": "a76ce8d65852cff3122a5bdbca1069691f86a0d6a779022aecddec585339bd8d"
+      "sha256": "60301a980c28e3aebfadaaa2a91866cc0d378b4d4f7e175faa6fbdb3f1c2c0e6"
     },
     {
       "path": ".claude/hooks/pack-creator-spf-guard.sh",
@@ -189,7 +189,7 @@
     },
     {
       "path": ".claude/hooks/secret-file-read-block.sh",
-      "sha256": "665cbe42116eb2100db1b5b33caa93dd56bfb8f03ddac1a00391f938583ff7df"
+      "sha256": "daa0e72ac581bc4ba85634a5123ac19441d66ca580cb6586f43a21c921716811"
     },
     {
       "path": ".claude/hooks/secret-leak-block.sh",
@@ -205,7 +205,7 @@
     },
     {
       "path": ".claude/hooks/session-open-gate.sh",
-      "sha256": "e1925ec5e8e9fa86503e6b9310d7f4bcf4e0f7ab11728fbd3b2e039974235e72"
+      "sha256": "8d9998e36fd6919ef9e50f72127a535425956c04db1379607b3b5c9c3ec718d5"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -301,11 +301,11 @@
     },
     {
       "path": ".claude/hooks/tests/test-issue-1657-secret-file-read-block-kimi-envelope.sh",
-      "sha256": "a4d5ffa2e5988ff9c0f37aac30f09396287d0db0c30781b3d6491455e9825863"
+      "sha256": "67fb184f2f66d20b363519db644e600765321928f2ec84d6901a3a783bb4bf40"
     },
     {
       "path": ".claude/hooks/tests/test-memory-write-permission.sh",
-      "sha256": "fb0e1fb6bf99116c2fcf6e0b6479518cf2b739200c16f22fd5669ef12587d35e"
+      "sha256": "e1c7901a5ae5c8504c57ef40762e0fe43b5f4e15c98061c23b6fa5c13a7547fa"
     },
     {
       "path": ".claude/hooks/tests/test-protocol-artifact-validate-mandatory-fail-closed.sh",
@@ -329,7 +329,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-session-open-gate.sh",
-      "sha256": "3cc8066595bde33be973c89d88088b520974465b5647949b360d3e39958961cf"
+      "sha256": "8e9501e3d6f403f5ea92e0c8926e151178e2e4bfc7d253c2d892c6f67eadabf7"
     },
     {
       "path": ".claude/hooks/tests/test_issue_1184_stop_gate_block_once.sh",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "db09321bff393002a6974c1b31f299fb0b7c34b4cb441471510155ca178b3f93"
+      "sha256": "af0b336988cd1f8628756420a074ad1a9cb42e1be1519d7feaf3045a8ad2cadf"
     },
     {
       "path": "CLAUDE.md",
@@ -3581,7 +3581,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "75e8316bf12eadc4def185ef39efcc9f31f41e78bee00b5fc7df818df43367cd"
+      "sha256": "210e0af8381dcdbff8caf77048f278d5e611f791b89019bf2e9a686dbf3ba466"
     }
   ],
   "excluded_paths": [

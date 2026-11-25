@@ -15,10 +15,15 @@
 #   - the path as written goes through <workspace>/memory/ (a direct real path is already
 #     approved by Claude Code itself), its parent folder exists, and the REAL path of the
 #     file (symlinks resolved) is still inside the memory folder.
+#   - no component of the real path inside the memory folder is hidden (starts with ".")
+#     or named .git/.claude/.github/.ssh/.gnupg (those keep their own confirmation).
 # Anything else: no output and exit 0, so the permission flow stays unchanged.
 # Opt out: IWE_MEMORY_WRITE_AUTO_APPROVE=0.
 #
 # Known limits (all fail safe: the hook stays silent and the prompt remains as before):
+#   - an "ask" rule of the user for a folder inside memory is NOT seen by this hook: for a
+#     path through memory/ it approves an ordinary file even though the same rule prompts
+#     for the real path (the hook cannot read the user's permission rules);
 #   - the request carries no reason, so the hook cannot tell the symlink prompt from any
 #     other prompt for the same path; the documentation does not say whether
 #     PermissionRequest hooks see the symlink prompt at all (issue #1487) - confirm on the
@@ -49,6 +54,7 @@ PATH_FIELD = {
     "MultiEdit": "file_path",
     "NotebookEdit": "notebook_path",
 }
+SENSITIVE = {".git", ".claude", ".github", ".ssh", ".gnupg"}
 ALLOW = {
     "hookSpecificOutput": {
         "hookEventName": "PermissionRequest",
@@ -91,8 +97,14 @@ def main():
     if not inside(os.path.normpath(target), os.path.normpath(link)):
         return
     real = os.path.realpath(target)
-    if inside(real, memory) and os.path.isdir(os.path.dirname(real)):
-        json.dump(ALLOW, sys.stdout)
+    if not (inside(real, memory) and os.path.isdir(os.path.dirname(real))):
+        return
+    # Sensitive places inside memory keep their own confirmation (hidden files and
+    # folders, .git/.claude/.github/.ssh/.gnupg): approving them here would drop it.
+    for part in real[len(memory) + 1 :].split(os.sep):
+        if part.startswith(".") or part.lower() in SENSITIVE:
+            return
+    json.dump(ALLOW, sys.stdout)
 
 
 main()

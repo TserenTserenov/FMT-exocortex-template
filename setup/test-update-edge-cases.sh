@@ -5884,6 +5884,9 @@ done
 if [ -n "$T52_MISSING" ]; then
     fail "T52: could not extract from update.sh:$T52_MISSING — signature moved?"
 else
+    T52_PY=$("$TEMPLATE_DIR/scripts/lib/find-python3.sh" 2>/dev/null || true)
+    [ -n "$T52_PY" ] || T52_PY=python3
+    export T52_PY
     T52_DIR="$TEST_WS/t52-additive-merge"
     rm -rf "$T52_DIR"
     mkdir -p "$T52_DIR/tpl/.claude/scripts"
@@ -5899,7 +5902,7 @@ else
     t52_ws() {
         local ws="$T52_DIR/$1"
         mkdir -p "$ws/.claude"
-        python3 - "$T52_DIR/tpl/.claude/settings.json" "$ws/.claude/settings.json" "$2" <<'PY'
+        "$T52_PY" - "$T52_DIR/tpl/.claude/settings.json" "$ws/.claude/settings.json" "$2" <<'PY'
 import json, sys
 src, dst, kind = sys.argv[1:4]
 data = json.load(open(src, encoding="utf-8"))
@@ -5919,7 +5922,7 @@ PY
     # output it produced; the function is the real one, sourced from update.sh.
     t52_run() {
         bash -c 'set -uo pipefail
-            PY_BIN=python3; SCRIPT_DIR="$1/tpl"; WORKSPACE_DIR="$1/$2"; TMPDIR_UPDATE="$1/tmp-$2"
+            PY_BIN="$T52_PY"; SCRIPT_DIR="$1/tpl"; WORKSPACE_DIR="$1/$2"; TMPDIR_UPDATE="$1/tmp-$2"
             AUTO_YES="$3"; NO_SETTINGS_MERGE="$4"; APPLY_SETTINGS_MERGE=false
             mkdir -p "$TMPDIR_UPDATE"
             source "$1/fn.sh"
@@ -5933,11 +5936,18 @@ PY
     T52_OUT=$(t52_run ws-user false false)
     if [ "$(t52_flag "$T52_OUT")" = "true" ] && printf '%s' "$T52_OUT" | grep -q 'вы подтвердили обновление'; then
         pass "T52: 'y' + purely additive merge switches the merge on and says so"
+        if printf '%s' "$T52_OUT" | grep -q 'приводятся к версии платформы' \
+            && printf '%s' "$T52_OUT" | grep -q 'резервная копия' \
+            && ! printf '%s' "$T52_OUT" | grep -q 'ваши значения не заменяются'; then
+            pass "T52: the confirmation text honestly says existing platform hooks are aligned and a backup is made"
+        else
+            fail "T52: the confirmation text is not the honest wording: $T52_OUT"
+        fi
     else
         fail "T52: 'y' + additive merge did not switch the merge on: $T52_OUT"
     fi
     if bash "$T52_DIR/tpl/.claude/scripts/settings-merge-apply.sh" "$T52_DIR/tpl/.claude/settings.json" \
-            "$T52_DIR/ws-user/.claude/settings.json" python3 >/dev/null 2>&1 \
+            "$T52_DIR/ws-user/.claude/settings.json" "$T52_PY" >/dev/null 2>&1 \
         && grep -q 'memory-write-permission.sh' "$T52_DIR/ws-user/.claude/settings.json" \
         && grep -q '/my/own/hook.sh' "$T52_DIR/ws-user/.claude/settings.json" \
         && grep -q 'Bash(my-tool:\*)' "$T52_DIR/ws-user/.claude/settings.json"; then
@@ -5957,7 +5967,7 @@ PY
 
     # (c') a conflicting user value (template scalar differs from a different user scalar)
     t52_ws ws-conflict plain
-    python3 - "$T52_DIR/ws-conflict/.claude/settings.json" "$T52_DIR/tpl/.claude/settings.json" <<'PY'
+    "$T52_PY" - "$T52_DIR/ws-conflict/.claude/settings.json" "$T52_DIR/tpl/.claude/settings.json" <<'PY'
 import json, sys
 ws_path, tpl_path = sys.argv[1:3]
 ws = json.load(open(ws_path, encoding="utf-8"))
@@ -5973,10 +5983,10 @@ else:
     json.dump(tpl, open(tpl_path, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
 json.dump(ws, open(ws_path, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
 PY
-    T52_REPORT=$(python3 "$T52_DIR/tpl/.claude/scripts/settings-merge-preview.py" \
+    T52_REPORT=$("$T52_PY" "$T52_DIR/tpl/.claude/scripts/settings-merge-preview.py" \
         "$T52_DIR/tpl/.claude/settings.json" "$T52_DIR/ws-conflict/.claude/settings.json" "$T52_DIR/conflict.preview.json" 2>/dev/null)
     T52_OUT=$(t52_run ws-conflict false false)
-    if printf '%s' "$T52_REPORT" | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin)["conflicts"] else 1)' \
+    if printf '%s' "$T52_REPORT" | "$T52_PY" -c 'import json,sys; sys.exit(0 if json.load(sys.stdin)["conflicts"] else 1)' \
         && [ "$(t52_flag "$T52_OUT")" = "false" ]; then
         pass "T52: a conflicting user value keeps the merge off (preview only)"
     else
@@ -6011,8 +6021,8 @@ PY
     fi
 
     # the preview always names the command
-    T52_PRINT=$(bash -c 'set -uo pipefail; PY_BIN=python3; source "$1"
-        python3 "$2/tpl/.claude/scripts/settings-merge-preview.py" "$2/tpl/.claude/settings.json" "$2/ws-retired/.claude/settings.json" "$2/p.json" > "$2/r.json"
+    T52_PRINT=$(bash -c 'set -uo pipefail; PY_BIN="$T52_PY"; source "$1"
+        "$T52_PY" "$2/tpl/.claude/scripts/settings-merge-preview.py" "$2/tpl/.claude/settings.json" "$2/ws-retired/.claude/settings.json" "$2/p.json" > "$2/r.json"
         print_settings_merge_report "$2/r.json"' -- "$T52_DIR/fn.sh" "$T52_DIR" 2>&1)
     if printf '%s' "$T52_PRINT" | grep -q 'bash update.sh --apply-settings-merge'; then
         pass "T52: the preview report names the --apply-settings-merge command"

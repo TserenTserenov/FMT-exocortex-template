@@ -1522,7 +1522,7 @@ enable_additive_settings_merge_on_confirmation() {
     probe_file=$(build_settings_merge_report "$src" "$dst" "$TMPDIR_UPDATE/settings-merge-probe-confirm.json") || return 0
     settings_merge_report_is_quiet "$probe_file" && return 0
     settings_merge_report_is_additive_only "$probe_file" || return 0
-    echo "  .claude/settings.json — вы подтвердили обновление: добавляю новые хуки и разрешения платформы (ваши значения не заменяются)"
+    echo "  .claude/settings.json — вы подтвердили обновление: добавляю новые хуки и разрешения платформы; уже существующие платформенные хуки приводятся к версии платформы (охват и таймаут); резервная копия — в .backups/ рабочей папки"
     APPLY_SETTINGS_MERGE=true
 }
 
