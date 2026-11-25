@@ -1130,6 +1130,7 @@ jobs:
             scripts/tests/test_release_notice_build.py \
             scripts/tests/test_check_changelog_fields.py \
             scripts/tests/test_skill_agents.py \
+            scripts/tests/test_skill_links.py \
             roles/extractor/tests/test_extractor_pipeline.py \
             roles/extractor/tests/test_extractor_branches_prune.py
           # The skill directory contains a hyphen, so pytest cannot import it

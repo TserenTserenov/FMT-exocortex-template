@@ -3053,6 +3053,19 @@ run_post_apply_backfills_or_die() {
         echo "  ⚠ навыки для DSH не подключены — запустите вручную: bash $SCRIPT_DIR/setup/install-dsh-skills.sh --workspace $WORKSPACE_DIR"
     fi
 
+    # Skills for Codex (WP-592 F7): re-sync the per-skill links in .agents/skills so
+    # a skill that gained or lost codex in runs_on (or was removed) is linked or
+    # unlinked; only our own links are touched. Never fails the update.
+    local skill_links_python skill_links_output
+    if ! skill_links_python=$("$SCRIPT_DIR/scripts/lib/find-python3.sh" 2>/dev/null); then
+        echo "  ⚠ навыки для Codex не обновлены: нет python3 с PyYAML."
+    elif skill_links_output=$("$skill_links_python" "$SCRIPT_DIR/scripts/skill_links.py" --workspace "$WORKSPACE_DIR" 2>&1); then
+        printf '%s\n' "$skill_links_output" | grep -E '^(CONFLICT|REFUSED|skill links)' | sed 's/^/  /'
+    else
+        printf '%s\n' "$skill_links_output" | sed 's/^/  /'
+        echo "  ⚠ навыки для Codex не обновлены — запустите вручную: $skill_links_python $SCRIPT_DIR/scripts/skill_links.py --workspace $WORKSPACE_DIR"
+    fi
+
     # scripts/day-open-llm-fill.py is no longer backfilled here (WP-485 Phase 17,
     # 2026-10-05): the Day Open pipeline runs it from $IWE_SCRIPTS (the template's
     # own copy, confirmed on a live installation -- ~/.iwe-paths resolves
