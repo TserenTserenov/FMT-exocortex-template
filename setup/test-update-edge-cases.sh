@@ -5859,6 +5859,177 @@ else
     fi
 fi
 
+# ============================================================================
+# T52: a confirmed interactive update ("y") registers the hooks/permissions the template added in
+# the workspace settings.json when the merge is purely additive; conflicts, a withdrawn platform
+# default and --no-settings-merge keep the preview; --yes is unchanged (0.42.2-rc.1 finding).
+# Runs the real functions extracted from update.sh on real settings.json files and the real
+# settings-merge-preview.py / settings-merge-apply.sh.
+# ============================================================================
+echo "--- T52: interactive 'y' applies a purely additive settings.json merge (0.42.2) ---"
+
+t52_extract_fn() {
+    awk -v header="$1() {" '$0 == header {found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh"
+}
+T52_FNS=""
+T52_MISSING=""
+for t52_fn in build_settings_merge_report settings_merge_report_is_quiet \
+              settings_merge_report_is_additive_only enable_additive_settings_merge_on_confirmation \
+              print_settings_merge_report; do
+    t52_body=$(t52_extract_fn "$t52_fn")
+    [ -z "$t52_body" ] && T52_MISSING="$T52_MISSING $t52_fn"
+    T52_FNS="$T52_FNS
+$t52_body"
+done
+if [ -n "$T52_MISSING" ]; then
+    fail "T52: could not extract from update.sh:$T52_MISSING — signature moved?"
+else
+    T52_DIR="$TEST_WS/t52-additive-merge"
+    rm -rf "$T52_DIR"
+    mkdir -p "$T52_DIR/tpl/.claude/scripts"
+    # py_available is a one-line helper in update.sh; the extracted functions only need it to exist
+    printf '%s\n%s\n' 'py_available() { [ -n "$PY_BIN" ]; }' "$T52_FNS" > "$T52_DIR/fn.sh"
+    cp "$TEMPLATE_DIR/.claude/settings.json" "$T52_DIR/tpl/.claude/settings.json"
+    cp "$TEMPLATE_DIR/.claude/scripts/settings-merge-preview.py" "$TEMPLATE_DIR/.claude/scripts/settings-merge-apply.sh" \
+        "$T52_DIR/tpl/.claude/scripts/"
+
+    # t52_ws NAME KIND — a workspace as 0.42.1 left it: the template minus the memory-write-permission
+    # hook (KIND=plain), plus a user hook and a user permission (userown), or plus the withdrawn
+    # permissions.defaultMode=acceptEdits (retired).
+    t52_ws() {
+        local ws="$T52_DIR/$1"
+        mkdir -p "$ws/.claude"
+        python3 - "$T52_DIR/tpl/.claude/settings.json" "$ws/.claude/settings.json" "$2" <<'PY'
+import json, sys
+src, dst, kind = sys.argv[1:4]
+data = json.load(open(src, encoding="utf-8"))
+for event, groups in list(data.get("hooks", {}).items()):
+    for group in groups:
+        group["hooks"] = [h for h in group.get("hooks", []) if "memory-write-permission" not in h.get("command", "")]
+    data["hooks"][event] = [g for g in groups if g.get("hooks")]
+if kind == "userown":
+    data["hooks"].setdefault("Stop", []).append({"hooks": [{"type": "command", "command": "/my/own/hook.sh"}]})
+    data.setdefault("permissions", {}).setdefault("allow", []).append("Bash(my-tool:*)")
+if kind == "retired":
+    data.setdefault("permissions", {})["defaultMode"] = "acceptEdits"
+json.dump(data, open(dst, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+PY
+    }
+    # t52_run WS AUTO_YES NO_SETTINGS_MERGE — prints the flag value after the function ran and the
+    # output it produced; the function is the real one, sourced from update.sh.
+    t52_run() {
+        bash -c 'set -uo pipefail
+            PY_BIN=python3; SCRIPT_DIR="$1/tpl"; WORKSPACE_DIR="$1/$2"; TMPDIR_UPDATE="$1/tmp-$2"
+            AUTO_YES="$3"; NO_SETTINGS_MERGE="$4"; APPLY_SETTINGS_MERGE=false
+            mkdir -p "$TMPDIR_UPDATE"
+            source "$1/fn.sh"
+            enable_additive_settings_merge_on_confirmation
+            echo "FLAG=$APPLY_SETTINGS_MERGE"' -- "$T52_DIR" "$1" "$2" "$3" 2>&1
+    }
+    t52_flag() { printf '%s\n' "$1" | sed -n 's/^FLAG=//p'; }
+
+    # (b) confirmed "y", additive merge, user's own hook and permission present
+    t52_ws ws-user userown
+    T52_OUT=$(t52_run ws-user false false)
+    if [ "$(t52_flag "$T52_OUT")" = "true" ] && printf '%s' "$T52_OUT" | grep -q 'вы подтвердили обновление'; then
+        pass "T52: 'y' + purely additive merge switches the merge on and says so"
+    else
+        fail "T52: 'y' + additive merge did not switch the merge on: $T52_OUT"
+    fi
+    if bash "$T52_DIR/tpl/.claude/scripts/settings-merge-apply.sh" "$T52_DIR/tpl/.claude/settings.json" \
+            "$T52_DIR/ws-user/.claude/settings.json" python3 >/dev/null 2>&1 \
+        && grep -q 'memory-write-permission.sh' "$T52_DIR/ws-user/.claude/settings.json" \
+        && grep -q '/my/own/hook.sh' "$T52_DIR/ws-user/.claude/settings.json" \
+        && grep -q 'Bash(my-tool:\*)' "$T52_DIR/ws-user/.claude/settings.json"; then
+        pass "T52: applying that merge registers memory-write-permission.sh and keeps the user's hook and permission"
+    else
+        fail "T52: the applied merge lost a user value or did not register memory-write-permission.sh"
+    fi
+
+    # (c) a withdrawn platform default (defaultMode=acceptEdits) must stay a preview
+    t52_ws ws-retired retired
+    T52_OUT=$(t52_run ws-retired false false)
+    if [ "$(t52_flag "$T52_OUT")" = "false" ]; then
+        pass "T52: a withdrawn default (defaultMode=acceptEdits) is not replaced silently — preview only"
+    else
+        fail "T52: 'y' replaced the withdrawn defaultMode=acceptEdits without the pilot's command: $T52_OUT"
+    fi
+
+    # (c') a conflicting user value (template scalar differs from a different user scalar)
+    t52_ws ws-conflict plain
+    python3 - "$T52_DIR/ws-conflict/.claude/settings.json" "$T52_DIR/tpl/.claude/settings.json" <<'PY'
+import json, sys
+ws_path, tpl_path = sys.argv[1:3]
+ws = json.load(open(ws_path, encoding="utf-8"))
+tpl = json.load(open(tpl_path, encoding="utf-8"))
+# pick a scalar the template sets and give the workspace another value -> conflict
+for key, value in tpl.items():
+    if isinstance(value, (str, int, bool)):
+        ws[key] = "user-value-differs" if not isinstance(value, bool) else (not value)
+        break
+else:
+    tpl.setdefault("env", {})["T52_PROBE"] = "template"
+    ws.setdefault("env", {})["T52_PROBE"] = "user"
+    json.dump(tpl, open(tpl_path, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+json.dump(ws, open(ws_path, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+PY
+    T52_REPORT=$(python3 "$T52_DIR/tpl/.claude/scripts/settings-merge-preview.py" \
+        "$T52_DIR/tpl/.claude/settings.json" "$T52_DIR/ws-conflict/.claude/settings.json" "$T52_DIR/conflict.preview.json" 2>/dev/null)
+    T52_OUT=$(t52_run ws-conflict false false)
+    if printf '%s' "$T52_REPORT" | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin)["conflicts"] else 1)' \
+        && [ "$(t52_flag "$T52_OUT")" = "false" ]; then
+        pass "T52: a conflicting user value keeps the merge off (preview only)"
+    else
+        fail "T52: conflict case — flag=$(t52_flag "$T52_OUT"), report=$T52_REPORT"
+    fi
+    # restore the template copy the conflict probe may have edited
+    cp "$TEMPLATE_DIR/.claude/settings.json" "$T52_DIR/tpl/.claude/settings.json"
+
+    # (d) --no-settings-merge, (e) --yes
+    t52_ws ws-optout plain
+    T52_OUT=$(t52_run ws-optout false true)
+    if [ "$(t52_flag "$T52_OUT")" = "false" ]; then
+        pass "T52: --no-settings-merge keeps the merge off even after 'y'"
+    else
+        fail "T52: --no-settings-merge was ignored: $T52_OUT"
+    fi
+    T52_OUT=$(t52_run ws-optout true false)
+    if [ "$(t52_flag "$T52_OUT")" = "false" ] && ! printf '%s' "$T52_OUT" | grep -q 'вы подтвердили'; then
+        pass "T52: with --yes the new function does nothing (the --yes path sets the flag at parse time, as before)"
+    else
+        fail "T52: --yes path changed behaviour: $T52_OUT"
+    fi
+
+    # an already identical file or a quiet merge changes nothing
+    mkdir -p "$T52_DIR/ws-same/.claude"
+    cp "$T52_DIR/tpl/.claude/settings.json" "$T52_DIR/ws-same/.claude/settings.json"
+    T52_OUT=$(t52_run ws-same false false)
+    if [ "$(t52_flag "$T52_OUT")" = "false" ] && ! printf '%s' "$T52_OUT" | grep -q 'вы подтвердили'; then
+        pass "T52: settings.json already equal to the template — nothing to switch on"
+    else
+        fail "T52: equal settings.json triggered the merge: $T52_OUT"
+    fi
+
+    # the preview always names the command
+    T52_PRINT=$(bash -c 'set -uo pipefail; PY_BIN=python3; source "$1"
+        python3 "$2/tpl/.claude/scripts/settings-merge-preview.py" "$2/tpl/.claude/settings.json" "$2/ws-retired/.claude/settings.json" "$2/p.json" > "$2/r.json"
+        print_settings_merge_report "$2/r.json"' -- "$T52_DIR/fn.sh" "$T52_DIR" 2>&1)
+    if printf '%s' "$T52_PRINT" | grep -q 'bash update.sh --apply-settings-merge'; then
+        pass "T52: the preview report names the --apply-settings-merge command"
+    else
+        fail "T52: the preview report does not name the command: $T52_PRINT"
+    fi
+
+    # wiring: the call sits before apply_settings_merge_if_requested in the main flow
+    T52_CALL_LINE=$(grep -n '^enable_additive_settings_merge_on_confirmation$' "$TEMPLATE_DIR/update.sh" | head -1 | cut -d: -f1)
+    T52_APPLY_LINE=$(grep -n '^apply_settings_merge_if_requested$' "$TEMPLATE_DIR/update.sh" | head -1 | cut -d: -f1)
+    if [ -n "$T52_CALL_LINE" ] && [ -n "$T52_APPLY_LINE" ] && [ "$T52_CALL_LINE" -lt "$T52_APPLY_LINE" ]; then
+        pass "T52: update.sh calls the confirmation hook right before apply_settings_merge_if_requested"
+    else
+        fail "T52: the call is missing or not before apply_settings_merge_if_requested (call=$T52_CALL_LINE apply=$T52_APPLY_LINE)"
+    fi
+fi
+
 # ============================================================
 # Summary
 # ============================================================

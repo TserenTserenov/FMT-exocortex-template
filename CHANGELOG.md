@@ -97,6 +97,11 @@ Refs: WP-NNN
   - Как проверить: `bash .claude/hooks/tests/test-memory-write-permission.sh` — 36 проверок проходят; без обработчика падают все проверки на разрешение
   - Как откатить: git revert слияния этого запроса; подтверждение записи в память вернётся
 
+- [behavior] Обновление шаблона после вашего ответа «y» теперь само подключает в `.claude/settings.json` новые хуки и разрешения платформы, если слияние только добавляет: ваши значения не заменяются, конфликты и отозванные платформой значения по умолчанию остаются предпросмотром. Раньше рабочая копия настроек оставалась прежней и показывался только предпросмотр без названия команды, из-за чего хук записи памяти (#1626) на обновлённой установке не работал, пока человек не запускал `bash update.sh --apply-settings-merge`. Предпросмотр теперь всегда называет эту команду. Отключить автоподключение: `--no-settings-merge`; поведение `--yes` не менялось. Найдено проверкой кандидата v0.42.2-rc.1 и исправлено на ветке выпуска; в основную ветку шаблона вернётся после выхода. Не проверено вживую: Claude Code на обновлённой установке с живой записью в `memory/`.
+  - Цель: 84 · Результат: служебное — обновление подключает новые защитные и разрешающие хуки платформы без отдельной команды, пользовательские настройки сохраняются
+  - Как проверить: на установке 0.42.1 запустить `bash update.sh` (канал кандидата), ответить «y» и убедиться, что в `.claude/settings.json` появился `memory-write-permission.sh`, а свои хуки на месте; с `--no-settings-merge` файл не меняется; `bash setup/test-update-edge-cases.sh` — новые проверки проходят
+  - Как откатить: git revert коммита этой правки на ветке выпуска; предпросмотр снова не будет применяться без `bash update.sh --apply-settings-merge`
+
 ### Added
 
 - [optional] The glossary supplier can explain the outcome for each requested concept code. Run `python3 scripts/glossary_supplier.py coverage` for the published snapshot. Use `--expected FILE` for selected codes, and `--input FILE` for the corresponding verified graph walk. New passports authenticate the entire input walk. The nightly run also saves a 30-day coverage artifact for previously published codes, current public snapshot codes and the public controls, even when the snapshot is unchanged. Each record contains a code and its outcome and reason. The raw graph walk stays on the runner. (#1647)
