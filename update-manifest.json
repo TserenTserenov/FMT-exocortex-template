@@ -81,7 +81,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "f944b60b53f181773a64dff8cf91b091e7bf787bb29b44d4dfb850eacb57ef8c"
+      "sha256": "0429331e17e42273e20ff9350411b226643decb7954e19fa276cfc7b6d1b7be6"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -281,7 +281,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-reader-overwrite.sh",
-      "sha256": "fddc29f4ea0ab14279e4cbff5428ca4f27db5a0a4f25a739f627c2ccb25134d2"
+      "sha256": "6a9c0723bc8f1278c668344bf752ec0f07dd46b929f87a2f665b064b93478887"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-windows-smoke.sh",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "bcbc783e46e3720117f4fe9c3a134b978e8e67100ade6e16f00bf71125798634"
+      "sha256": "a246d9bcf372b6cc42cea4cf439ec19fc8d7a37050e60166094b55b36dff834f"
     },
     {
       "path": "CLAUDE.md",
