@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "a246d9bcf372b6cc42cea4cf439ec19fc8d7a37050e60166094b55b36dff834f"
+      "sha256": "bb44bec78da4f28f7cd094f1376936f81d262b161a7686f5aaf044ea7da92242"
     },
     {
       "path": "CLAUDE.md",
@@ -2936,6 +2936,18 @@
       "sha256": "c2d80d278ad6b8706013ef1790ce0c69669e74bfebe8d8baa3117118fe70c85c"
     },
     {
+      "path": "scripts/postman-address-book.py",
+      "sha256": "ed0b61cc866d4097c7a7ddfabfe23469a6345f3111513ed76ddb45198269803d"
+    },
+    {
+      "path": "scripts/postman-address-book.yaml",
+      "sha256": "26bc76ef4cb6534c0c0a3649cd05aee7fc98eb78c4fe43cc42353ebc4d88f6ef"
+    },
+    {
+      "path": "scripts/postman.py",
+      "sha256": "09b16be29c13d47641d1c4a2d64fc455cc475e7743704c030dde5665d32bbca1"
+    },
+    {
       "path": "scripts/pre-commit-secret-scan.sh",
       "sha256": "b91187a8be7ca0dc653fc0dc904397bea5c82153b885a664c9fad8953d7baa09"
     },
@@ -3093,7 +3105,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "7cde0c8b84ff201245bc21ecee02a2d51f57d1341ed02d8f847dd6ad3e06a6dd"
+      "sha256": "e58a6938d23e82d1d2da977bbc6c1e0bd86eb457690de63ab6ccc3a27f1dddf0"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3360,6 +3372,10 @@
       "sha256": "08ebe1a872d0a02fbdd5ba92115773b919181eda541816286f9f4920e62b2024"
     },
     {
+      "path": "scripts/wp-inbox-close-gate.sh",
+      "sha256": "9d8625533ffc69b34a8e42c0c8f634c595ad3c705e684b8049b6ac236f46c1b6"
+    },
+    {
       "path": "scripts/wp-inbox.sh",
       "sha256": "43e9eefd89f0cf9f874de66914fd0b8e635e40a38f18a9cfe2071ec537aba2b9"
     },
@@ -3377,11 +3393,11 @@
     },
     {
       "path": "seed/strategy/.githooks/pre-commit",
-      "sha256": "6c54749ea157afa4f041e6ae0d726fbfc74e7040ee2e1657e0f1ab64fb727d62"
+      "sha256": "ad0d8f6d6c92d4113a0d1c69040d8ecde0924bd0f938c146218f0c0826548ffe"
     },
     {
       "path": "seed/strategy/.githooks/pre-push",
-      "sha256": "d2fc416595518b4bf1d3989308a66090f9c2a984530388114244e5d3b6ca7c5f"
+      "sha256": "3323f5971c920c13b03ffed8484b06b96c0be196139a22d8c5098fc472ac4367"
     },
     {
       "path": "seed/strategy/exocortex/agent-fault-profile/.gitignore",
@@ -3647,6 +3663,8 @@
     "scripts/tests/test-issue-1581-close-note-commit.sh",
     "scripts/tests/test-iwe-audit-fpf-copy.sh",
     "scripts/tests/test-peer-session-finalize-index-lock.sh",
+    "scripts/tests/test-postman-address-book.py",
+    "scripts/tests/test-postman.py",
     "scripts/tests/test-rt4-copied-files-no-install-placeholders.sh",
     "scripts/tests/test-setup-extractor-feeders-linux-env.sh",
     "scripts/tests/test-setup-git-identity-precheck.sh",
@@ -3896,6 +3914,7 @@
     "scripts/tests/test_validate_skill_hook_claims_path.sh",
     "scripts/tests/test_wp568_strategist_auth_and_retry_message.sh",
     "scripts/tests/test_wp_inbox_bundle_signal.sh",
+    "scripts/tests/wp-inbox-close-gate-smoke.sh",
     "scripts/tests/wp-sync-bundle-origin-pinned-smoke.sh",
     "scripts/translate.py",
     "scripts/verify-template-integrity.sh",

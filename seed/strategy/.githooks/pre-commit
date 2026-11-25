@@ -64,6 +64,27 @@ else
     fi
 fi
 
+# === WP-503 Phase 110: inbound mailbox before a WP goes to the archive ===
+# A WP whose inbox/WP-N/INBOX.md still has «новое» entries is not archived
+# (catches a manual git mv). The gate lives in the template scripts folder next
+# to wp-inbox.sh. Not found: refuse only a commit that actually closes a mailbox.
+WP_INBOX_GATE=""
+for d in "${IWE_SCRIPTS:-}" "$HOOK_REPO_ROOT/../FMT-exocortex-template/scripts"; do
+    if [ -n "$d" ] && [ -f "$d/wp-inbox-close-gate.sh" ]; then WP_INBOX_GATE="$d/wp-inbox-close-gate.sh"; break; fi
+done
+if [ -n "$WP_INBOX_GATE" ]; then
+    bash "$WP_INBOX_GATE" pre-commit || exit 1
+elif git rev-parse --verify -q HEAD >/dev/null; then
+    if ! WP_INBOX_DELETED=$(git diff --cached --name-only --no-renames --diff-filter=D HEAD); then
+        echo "Pre-commit blocked: git diff failed, the inbound mailbox check cannot run." >&2
+        exit 1
+    fi
+    if printf '%s\n' "$WP_INBOX_DELETED" | grep -qE '^inbox/WP-[0-9]+/INBOX\.md$'; then
+        echo "Pre-commit blocked: the commit closes a WP with an inbound mailbox, but wp-inbox-close-gate.sh was not found (update the template: /iwe-update)." >&2
+        exit 1
+    fi
+fi
+
 hook_dir="$(dirname "$0")"
 if [ -x "$hook_dir/pre-commit-deny-legacy-sessions.sh" ]; then
     "$hook_dir/pre-commit-deny-legacy-sessions.sh" || exit 1
