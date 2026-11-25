@@ -42,7 +42,11 @@ def skill_dirs(skills_dir: Path) -> list[Path]:
 
 def read_header(skill_md: Path) -> dict:
     """Parse the SKILL.md front matter as YAML; raise ValueError if it is not a mapping."""
-    match = FRONTMATTER_RE.match(skill_md.read_text(encoding="utf-8"))
+    try:
+        text = skill_md.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ValueError(f"cannot read SKILL.md: {exc}") from exc
+    match = FRONTMATTER_RE.match(text)
     if not match:
         raise ValueError("no front matter")
     try:
@@ -62,6 +66,8 @@ def header_errors(header: dict) -> list[str]:
     runs_on = header.get("runs_on")
     if not isinstance(runs_on, list) or not runs_on:
         errors.append(f"runs_on must be a non-empty list of {list(AGENTS)}, got {runs_on!r}")
+    elif not all(isinstance(a, str) for a in runs_on):
+        errors.append(f"runs_on items must be agent names, got {runs_on!r}")
     else:
         unknown = [a for a in runs_on if a not in AGENTS]
         if unknown:

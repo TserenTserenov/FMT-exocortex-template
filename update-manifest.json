@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "3d305f91a9f903d65e8e82dd3c03b8c036c8ae3adf1d1664a1a425c4f5f90375"
+      "sha256": "b532ecf5b724f665513c5a722f9701ab31417ef170e3096975df5cadde144a01"
     },
     {
       "path": "CLAUDE.md",
@@ -3017,7 +3017,7 @@
     },
     {
       "path": "scripts/skill_agents.py",
-      "sha256": "3c76470def52be568c3130d5d659a381e93019f81196698c16ad4406be4da2ab"
+      "sha256": "614143fcdababe03b57dbeff21b5b75bc16f4d524614e963ad897778d1f8d76e"
     },
     {
       "path": "scripts/skills-pull.sh",
