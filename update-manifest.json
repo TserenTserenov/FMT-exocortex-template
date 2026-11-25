@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "745f5ac4a066d19ebc61e241b6e0242aa4a53eaa5b2f1311538bb8f0235abf48"
+      "sha256": "b479ba77c23ce63b2009dadf9f97709dddb888cfeaf96fa1dc447680c8a7b99c"
     },
     {
       "path": "CLAUDE.md",
@@ -1029,7 +1029,7 @@
     },
     {
       "path": "docs/AGENT-VENDOR-SETUP.md",
-      "sha256": "3534cf067d6e9787cdbb769cbf1dd36833994f4461377e78242b2c112e3a8da6"
+      "sha256": "57a85f1f8c9ff926cd4167a8b38e12b2beff845877fcc291cb248b792b8dfe8c"
     },
     {
       "path": "docs/BRANCH-PROTECTION-EMERGENCY.md",
@@ -3017,11 +3017,11 @@
     },
     {
       "path": "scripts/skill_agents.py",
-      "sha256": "3c76470def52be568c3130d5d659a381e93019f81196698c16ad4406be4da2ab"
+      "sha256": "614143fcdababe03b57dbeff21b5b75bc16f4d524614e963ad897778d1f8d76e"
     },
     {
       "path": "scripts/skill_links.py",
-      "sha256": "5f54aa7c7686c1b97c4bb46bc451c8b31207b7e50bf285a56e00a5d2da409638"
+      "sha256": "b663cba236a4b8c66192d1f408813c0a585b6907139c8e5c8bc84413770c36dc"
     },
     {
       "path": "scripts/skills-pull.sh",
@@ -3557,7 +3557,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "ad566e7aeca3141f9865ffc55045d3ab304bcef6f347fb29fe8d01d8195d75a4"
+      "sha256": "b2d57fa71346b46155c8ccb91fe42c4e9b85479071ea0cdc1c9c7207e458babd"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3601,7 +3601,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "0b716f0c1d387ceff844c0e4b37d1b8ab3b062dda8bf5c8c274021ea96ed6be8"
+      "sha256": "790304bbbeb4d47962c5b7c3674e21f30eeeaee4bda9d88e01640c38383cfbf3"
     }
   ],
   "excluded_paths": [

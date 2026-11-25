@@ -1164,14 +1164,19 @@ fi
 if [ -z "$YAML_PYTHON3" ]; then
     echo "  ⚠ навыки для Codex не подключены: нет python3 с PyYAML (см. предупреждение выше)."
 elif $DRY_RUN; then
-    "$YAML_PYTHON3" "$TEMPLATE_DIR/scripts/skill_links.py" --workspace "$WORKSPACE_DIR" --dry-run 2>&1 | tail -1 | sed 's/^/  /'
+    # In a dry run step 4b copied nothing, so a fresh workspace has no skills yet.
+    if [ -d "$WORKSPACE_DIR/.claude/skills" ]; then
+        "$YAML_PYTHON3" "$TEMPLATE_DIR/scripts/skill_links.py" --workspace "$WORKSPACE_DIR" --dry-run 2>&1 | tail -1 | sed 's/^/  /'
+    else
+        echo "  [DRY RUN] Would link template skills for Codex in $WORKSPACE_DIR/.agents/skills"
+    fi
 else
     echo "[4h] Connecting template skills to Codex..."
     if ! SKILL_LINKS_OUTPUT=$("$YAML_PYTHON3" "$TEMPLATE_DIR/scripts/skill_links.py" --workspace "$WORKSPACE_DIR" 2>&1); then
         echo "  ⚠ навыки для Codex не подключены — запусти вручную:"
         echo "    $YAML_PYTHON3 $TEMPLATE_DIR/scripts/skill_links.py --workspace $WORKSPACE_DIR"
     fi
-    printf '%s\n' "$SKILL_LINKS_OUTPUT" | grep -E '^(CONFLICT|REFUSED|skill links|ERROR)' | sed 's/^/  /'
+    printf '%s\n' "$SKILL_LINKS_OUTPUT" | grep -E '^(unlink|CONFLICT|REFUSED|skill links|ERROR)' | sed 's/^/  /'
 fi
 
 # === 5. Install roles (autodiscovery via role.yaml) ===

@@ -57,52 +57,84 @@ class Report:
         return out
 
 
+def link_target(path: Path) -> Path:
+    """Where a symlink points after one step: its parent resolved, its own target not.
+
+    One step only, so a skill folder that is itself a symlink does not move the
+    answer outside .claude/skills (that skill is refused before linking instead).
+    """
+    return Path(os.path.normpath(os.path.join(os.path.realpath(path.parent), os.readlink(path))))
+
+
 def is_own_link(path: Path, skills_root: Path) -> bool:
-    """A symlink whose target, once resolved, lies inside skills_root (broken targets included)."""
-    if not path.is_symlink():
-        return False
-    # realpath resolves every symlink on the way (macOS /tmp -> /private/tmp) and
-    # still answers for a broken target, so a dangling own link stays ours.
-    target = Path(os.path.realpath(path.parent / os.readlink(path)))
-    return skills_root == target.parent or skills_root in target.parents
+    """A symlink pointing (one step) at an entry inside skills_root; dangling ones included."""
+    return path.is_symlink() and link_target(path).parent == skills_root
+
+
+def folder_problem(folder: Path) -> str:
+    """Why the agent folder cannot be used, or '' when it is usable (absent or a plain directory)."""
+    for level in (folder.parent, folder):
+        if level.is_symlink():
+            return f"{level} is a symlink; links there would land in another place, nothing linked"
+        if level.exists() and not level.is_dir():
+            return f"{level} is not a directory; nothing linked"
+    return ""
+
+
+def remove_link(entry: Path, report: Report, dry_run: bool) -> None:
+    report.removed.append(entry.name)
+    if dry_run:
+        return
+    try:
+        if entry.is_symlink():  # re-check right before unlink: never remove a real file
+            entry.unlink()
+    except OSError as exc:
+        report.removed.remove(entry.name)
+        report.refused.append(f"{entry.name}: cannot remove the old link ({exc.strerror})")
+
+
+def create_link(name: str, folder: Path, skills_root: Path, report: Report, dry_run: bool) -> None:
+    if skills_root not in Path(os.path.realpath(skills_root / name)).parents:
+        report.refused.append(f"{name}: the skill folder points outside .claude/skills, not linked")
+        return
+    report.created.append(name)
+    if dry_run:
+        return
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        relative = os.path.relpath(skills_root / name, os.path.realpath(folder))
+        (folder / name).symlink_to(relative, target_is_directory=True)
+    except OSError as exc:
+        report.created.remove(name)
+        report.refused.append(f"{name}: cannot create a symlink ({exc.strerror}); see docs/AGENT-VENDOR-SETUP.md")
 
 
 def sync(workspace: Path, agent: str, dry_run: bool = False) -> Report:
-    skills_root = (workspace / ".claude" / "skills").resolve()
+    skills_root = Path(os.path.realpath(workspace / ".claude" / "skills"))
     folder = workspace / AGENT_FOLDERS[agent]
     wanted = set(skill_agents.select_for(agent, skills_root))
     report = Report()
-    occupied: set[str] = set()  # wanted names whose place holds something that is not ours
+    problem = folder_problem(folder)
+    if problem:
+        report.conflicts.append(problem)
+        return report
 
-    if folder.exists() or folder.is_symlink():
-        if folder.is_symlink() or not folder.is_dir():
-            report.conflicts.append(f"{folder} is not a plain directory; nothing linked")
-            return report
-        for entry in sorted(folder.iterdir()):
-            if not is_own_link(entry, skills_root):
-                if entry.name in wanted:
-                    occupied.add(entry.name)
-                    report.conflicts.append(f"{entry.name}: {entry} is not our link, left untouched")
-                continue
-            target_ok = (skills_root / entry.name / "SKILL.md").is_file()
-            if entry.name in wanted and target_ok and entry.resolve() == skills_root / entry.name:
-                report.kept.append(entry.name)
-                continue
-            report.removed.append(entry.name)
-            if not dry_run:
-                entry.unlink()
+    occupied: set[str] = set()  # wanted names whose place holds something that is not ours
+    for entry in sorted(folder.iterdir()) if folder.is_dir() else []:
+        if not is_own_link(entry, skills_root):
+            if entry.name in wanted:
+                occupied.add(entry.name)
+                report.conflicts.append(f"{entry.name}: {entry} is not our link, left untouched")
+            continue
+        current = entry.name in wanted and link_target(entry) == skills_root / entry.name \
+            and (skills_root / entry.name / "SKILL.md").is_file()
+        if current:
+            report.kept.append(entry.name)
+        else:
+            remove_link(entry, report, dry_run)
 
     for name in sorted(wanted - set(report.kept) - occupied):
-        report.created.append(name)
-        if dry_run:
-            continue
-        try:
-            folder.mkdir(parents=True, exist_ok=True)
-            relative = os.path.relpath(skills_root / name, folder.resolve())
-            (folder / name).symlink_to(relative, target_is_directory=True)
-        except OSError as exc:
-            report.created.remove(name)
-            report.refused.append(f"{name}: cannot create a symlink ({exc.strerror}); see docs/AGENT-VENDOR-SETUP.md")
+        create_link(name, folder, skills_root, report, dry_run)
     return report
 
 
@@ -117,8 +149,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         report = sync(args.workspace, args.agent, args.dry_run)
-    except OSError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+    except Exception as exc:  # install/update print this line and go on; no traceback for users
+        print(f"ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
     print("\n".join(report.lines(args.dry_run)))
     return 0

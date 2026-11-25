@@ -103,3 +103,18 @@ def test_template_keeps_codex_away_from_skills_without_fallback() -> None:
     # Closing protocols need an isolated-context checker Codex does not have yet (inventory 25.11).
     assert not codex & {"run-protocol", "day-close", "week-close", "month-close", "verify"}
     assert {"think", "wp-new", "org-dev", "transcribe"} <= codex
+
+
+def test_unhashable_runs_on_is_a_header_error_not_a_crash(tmp_path: Path) -> None:
+    make_skill(tmp_path, "nested", "audience: user\nruns_on: [[codex]]\n")
+    make_skill(tmp_path, "ok", "audience: user\nruns_on: [codex]\n")
+    assert skill_agents.select_for("codex", tmp_path) == ["ok"]
+    problems = skill_agents.check(tmp_path)
+    assert len(problems) == 1 and problems[0].startswith("nested: runs_on items must be agent names")
+
+
+def test_non_utf8_skill_is_a_header_error(tmp_path: Path) -> None:
+    skill = tmp_path / "latin"
+    skill.mkdir()
+    (skill / "SKILL.md").write_bytes(b"---\nname: latin\n\xff\xfe\n---\n")
+    assert skill_agents.check(tmp_path)[0].startswith("latin: cannot read SKILL.md")

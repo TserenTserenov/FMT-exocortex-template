@@ -130,3 +130,67 @@ def test_cli_reports_and_exits_zero_on_conflict(ws: Path) -> None:
 def test_cli_without_skills_dir_fails(tmp_path: Path) -> None:
     out = subprocess.run([sys.executable, str(SCRIPT), "--workspace", str(tmp_path)], capture_output=True, text=True)
     assert out.returncode == 2 and ".claude/skills not found" in out.stderr
+
+
+# --- regressions from the review of 2026-11-25 ---------------------------------
+
+def test_skill_folder_pointing_outside_is_refused_and_stays_stable(ws: Path, tmp_path_factory: pytest.TempPathFactory) -> None:
+    outside = tmp_path_factory.mktemp("outside-skill")
+    (outside / "SKILL.md").write_text("---\nname: outer\naudience: user\nruns_on: [codex]\n---\n", encoding="utf-8")
+    (ws / ".claude" / "skills" / "outer").symlink_to(outside, target_is_directory=True)
+    first = skill_links.sync(ws, "codex")
+    second = skill_links.sync(ws, "codex")
+    for report in (first, second):
+        assert [r for r in report.refused if r.startswith("outer:")]
+        assert not [c for c in report.conflicts if c.startswith("outer:")]
+    assert "outer" not in links(ws)
+
+
+def test_skill_alias_inside_skills_folder_is_kept_on_rerun(ws: Path) -> None:
+    (ws / ".claude" / "skills" / "think-alias").symlink_to("think", target_is_directory=True)
+    skill_links.sync(ws, "codex")
+    report = skill_links.sync(ws, "codex")
+    assert "think-alias" in report.kept and report.removed == []
+
+
+def test_unhashable_runs_on_skips_only_that_skill(ws: Path) -> None:
+    make_skill(ws, "broken", runs_on="[[codex]]")
+    report = skill_links.sync(ws, "codex")
+    assert report.created == ["think", "wp-new"]
+
+
+def test_dot_agents_as_symlink_is_a_conflict_and_nothing_is_written(ws: Path, tmp_path_factory: pytest.TempPathFactory) -> None:
+    shared = tmp_path_factory.mktemp("shared")
+    (ws / ".agents").symlink_to(shared, target_is_directory=True)
+    report = skill_links.sync(ws, "codex")
+    assert report.created == [] and len(report.conflicts) == 1
+    assert list(shared.iterdir()) == []
+
+
+def test_agent_skills_folder_as_symlink_is_a_conflict(ws: Path, tmp_path_factory: pytest.TempPathFactory) -> None:
+    shared = tmp_path_factory.mktemp("shared-skills")
+    (ws / ".agents").mkdir()
+    (ws / ".agents" / "skills").symlink_to(shared, target_is_directory=True)
+    report = skill_links.sync(ws, "codex")
+    assert report.created == [] and len(report.conflicts) == 1
+    assert list(shared.iterdir()) == []
+
+
+def test_rerun_with_conflict_is_stable(ws: Path) -> None:
+    (ws / ".agents" / "skills" / "think").mkdir(parents=True)
+    skill_links.sync(ws, "codex")
+    report = skill_links.sync(ws, "codex")
+    assert report.created == [] and report.kept == ["wp-new"]
+    assert [c for c in report.conflicts if c.startswith("think:")]
+
+
+def test_cli_dry_run_prints_would_link(ws: Path) -> None:
+    out = subprocess.run([sys.executable, str(SCRIPT), "--workspace", str(ws), "--dry-run"], capture_output=True, text=True)
+    assert out.returncode == 0 and "would link: think" in out.stdout
+    assert not (ws / ".agents").exists()
+
+
+def test_relative_workspace_argument(ws: Path) -> None:
+    out = subprocess.run([sys.executable, str(SCRIPT), "--workspace", "."], capture_output=True, text=True, cwd=ws)
+    assert out.returncode == 0 and "skill links: 2 new" in out.stdout
+    assert links(ws)["think"] == "../../.claude/skills/think"

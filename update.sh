@@ -3060,7 +3060,7 @@ run_post_apply_backfills_or_die() {
     if ! skill_links_python=$("$SCRIPT_DIR/scripts/lib/find-python3.sh" 2>/dev/null); then
         echo "  ⚠ навыки для Codex не обновлены: нет python3 с PyYAML."
     elif skill_links_output=$("$skill_links_python" "$SCRIPT_DIR/scripts/skill_links.py" --workspace "$WORKSPACE_DIR" 2>&1); then
-        printf '%s\n' "$skill_links_output" | grep -E '^(CONFLICT|REFUSED|skill links)' | sed 's/^/  /'
+        printf '%s\n' "$skill_links_output" | grep -E '^(unlink|CONFLICT|REFUSED|skill links)' | sed 's/^/  /'
     else
         printf '%s\n' "$skill_links_output" | sed 's/^/  /'
         echo "  ⚠ навыки для Codex не обновлены — запустите вручную: $skill_links_python $SCRIPT_DIR/scripts/skill_links.py --workspace $WORKSPACE_DIR"
