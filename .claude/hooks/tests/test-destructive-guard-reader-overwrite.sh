@@ -342,5 +342,40 @@ expect "shell n>=2 comparison inside awk" pass 'echo "$(echo '"'"'q'"'"')"; awk 
 expect "address <name@host> closes a commit message" pass 'echo "$(echo '"'"'q'"'"')"; echo '"'"'{"m":"x <n@a.com>"}]}'"'"''
 expect "real redirect after an address still asks" ask 'echo "$(echo '"'"'q'"'"')"; echo "<n@a.com>" ; echo hi > params.yaml'
 
+# === WP-7 F316 (25.11): red-team review - every one of these must keep the question ===
+expect "trailing path after $(mktemp) is not temporary" ask 'F=$(mktemp -d)/../../home/user/IWE/.claude/settings.json; cat a > $F'
+expect "trailing .. after plain $(mktemp)" ask 'F=$(mktemp)/../params.yaml; git show HEAD:x > $F'
+expect "trailing .. after a double-quoted path" ask 'F="/tmp/x"/../params.yaml; git show HEAD:x > $F'
+expect "trailing .. after a single-quoted path" ask 'F='"'"'/tmp/x'"'"'/../params.yaml; git show HEAD:x > $F'
+expect "trailing variable after $(mktemp)" ask 'F=$(mktemp -d)"$HOME"/x; git show HEAD:x > $F'
+expect "backslash-escaped dots in the value" ask 'F=/tmp/\.\./params.yaml; git show HEAD:x > $F'
+expect "brace expansion in the value" ask 'F=/tmp/{..,x}/params.yaml; git show HEAD:x > $F'
+expect "glob in the value" ask 'F=/tmp/x/*; git show HEAD:x > $F'
+expect "dots built from an unset variable inside the sub-path" ask 'F=/tmp/x; git show HEAD:x > $F/.${X}./params.yaml'
+expect "brace dots inside the sub-path" ask 'F=/tmp/x; git show HEAD:x > $F/a/.{.,}/params.yaml'
+expect "command substitution inside the sub-path" ask 'F=/tmp/x; git show HEAD:x > $F/$(echo ../home)/settings.json'
+expect "backquote substitution inside the sub-path" ask 'F=/tmp/x; git show HEAD:x > $F/`echo ..`/params.yaml'
+expect "second variable with a slash inside the file name" ask 'F=/tmp/y; G=/../home/user/IWE/params.yaml; git show HEAD:x > $F/z$G'
+expect "use before assignment" ask 'git show HEAD:x > $F; F=$(mktemp)'
+expect "unset after assignment" ask 'F=/tmp/x; unset F; git show HEAD:x > $F'
+expect "printf -v rebinds the variable" ask 'F=/tmp/x; N=F; printf -v $N params.yaml; git show HEAD:x > $F'
+expect "array element rebinds the variable" ask 'F=/tmp/x; F[0]=params.yaml; git show HEAD:x > $F'
+expect "assignment inside a quoted bash -c string" ask 'F=/tmp/x; bash -c '"'"'F=params.yaml; git show HEAD:x > $F'"'"''
+expect "sourced file between assignment and use" ask 'F=/tmp/x; . ./evil.sh; git show HEAD:x > $F'
+expect "source between assignment and use" ask 'F=/tmp/x; source ./evil.sh; git show HEAD:x > $F'
+expect "TMPDIR set to a working folder" ask 'export TMPDIR=/home/user/IWE; F=$TMPDIR/x; git show HEAD:x > $F'
+expect "indirect rebinding with declare" ask 'F=/tmp/x; N=F; declare $N=params.yaml; git show HEAD:x > $F'
+expect "default-assign expansion" ask 'unset F; : ${F:=params.yaml}; git show HEAD:x > $F'
+expect "here-string address hides a real redirect" ask 'echo "$(echo '"'"'a'"'"')"; cat <<<x@y>params.yaml'
+expect "process substitution address hides a real redirect" ask 'echo "$(echo '"'"'a'"'"')"; cat <(true)@>params.yaml'
+
+# === WP-7 F316 (25.11): second review round ===
+expect "dot-valued variable next to a literal dot" ask 'F=/tmp/x; X=.; cat z > $F/b/.${X}/params.yaml'
+expect "dot-valued variable after a literal dot, plain form" ask 'F=/tmp/x; X=.; cat z > $F/b/.$X/params.yaml'
+expect "assignment as an argument of echo" ask 'echo "a" F=/tmp/x; cat z > $F'
+expect "assignment word after echo" ask 'echo F=/tmp/x; cat z > $F'
+expect "prefix assignment before a command" ask 'F=/tmp/x cat z > $F'
+expect "temporary path that names a protective folder" ask 'F=/tmp/x/.claude/hooks/y; git show HEAD:x > $F'
+
 echo "reader-overwrite: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

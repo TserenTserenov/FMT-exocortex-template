@@ -105,6 +105,8 @@ DG_LEGACY_PIDS=()
 DG_NEW_ASKED=0
 DG_LEGACY_BYPASS=0
 DG_TEMP_VARS=
+DG_COMP_VARS=
+TEMP_TARGET_SUB=
 dg_legacy_cleanup() {
   local pid n
   for pid in ${DG_LEGACY_PIDS[@]+"${DG_LEGACY_PIDS[@]}"}; do
@@ -125,18 +127,17 @@ dg_legacy_cleanup() {
 # target they name is `$NAME` or `$NAME/sub` of a variable this guard found to be temporary in this
 # very call; every other ask of theirs, and every block, stays.
 dg_legacy_temp_exempt() {
-  local reason t v
+  local reason t plain esc
   reason=$(jq -r -s 'if length == 1 then (.[0].hookSpecificOutput.permissionDecisionReason // "") else "" end' "$1" 2>/dev/null) || return 1
   case "$reason" in
     "перенаправление «>» после читающей команды перезапишет файл ("*)
-      [ -n "$DG_TEMP_VARS" ] || return 1
       t=${reason#*файл (}
       t=${t%%) —*} ;;
     "перенаправление «>» или tee после комментария с кавычкой"*)
-      # The target they name starts with `]`: the `>` of a regex class such as '^[<>]x'. When this guard
-      # sees a real redirect there it asks itself, and their ask is not used.
       t=${reason%%): такой текст*}
       t=${t##* (}
+      # The target they name starts with `]`: the `>` of a regex class such as '^[<>]x'. When this guard
+      # sees a real redirect there it asks itself, and their ask is not used.
       case "$t" in "]"*) return 0 ;; esac
       # The target they name stands right after a lone ` => ` / ` -> ` arrow of a message
       # (`echo "$m => $r"`, WP-7 F316, 23.11); this guard reads the same arrow as text, and asks
@@ -145,19 +146,17 @@ dg_legacy_temp_exempt() {
       # The target they name stands right after a `>=` comparison or after the closing `>` of an
       # address `<name@host>` (WP-7 F316, 25.11); the text is compared with its quotes removed.
       if [ -n "$t" ]; then
-        local plain esc
         plain=${CMD:-}; plain=${plain//[\"\'\\]/}
         esc=$(printf '%s' "$t" | sed 's/[][\.*^$(){}?+|\/]/\\&/g')
         case "$t" in "="*) [[ "$plain" == *">$t"* ]] && return 0 ;; esac
-        [[ "$plain" =~ @[^[:space:]\<\>]*\>$esc ]] && return 0
+        case "$t" in "]"*|"}"*|")"*|","*|"\\"*) [[ "$plain" =~ @[^[:space:]\<\>]*\>$esc ]] && return 0 ;; esac
       fi ;;
     *) return 1 ;;
   esac
-  [[ "$t" =~ ^\$(\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))(/[^\`]*)?$ ]] || return 1
-  v=${BASH_REMATCH[2]:-${BASH_REMATCH[3]}}
-  case "$t" in */../*|*/..|*/\$*|*\$\(*|*\$) return 1 ;; esac
-  case " $DG_TEMP_VARS " in *" $v "*) return 0 ;; esac
-  return 1
+  # A temporary variable: the same test as in this guard's own scan.
+  [ -n "$DG_TEMP_VARS" ] && [ -n "${TEMP_TARGET_SUB:-}" ] || return 1
+  [ "$(printf '%s\n' "$t" | DG_TEMPV="$DG_TEMP_VARS" DG_COMPV="$DG_COMP_VARS" perl -e "$TEMP_TARGET_SUB"'
+    my $line = <STDIN>; chomp $line; print temp_target($line) ? "1" : "0";' 2>/dev/null)" = 1 ]
 }
 # Called when this guard allows or asks: every released guard must have answered allow, ask or
 # block; a block wins, an ask is asked, anything else blocks.
@@ -2368,50 +2367,108 @@ case "$TEXT_PROTECTED" in
   HIT|BLOCK) block "запись в .claude/hooks, .claude/bin или settings.json запрещена в любом написании пути — и через подстановку перед ним (\$(pwd)/.claude//hooks, \`pwd\`/…, \$HOME/…), \$'…', tee после <(…). Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота." ;;
 esac
 
-# Temporary-file variables (WP-7 F316, 22.11): `F=$(mktemp); git show X > $F` and `S=/tmp/…; … > $S/a.md`
-# asked a question although the target is a temporary file: the rule above knows only literal temporary
-# paths, and a bare `$F` looks like a working file. A variable counts as temporary only when EVERY
-# assignment to it in this same call (a shell does not keep variables between calls) is a temporary
-# path (/tmp, /var/folders, $TMPDIR), `$(mktemp …)` without a template outside them or -p/--tmpdir,
-# or another temporary variable plus a path; no `for`, `read`, `+=` or `eval` may rebind it.
-# `R=$I/DS-governance`, `F=params.yaml` and a variable with no assignment stay questions.
+# Temporary-file variables (WP-7 F316, 22.11; hardened after the red-team review 25.11):
+# `F=$(mktemp); git show X > $F` and `S=/tmp/...; ... > $S/a.md` asked although the target is a
+# temporary file; the rule above knows only literal temporary paths. A variable counts as temporary
+# only when EVERY assignment to it in this same call (a shell does not keep variables between calls)
+# is, as a WHOLE word: a path of plain characters under /tmp, /var/folders or $TMPDIR with no `..`
+# component, exactly `$(mktemp)` / `$(mktemp -d)`, or another temporary variable plus a plain path;
+# and the variable is assigned before its first use. Anything that can rebind a variable behind the
+# scan's back (eval, unset, declare, read, source, `. file`, printf -v, ${!x}, ${x:=y}, `x[0]=`,
+# `x+=`, `for x in`, an assignment of TMPDIR) leaves the question. `R=$I/DS-governance`,
+# `F=params.yaml`, `F=$(mktemp)/../x` and a variable with no assignment stay questions.
+# Second list: variables that hold one plain path component (no slash), assigned by `x=word` or
+# `for x in word word`; such a variable may stand INSIDE a file name of a temporary path
+# (`$P/p2b-$ag.md`), never as a whole component.
 TEMP_VARS_PL='
   use strict; use warnings;
   my $text = do { local $/; <STDIN> };
-  exit 0 if $text =~ /\beval\b/;
-  my (%vals, %bad);
-  while ($text =~ /(?:^|[\s;&|(])([A-Za-z_][A-Za-z0-9_]*)(\+?)=("[^"]*"|\x27[^\x27]*\x27|\$\([^)]*\)|[^\s;&|()]*)/g) {
-    $bad{$1} = 1 if $2 ne q{};
-    push @{$vals{$1}}, $3;
+  exit 0 if $text =~ /\b(?:eval|unset|declare|typeset|local|readonly|mapfile|readarray|getopts|read|source)\b|printf\s+-v|\$\{!|:=|(?:^|[\s;&|(])\.[ \t]+\S/;
+  my $safe = qr/[A-Za-z0-9_.+\@%:=,-]/;
+  my $tmp_root = qr{(?:/tmp|/private/tmp|/var/folders|/private/var/folders)};
+  my $dotdot = qr{(?:^|/)\.\.(?:/|$)};
+  my $value = qr/(?:"[^"]*"|\x27[^\x27]*\x27|\$\((?:[^()]|\([^()]*\))*\)|\$\{[^}]*\}|[^\s;&|()"\x27])+/;
+  my (%vals, %first, %bad, %loop);
+  while ($text =~ /(?:^|[\s;&|(`{"\x27])([A-Za-z_][A-Za-z0-9_]*)(\+?|\[[^\]]*\])=($value)?/g) {
+    my ($n, $mod, $v, $p, $e) = ($1, $2, defined $3 ? $3 : q{}, $-[1], $+[0]);
+    $bad{$n} = 1 if $mod ne q{};
+    # A real assignment stands at command position and ends its statement; `echo F=x`, `"F=x"`, a
+    # quoted `bash -c \x27F=x; ...\x27` and a prefix assignment `F=x cmd` do not bind $F for the
+    # redirection that follows, so they make the variable untrusted.
+    my $pre = substr($text, 0, $p); $pre =~ s/[ \t]+$//;
+    my $cmdpos = ($pre eq q{} || $pre =~ /[;&|(`{\n]$/ || $pre =~ /(?:^|[\s;&|(`{])(?:do|then|else|elif|if|while|until|export|!)$/);
+    my $whole = substr($text, $e) =~ /^[ \t]*(?:[;&|)}\n`]|\z)/;
+    $bad{$n} = 1 unless $cmdpos && $whole;
+    $first{$n} = $p unless exists $first{$n};
+    push @{$vals{$n}}, $v;
   }
-  for my $n (keys %vals) {
-    $bad{$n} = 1 if $text =~ /\bfor\s+\Q$n\E\b/ || $text =~ /\b(?:read|mapfile|readarray|getopts)\b[^;&|\n]*\b\Q$n\E\b/ || $text =~ /printf\s+-v\s+\Q$n\E\b/;
+  while ($text =~ /\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\s+([^;\n]*)/g) {
+    my ($n, $list) = ($1, $2);
+    $first{$n} = $-[1] unless exists $first{$n};
+    $list =~ s/\s+do\b.*$//s;
+    push @{$loop{$n}}, grep { length } split /\s+/, $list;
   }
+  my $tmpdir_bad = $text =~ /(?:^|[\s;&|(`{"\x27])TMPDIR\+?=/ ? 1 : 0;
+  my $unq = sub { my $v = shift; $v =~ s/^"(.*)"$/$1/s; return $v; };
+  my $used_first = sub { my $n = shift; return ($text =~ /\$\{?\Q$n\E(?![A-Za-z0-9_])/) ? $-[0] : undef; };
   my %temp;
-  my $tmp_root = qr{(?:/tmp|/private/tmp|/var/folders|/private/var/folders)/};
   my $is_temp = sub {
-    my $v = shift;
-    $v =~ s/^"(.*)"$/$1/s;
-    return 0 if $v =~ m{(?:^|/)\.\.(?:/|$)};
-    return 1 if $v =~ m{^$tmp_root[^\$`]*$};
-    return 1 if $v =~ m{^\$(?:TMPDIR|\{TMPDIR\})/[^\$`]*$};
-    return 1 if $v =~ m{^\$\(\s*mktemp(?:\s+-[dtq]+)*(?:\s+$tmp_root[^\s)\$`]*)?\s*\)$};
-    if ($v =~ m{^\$(?:([A-Za-z_][A-Za-z0-9_]*)|\{([A-Za-z_][A-Za-z0-9_]*)\})(?:/[^\$`]*)?$}) {
-      my $r = defined $1 ? $1 : $2;
-      return $temp{$r} ? 1 : 0;
+    my $v = $unq->(shift);
+    return 0 if $v =~ $dotdot || $v =~ /\.claude/i;
+    return 1 if $v =~ m{^$tmp_root/(?:$safe|/)*$};
+    return 1 if !$tmpdir_bad && $v =~ m{^\$(?:TMPDIR|\{TMPDIR\})/(?:$safe|/)*$};
+    return 1 if $v =~ m{^\$\(\s*mktemp(?:\s+-[dtq]+)*\s*\)$};
+    if ($v =~ m{^\$(?:([A-Za-z_][A-Za-z0-9_]*)|\{([A-Za-z_][A-Za-z0-9_]*)\})((?:/$safe+)*)$}) {
+      my ($r, $tail) = (defined $1 ? $1 : $2, $3);
+      return ($temp{$r} && $tail !~ $dotdot) ? 1 : 0;
     }
     return 0;
   };
   for (1 .. 4) {
     for my $n (keys %vals) {
-      next if $bad{$n} || $temp{$n};
-      $temp{$n} = 1 unless grep { !$is_temp->($_) } @{$vals{$n}};
+      next if $bad{$n} || $loop{$n} || $temp{$n};
+      next if grep { !$is_temp->($_) } @{$vals{$n}};
+      my $use = $used_first->($n);
+      next if defined $use && $use < $first{$n};
+      $temp{$n} = 1;
     }
   }
-  print join(q{ }, sort keys %temp), "\n";
+  my %comp;
+  for my $n (keys %vals, keys %loop) {
+    next if $bad{$n};
+    my @w = (@{$vals{$n} || []}, @{$loop{$n} || []});
+    next unless @w;
+    next if grep { $unq->($_) !~ m{^[A-Za-z0-9_+\@%:=,-]+$} } @w;
+    my $use = $used_first->($n);
+    next if defined $use && $use < $first{$n};
+    $comp{$n} = 1;
+  }
+  print join(q{ }, sort keys %temp), "\n", join(q{ }, sort keys %comp), "\n";
 '
-TEMP_VARS=$(printf '%s' "$CMD_EXEC" | perl -e "$TEMP_VARS_PL") || fail_check "perl, временные переменные"
+# Is a write target a temporary file reached through such a variable? Shared by the three places
+# below. Names come in DG_TEMPV (temporary paths) and DG_COMPV (one path component).
+TEMP_TARGET_SUB='
+  my $dg_safe = qr/[A-Za-z0-9_.+\@%:=,-]/;
+  my (%dg_temp, %dg_comp);
+  $dg_temp{$_} = 1 for split / /, ($ENV{DG_TEMPV} // q{});
+  $dg_comp{$_} = 1 for split / /, ($ENV{DG_COMPV} // q{});
+  sub temp_target {
+    my $t = shift;
+    return 0 unless $t =~ m{^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))(.*)$}s;
+    my ($name, $rest) = (defined $1 ? $1 : $2, $3);
+    return 0 unless $dg_temp{$name};
+    return 1 if $rest eq q{};
+    return 0 unless $rest =~ m{^/};
+    return 0 if $rest =~ m{(?:^|/)\.\.(?:/|$)} || $rest =~ m{/\$} || $rest =~ /\.claude/i;
+    $rest =~ s{\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)}{ $dg_comp{defined $1 ? $1 : $2} ? q{} : q{!} }ge;
+    return $rest =~ m{^(?:$dg_safe|/)*$} ? 1 : 0;
+  }
+'
+TEMP_OUT=$(printf '%s' "$CMD_EXEC" | perl -e "$TEMP_VARS_PL") || fail_check "perl, временные переменные"
+TEMP_VARS=$(printf '%s\n' "$TEMP_OUT" | sed -n 1p)
+COMP_VARS=$(printf '%s\n' "$TEMP_OUT" | sed -n 2p)
 DG_TEMP_VARS="$TEMP_VARS"
+DG_COMP_VARS="$COMP_VARS"
 
 # A `#` comment or a command substitution the scanners above do not understand (WP-529 F275). They
 # know no comments, so a quote or backtick inside one (`ls # don't`, `ls # a\'b'`) opens a string
@@ -2424,7 +2481,7 @@ DG_TEMP_VARS="$TEMP_VARS"
 # Write targets of `>`, `>>`, `>|`, `&>`, `>&file` and tee are taken with quotes and backslashes
 # removed and go through the same path comparison as above (glob, braces, `//`, `..`): a
 # protective file blocks; any other target outside temporary directories and /dev asks.
-COMMENT_TAIL_PL="$TEXT_TARGETS_SUB"'
+COMMENT_TAIL_PL="$TEXT_TARGETS_SUB""$TEMP_TARGET_SUB"'
   use strict; use warnings;
   my ($exec, $raw) = split /\0/, do { local $/; <STDIN> }, 2;
   $exec //= q{}; $raw //= q{};
@@ -2506,7 +2563,7 @@ COMMENT_TAIL_PL="$TEXT_TARGETS_SUB"'
       # `awk \x27$1>="2026-10-26"\x27`, `n>=2`: a comparison, not a redirection; and the closing `>` of an
       # address such as `Co-Authored-By: Name <name@host>` in a commit message (WP-7 F316, 25.11).
       next if $op !~ /&/ && substr($l, $at + length($op), 1) eq q{=};
-      next if $op eq q{>} && substr($l, 0, $at) =~ /<[^\s<>]*\@[^\s<>]*$/;
+      next if $op eq q{>} && substr($l, 0, $at) =~ /(?<![<(&>])<[^\s<>]*\@[^\s<>]*$/ && $t =~ /^[\]\}\),\\]/;
       next if $op =~ /&$/ && $op !~ /^&/ && $t =~ /^(?:\d+|-)$/;   # 2>&1, >&2, >&- copy a descriptor
       push @found, $t;
     }
@@ -2522,11 +2579,8 @@ COMMENT_TAIL_PL="$TEXT_TARGETS_SUB"'
       push @targets, $t;
       next if $t =~ m{^/dev/(null|stdout|stderr|tty|fd/\d+)$};
       next if $t =~ m{^(/tmp/|/private/tmp/|/var/folders/|/private/var/folders/|\$TMPDIR/|\$\{TMPDIR\}/)} && $t !~ m{/\.\.(/|$)};
-      # A variable this call set to a temporary path (TEMP_VARS_PL below): same exemption.
-      if ($t =~ m{^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))(/(?:[^\$`]|(?<=[^/])\$(?!\(|\z))*)?$} && $t !~ m{/\.\.(/|$)}) {
-        my $v = defined $1 ? $1 : $2;
-        next if grep { $_ eq $v } split / /, ($ENV{DG_TEMPV} // q{});
-      }
+      # A variable this call set to a temporary path (TEMP_VARS_PL above): same exemption.
+      next if temp_target($t);
       $ask //= $t;
     }
   }
@@ -2536,7 +2590,7 @@ COMMENT_TAIL_PL="$TEXT_TARGETS_SUB"'
 '
 COMMENT_TAIL=
 case "$CMD_EXEC" in
-  *"#"*|*'$('*|*'`'*) COMMENT_TAIL=$(printf '%s\0%s' "$CMD_EXEC" "$CMD" | DG_TEMPV="$TEMP_VARS" perl -e "$COMMENT_TAIL_PL") || fail_check "perl, строки после комментария" ;;
+  *"#"*|*'$('*|*'`'*) COMMENT_TAIL=$(printf '%s\0%s' "$CMD_EXEC" "$CMD" | DG_TEMPV="$TEMP_VARS" DG_COMPV="$COMP_VARS" perl -e "$COMMENT_TAIL_PL") || fail_check "perl, строки после комментария" ;;
 esac
 if [ -n "$COMMENT_TAIL" ] && [ "$COMMENT_TAIL" != "BLOCK" ]; then
   COMMENT_PROTECTED=$(printf '%s\n' "$COMMENT_TAIL" | awk '!/^ASK\t/' | perl -e "$PROTECTED_TARGET_PL") || fail_check "perl, цели после комментария"
@@ -2563,18 +2617,22 @@ esac
 # `cat F > f <<< x`) still asks (WP-529 F275). The blocks above (protective files, /dev/null)
 # still apply to it.
 # Keep the reader list in step with the Bash(...) allow rules of .claude/settings.json.
-READER_OVERWRITE=$(printf '%s\n' "$WRITE_TARGETS" | awk -F'\t' -v tv="$TEMP_VARS" '
+READER_CANDIDATES=$(printf '%s\n' "$WRITE_TARGETS" | awk -F'\t' '
   $2 == "T" && $4 != "H" && $1 ~ /^(ls|cat|head|tail|wc|grep|egrep|fgrep|rg|find|diff|git (status|log|diff|show|branch|remote))$/ {
     t = $3
     if (t ~ /^(\/tmp\/|\/private\/tmp\/|\/var\/folders\/|\/private\/var\/folders\/|\$TMPDIR\/|\$\{TMPDIR\}\/|\$\{TMPDIR:-[^}]*\}\/)/ && t !~ /\/\.\.(\/|$)/) next
     if (t ~ /^\/dev\/(null|stdout|stderr|tty|fd\/[0-9]+)$/) next
-    if (match(t, /^\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)/) && t !~ /\/\.\.(\/|$)/) {
-      v = substr(t, 2, RLENGTH - 1); gsub(/[{}]/, "", v)
-      rest = substr(t, RLENGTH + 1)
-      if (rest ~ /^(\/[^`]*)?$/ && rest !~ /\/\$/ && rest !~ /\$\(/ && rest !~ /\$$/ && (" " tv " ") ~ (" " v " ")) next
-    }
     print t
   }')
+READER_OVERWRITE=$(printf '%s\0%s\n' "$CMD_EXEC" "$READER_CANDIDATES" | DG_TEMPV="$TEMP_VARS" DG_COMPV="$COMP_VARS" perl -e "$TEMP_TARGET_SUB"'
+  # A temporary-variable target counts only when the word really ends there in the call text:
+  # the target scan cuts a word at `$(`, so `$F/$(echo ..)/x` would otherwise read as `$F/`.
+  my ($cmd, $list) = split /\0/, do { local $/; <STDIN> }, 2;
+  for my $line (split /\n/, $list // q{}) {
+    my $ok = temp_target($line) && $cmd =~ /(?:^|[\s;&|(>])\Q$line\E(?:[\s;&|)<>]|\z)/;
+    print "$line\n" unless $ok;
+  }
+') || fail_check "perl, цели записи во временные переменные"
 if [ -n "$READER_OVERWRITE" ]; then
   ASK_REASON="перенаправление «>» после читающей команды перезапишет файл ($(printf '%s' "$READER_OVERWRITE" | head -1)) — такие команды разрешены без запроса, а пустой вывод (grep без совпадений, ls несуществующего, head -0) стирает файл. Подтверди запись, если она нужна; рабочие файлы правят правкой файла."
 fi
