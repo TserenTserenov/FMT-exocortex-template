@@ -1493,6 +1493,39 @@ apply_refresh_stale() {
     echo "  --refresh-stale: обновлено $refreshed из ${#AUTHOR_STALE_PAIRS[@]}, бэкап: $backup_root"
 }
 
+# Interactive "y" at the update prompt (issue #1487 follow-up, 0.42.2-rc.2): the preview-only path
+# left a new platform hook (memory-write-permission.sh, #1626) unregistered in the workspace
+# settings.json until the pilot re-ran with --apply-settings-merge, and the preview did not name that
+# command. A confirmed update now registers hooks/permissions the template added, but only when the
+# merge is purely additive: no conflicting user value and no withdrawn platform default would be
+# replaced. Anything else stays a preview with the command named. --no-settings-merge opts out.
+settings_merge_report_is_additive_only() {
+    local report_file="$1"
+    "$PY_BIN" - "$report_file" <<'PY' 2>/dev/null
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    r = json.load(handle)
+additive = not r["conflicts"] and not r.get("retired_defaults_replaced")
+sys.exit(0 if additive else 1)
+PY
+}
+
+enable_additive_settings_merge_on_confirmation() {
+    [ "$APPLY_SETTINGS_MERGE" = "true" ] && return 0
+    [ "$NO_SETTINGS_MERGE" = "true" ] && return 0
+    $AUTO_YES && return 0
+    local src="$SCRIPT_DIR/.claude/settings.json"
+    local dst="$WORKSPACE_DIR/.claude/settings.json"
+    [ -f "$src" ] && [ -f "$dst" ] || return 0
+    cmp -s "$src" "$dst" && return 0
+    local probe_file
+    probe_file=$(build_settings_merge_report "$src" "$dst" "$TMPDIR_UPDATE/settings-merge-probe-confirm.json") || return 0
+    settings_merge_report_is_quiet "$probe_file" && return 0
+    settings_merge_report_is_additive_only "$probe_file" || return 0
+    echo "  .claude/settings.json — вы подтвердили обновление: добавляю новые хуки и разрешения платформы; уже существующие платформенные хуки приводятся к версии платформы (охват и таймаут); резервная копия — в .backups/ рабочей папки"
+    APPLY_SETTINGS_MERGE=true
+}
+
 # --apply-settings-merge (stage B): applied regardless of whether the template's
 # settings.json changed in THIS run — the live e2e run of 14.08 showed that
 # the user path "saw the preview → re-ran with the flag" otherwise
@@ -1578,6 +1611,7 @@ if r.get("hooks_regrouped"):
     print(f"    + хуков, которые шаблон перенёс в другую группу: {r['hooks_regrouped']} (дубль не появится)")
 if r["conflicts"]:
     print(f"    ⚠ конфликты (оставлено ваше значение): {', '.join(r['conflicts'])}")
+print("    Применить слияние (с резервной копией): bash update.sh --apply-settings-merge")
 PY
 }
 
@@ -6984,6 +7018,7 @@ done
 
 # Stage B: settings merge on an explicit flag — outside the propagation loop, so that it
 # also works on a repeated run, when the template's settings.json is no longer in UPDATED.
+enable_additive_settings_merge_on_confirmation
 apply_settings_merge_if_requested
 report_settings_merge_drift
 

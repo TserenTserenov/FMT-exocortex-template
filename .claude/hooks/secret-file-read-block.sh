@@ -175,6 +175,7 @@ self_test() {
   run_raw_case claude_tool_without_session_denied deny '{"tool_name":"Read","tool_input":{"file_path":"id_rsa"}}'
   run_raw_case path_only_secret_denied deny '{"tool_name":"Read","tool_input":{"path":".env"}}'
   run_raw_case file_path_wins_over_path_denied deny '{"tool_name":"Read","tool_input":{"file_path":".env","path":"README.md"}}'
+  run_raw_case differing_file_path_and_secret_path_denied deny '{"tool_name":"ReadFile","tool_input":{"file_path":"README.md","path":".env"}}'
   run_raw_case blank_session_id_allowed allow '{"session_id":"  ","tool_name":"Read","tool_input":{"file_path":"README.md"}}'
   # The relaxed envelope must not relax anything else.
   run_raw_case other_event_fails_closed "error(rc=2)" '{"hook_event_name":"PostToolUse","tool_name":"Read","tool_input":{"file_path":"README.md"}}'
@@ -224,6 +225,24 @@ case "$tool_name" in
   Grep) fp_field='.tool_input.path' ;;
   *) security_failure ;;
 esac
+
+# Kimi reads `path`, Claude reads `file_path`: when a file tool carries BOTH string
+# fields and they differ, judge each path on its own (re-run this hook once per field);
+# the first deny wins, so an ordinary file_path cannot hide a secret path.
+if [ "$tool_name" != "Grep" ] && [ -z "${IWE_SECRET_READ_SPLIT:-}" ] && printf '%s' "$input" | "$SECRET_BYPASS_JQ" -e \
+  '(.tool_input.file_path | type) == "string" and (.tool_input.path | type) == "string" and .tool_input.file_path != .tool_input.path' >/dev/null 2>&1; then
+  for split_field in file_path path; do
+    # The jq program references a jq variable.
+    # shellcheck disable=SC2016
+    split_input=$(printf '%s' "$input" | "$SECRET_BYPASS_JQ" -c --arg f "$split_field" '.tool_input |= {($f): .[$f]}') || security_failure
+    split_out=$(printf '%s' "$split_input" | IWE_SECRET_READ_SPLIT=1 bash "$0") || security_failure
+    if [ -n "$split_out" ]; then
+      printf '%s\n' "$split_out"
+      exit 0
+    fi
+  done
+  exit 0
+fi
 
 fp_type=$(printf '%s' "$input" | "$SECRET_BYPASS_JQ" -r "$fp_field | type" 2>/dev/null) || security_failure
 case "$tool_name:$fp_type" in

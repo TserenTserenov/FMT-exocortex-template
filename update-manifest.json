@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "version": "0.42.1",
+  "version": "0.42.2",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
@@ -125,7 +125,7 @@
     },
     {
       "path": ".claude/hooks/memory-write-permission.sh",
-      "sha256": "a76ce8d65852cff3122a5bdbca1069691f86a0d6a779022aecddec585339bd8d"
+      "sha256": "3ab74ec1d2b79ee8882e12574fa6329896381f9945c626467aba1fc2e31b8757"
     },
     {
       "path": ".claude/hooks/pack-creator-spf-guard.sh",
@@ -189,7 +189,7 @@
     },
     {
       "path": ".claude/hooks/secret-file-read-block.sh",
-      "sha256": "665cbe42116eb2100db1b5b33caa93dd56bfb8f03ddac1a00391f938583ff7df"
+      "sha256": "daa0e72ac581bc4ba85634a5123ac19441d66ca580cb6586f43a21c921716811"
     },
     {
       "path": ".claude/hooks/secret-leak-block.sh",
@@ -205,7 +205,7 @@
     },
     {
       "path": ".claude/hooks/session-open-gate.sh",
-      "sha256": "e1925ec5e8e9fa86503e6b9310d7f4bcf4e0f7ab11728fbd3b2e039974235e72"
+      "sha256": "2e3d870f4c0eaecd65fbc6d5fa4039e291d0a371d677f63d105e1c6dd7f54318"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -301,11 +301,11 @@
     },
     {
       "path": ".claude/hooks/tests/test-issue-1657-secret-file-read-block-kimi-envelope.sh",
-      "sha256": "a4d5ffa2e5988ff9c0f37aac30f09396287d0db0c30781b3d6491455e9825863"
+      "sha256": "67fb184f2f66d20b363519db644e600765321928f2ec84d6901a3a783bb4bf40"
     },
     {
       "path": ".claude/hooks/tests/test-memory-write-permission.sh",
-      "sha256": "fb0e1fb6bf99116c2fcf6e0b6479518cf2b739200c16f22fd5669ef12587d35e"
+      "sha256": "1c6aee25c5a0f16c04f6f93ce94f11c7b2b0f1dc9964a49aa38dfdd80d296ce4"
     },
     {
       "path": ".claude/hooks/tests/test-protocol-artifact-validate-mandatory-fail-closed.sh",
@@ -329,7 +329,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-session-open-gate.sh",
-      "sha256": "3cc8066595bde33be973c89d88088b520974465b5647949b360d3e39958961cf"
+      "sha256": "27b4c021bb70c3692791575ec4e4494961ec8b761108ae7c4bcabe206e9c4706"
     },
     {
       "path": ".claude/hooks/tests/test_issue_1184_stop_gate_block_once.sh",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "b89b1961ad7051f1eb168005afaa67d180ad9334538bad172a2916bf9baaaf81"
+      "sha256": "bcbc783e46e3720117f4fe9c3a134b978e8e67100ade6e16f00bf71125798634"
     },
     {
       "path": "CLAUDE.md",
@@ -2936,18 +2936,6 @@
       "sha256": "c2d80d278ad6b8706013ef1790ce0c69669e74bfebe8d8baa3117118fe70c85c"
     },
     {
-      "path": "scripts/postman-address-book.py",
-      "sha256": "ed0b61cc866d4097c7a7ddfabfe23469a6345f3111513ed76ddb45198269803d"
-    },
-    {
-      "path": "scripts/postman-address-book.yaml",
-      "sha256": "26bc76ef4cb6534c0c0a3649cd05aee7fc98eb78c4fe43cc42353ebc4d88f6ef"
-    },
-    {
-      "path": "scripts/postman.py",
-      "sha256": "09b16be29c13d47641d1c4a2d64fc455cc475e7743704c030dde5665d32bbca1"
-    },
-    {
       "path": "scripts/pre-commit-secret-scan.sh",
       "sha256": "b91187a8be7ca0dc653fc0dc904397bea5c82153b885a664c9fad8953d7baa09"
     },
@@ -3389,11 +3377,11 @@
     },
     {
       "path": "seed/strategy/.githooks/pre-commit",
-      "sha256": "ad0d8f6d6c92d4113a0d1c69040d8ecde0924bd0f938c146218f0c0826548ffe"
+      "sha256": "6c54749ea157afa4f041e6ae0d726fbfc74e7040ee2e1657e0f1ab64fb727d62"
     },
     {
       "path": "seed/strategy/.githooks/pre-push",
-      "sha256": "3323f5971c920c13b03ffed8484b06b96c0be196139a22d8c5098fc472ac4367"
+      "sha256": "d2fc416595518b4bf1d3989308a66090f9c2a984530388114244e5d3b6ca7c5f"
     },
     {
       "path": "seed/strategy/exocortex/agent-fault-profile/.gitignore",
@@ -3593,7 +3581,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "5ac7fe734fd06be0021f8ceabfef650448ae4d6dee8f204a921f1cb3c6702635"
+      "sha256": "210e0af8381dcdbff8caf77048f278d5e611f791b89019bf2e9a686dbf3ba466"
     }
   ],
   "excluded_paths": [
@@ -3659,8 +3647,6 @@
     "scripts/tests/test-issue-1581-close-note-commit.sh",
     "scripts/tests/test-iwe-audit-fpf-copy.sh",
     "scripts/tests/test-peer-session-finalize-index-lock.sh",
-    "scripts/tests/test-postman-address-book.py",
-    "scripts/tests/test-postman.py",
     "scripts/tests/test-rt4-copied-files-no-install-placeholders.sh",
     "scripts/tests/test-setup-extractor-feeders-linux-env.sh",
     "scripts/tests/test-setup-git-identity-precheck.sh",
