@@ -194,3 +194,14 @@ def test_relative_workspace_argument(ws: Path) -> None:
     out = subprocess.run([sys.executable, str(SCRIPT), "--workspace", "."], capture_output=True, text=True, cwd=ws)
     assert out.returncode == 0 and "skill links: 2 new" in out.stdout
     assert links(ws)["think"] == "../../.claude/skills/think"
+
+
+def test_linked_skill_moved_outside_is_unlinked_and_refused(ws: Path, tmp_path_factory: pytest.TempPathFactory) -> None:
+    skill_links.sync(ws, "codex")
+    moved = tmp_path_factory.mktemp("moved") / "wp-new"
+    (ws / ".claude" / "skills" / "wp-new").rename(moved)
+    (ws / ".claude" / "skills" / "wp-new").symlink_to(moved, target_is_directory=True)
+    report = skill_links.sync(ws, "codex")
+    assert report.removed == ["wp-new"]
+    assert [r for r in report.refused if r.startswith("wp-new:")]
+    assert "wp-new" not in links(ws)

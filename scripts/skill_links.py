@@ -71,6 +71,11 @@ def is_own_link(path: Path, skills_root: Path) -> bool:
     return path.is_symlink() and link_target(path).parent == skills_root
 
 
+def skill_inside(name: str, skills_root: Path) -> bool:
+    """The skill folder, after every symlink is resolved, still lies inside skills_root."""
+    return skills_root in Path(os.path.realpath(skills_root / name)).parents
+
+
 def folder_problem(folder: Path) -> str:
     """Why the agent folder cannot be used, or '' when it is usable (absent or a plain directory)."""
     for level in (folder.parent, folder):
@@ -94,7 +99,7 @@ def remove_link(entry: Path, report: Report, dry_run: bool) -> None:
 
 
 def create_link(name: str, folder: Path, skills_root: Path, report: Report, dry_run: bool) -> None:
-    if skills_root not in Path(os.path.realpath(skills_root / name)).parents:
+    if not skill_inside(name, skills_root):
         report.refused.append(f"{name}: the skill folder points outside .claude/skills, not linked")
         return
     report.created.append(name)
@@ -127,7 +132,7 @@ def sync(workspace: Path, agent: str, dry_run: bool = False) -> Report:
                 report.conflicts.append(f"{entry.name}: {entry} is not our link, left untouched")
             continue
         current = entry.name in wanted and link_target(entry) == skills_root / entry.name \
-            and (skills_root / entry.name / "SKILL.md").is_file()
+            and skill_inside(entry.name, skills_root) and (skills_root / entry.name / "SKILL.md").is_file()
         if current:
             report.kept.append(entry.name)
         else:

@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "b479ba77c23ce63b2009dadf9f97709dddb888cfeaf96fa1dc447680c8a7b99c"
+      "sha256": "48cf53822fc8acec8c89097d3f04a4e89210aca47ed7f1dd4f2f6cb5663086e4"
     },
     {
       "path": "CLAUDE.md",
@@ -1029,7 +1029,7 @@
     },
     {
       "path": "docs/AGENT-VENDOR-SETUP.md",
-      "sha256": "57a85f1f8c9ff926cd4167a8b38e12b2beff845877fcc291cb248b792b8dfe8c"
+      "sha256": "f6fbf5ec9bfb0073ac1891a0722272ef56cfd15803b410fa43f8f8557e82c300"
     },
     {
       "path": "docs/BRANCH-PROTECTION-EMERGENCY.md",
@@ -3021,7 +3021,7 @@
     },
     {
       "path": "scripts/skill_links.py",
-      "sha256": "b663cba236a4b8c66192d1f408813c0a585b6907139c8e5c8bc84413770c36dc"
+      "sha256": "4a3f9147930774046e74f9588a7acaebe28d600f18194cee12a7eef80a60b9a0"
     },
     {
       "path": "scripts/skills-pull.sh",
