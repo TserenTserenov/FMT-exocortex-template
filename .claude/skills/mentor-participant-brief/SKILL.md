@@ -23,6 +23,8 @@ triggers:
     - "подготовь ответ участнику"
     - "что известно об участнике"
     - "сводка по участнику"
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # /mentor-participant-brief

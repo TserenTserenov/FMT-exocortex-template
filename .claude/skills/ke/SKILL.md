@@ -6,6 +6,8 @@ browser_safe: true
 routing:
   executor: sonnet
   deterministic: false
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # Knowledge Extraction (Capture-to-Pack)

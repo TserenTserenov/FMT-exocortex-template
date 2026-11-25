@@ -19,6 +19,8 @@ related: [archgate]
 routing:
   executor: sonnet
   deterministic: false
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # /integration-gate — IntegrationGate

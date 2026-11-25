@@ -6,6 +6,8 @@ browser_safe: true
 routing:
   executor: opus
   deterministic: false
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # ADI-цикл рассуждения

@@ -23,6 +23,13 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+### Added
+
+- [behavior] Every skill header now declares who the skill is for (`audience: user|author`) and which agents run it correctly today (`runs_on: [claude, kimi, codex]`), per the skill inventory approved on 2026-11-25. `scripts/skill_agents.py --check .claude/skills` validates every header as YAML and runs as a release check; `--for <agent>` lists the skills to expose to that agent (34 for Codex now; closing protocols, `verify`, `audit-installation`, `pack-creator`, `day-open`, `discovery-session` and `platform-bottleneck` wait for a fallback). The headers of `org-dev` and `transcribe` are now valid YAML (#1676). The skill scaffold (`_template`) explains both fields.
+  - Цель: 20 · Результат: служебное — основа для поштучных ссылок на навыки в `.agents/skills`, по которым Codex и Kimi Code увидят только навыки, которые выполняют правильно
+  - Как проверить: `python3 scripts/skill_agents.py --check .claude/skills` — «OK: 52 skill headers declare audience and runs_on»; `python3 -m pytest -q scripts/tests/test_skill_agents.py` — 18 проверок проходят
+  - Как откатить: git revert слияния этого запроса; заголовки навыков вернутся без двух полей, шаг проверки исчезнет
+
 ### Fixed
 
 - [behavior] (#1672) Пункт закрытия дня «Rule-engine FP-stats» (навык `day-close`) при отсутствии `fp-stats.py` больше не пишет «skip: fp-stats.py требует rule-classifier.py»: это неверно, `fp-stats.py` не зависит от `rule-classifier.py` (отдельный необязательный компонент, его отсутствие штатно), и текст заставлял считать рабочий контур сломанным (обращение #1656). Теперь пропуск говорит только то, что `fp-stats.py` не найден. Менялась только формулировка: условие запуска и порядок шагов остались прежними; тот же текст обновлён в контрольном списке `scripts/tests/fixtures/python-resolver-baseline.txt`, который следит за вызовами `python3` в шаблоне.

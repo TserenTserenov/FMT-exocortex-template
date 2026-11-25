@@ -20,6 +20,8 @@ triggers:
 routing:
   executor: sonnet
   deterministic: false
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # /repo-new
