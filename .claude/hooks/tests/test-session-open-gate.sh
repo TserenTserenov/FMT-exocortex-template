@@ -411,5 +411,50 @@ got=$(run_gate_os linux-gnu 'git status')
 if [ "$got" = 0 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: skip: git status должен проходить (получено $got)"; fi
 rm -f "$PARAMS"
 
+# === Issue #1658: personal local repository outside IWE_ROOT, no remote -> no WP needed ===
+close_semaphore
+OUTSIDE=$(mktemp -d)
+git -C "$OUTSIDE" init -q
+INSIDE="$TMP_ROOT/DS-inside"
+mkdir -p "$INSIDE" && git -C "$INSIDE" init -q
+expect "outside repo without remote: -C commit passes"        0 "git -C $OUTSIDE commit -m x"
+expect "outside repo without remote: quoted path passes"      0 "git -C \"$OUTSIDE\" commit -m x"
+expect "outside repo without remote: after add passes"        0 "git -C $OUTSIDE add f && git -C $OUTSIDE commit -m x"
+expect "outside repo without remote: push stays blocked"      2 "git -C $OUTSIDE push"
+expect "outside repo: bare commit (no -C) stays blocked"      2 "git commit -m x"
+expect "inside IWE_ROOT repo without remote stays blocked"    2 "git -C $INSIDE commit -m x"
+expect "missing directory stays blocked"                      2 "git -C $OUTSIDE/nope commit -m x"
+expect "not a repository stays blocked"                       2 "git -C /tmp commit -m x"
+expect "outside commit chained with a bare commit blocked"    2 "git -C $OUTSIDE commit -m x; git commit -m y"
+expect "outside commit chained with inside commit blocked"    2 "git -C $OUTSIDE commit -m x && git -C $INSIDE commit -m y"
+expect "outside commit then push blocked"                     2 "git -C $OUTSIDE commit -m x; git -C $OUTSIDE push"
+expect "GIT_DIR retarget stays blocked"                       2 "GIT_DIR=$INSIDE/.git git -C $OUTSIDE commit -m x"
+expect "--git-dir retarget stays blocked"                     2 "git -C $OUTSIDE --git-dir=$INSIDE/.git commit -m x"
+expect "--work-tree retarget stays blocked"                   2 "git -C $OUTSIDE --work-tree=$INSIDE commit -m x"
+expect "two -C flags stay blocked"                            2 "git -C $INSIDE -C $OUTSIDE commit -m x"
+expect "variable in path stays blocked"                       2 'git -C $HOME/x commit -m x'
+# a repository with a remote (a clone of a real project) stays guarded
+git -C "$OUTSIDE" remote add origin https://example.invalid/x.git
+expect "outside repo WITH remote stays blocked"               2 "git -C $OUTSIDE commit -m x"
+git -C "$OUTSIDE" remote remove origin
+# a repository that CONTAINS IWE_ROOT is not outside it
+PARENT=$(mktemp -d); mkdir -p "$PARENT/iwe"; git -C "$PARENT" init -q
+got=$(printf '{"tool_name":"Bash","tool_input":{"command":"git -C %s commit -m x"},"session_id":"%s"}' "$PARENT" "$SID" \
+  | IWE_ROOT="$PARENT/iwe" bash "$HOOK" >/dev/null 2>&1; echo $?)
+if [ "$got" = 2 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: repo above IWE_ROOT must stay blocked (получено $got)"; fi
+# a worktree placed outside, whose common git dir is inside IWE_ROOT, stays guarded
+git -C "$INSIDE" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+WT="$(mktemp -d)/wt"
+git -C "$INSIDE" worktree add -q "$WT" -b wt-test 2>/dev/null
+expect "worktree of an IWE repo placed outside stays blocked" 2 "git -C $WT commit -m x"
+# relative -C resolved against the payload cwd
+got=$(printf '{"tool_name":"Bash","tool_input":{"command":"git -C . commit -m x"},"session_id":"%s","cwd":"%s"}' "$SID" "$OUTSIDE" \
+  | IWE_ROOT="$TMP_ROOT" bash "$HOOK" >/dev/null 2>&1; echo $?)
+if [ "$got" = 0 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: relative -C against outside cwd must pass (получено $got)"; fi
+got=$(printf '{"tool_name":"Bash","tool_input":{"command":"git -C . commit -m x"},"session_id":"%s"}' "$SID" \
+  | IWE_ROOT="$TMP_ROOT" bash "$HOOK" >/dev/null 2>&1; echo $?)
+if [ "$got" = 2 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: relative -C without cwd must stay blocked (получено $got)"; fi
+rm -rf "$OUTSIDE" "$PARENT" "$(dirname "$WT")"
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

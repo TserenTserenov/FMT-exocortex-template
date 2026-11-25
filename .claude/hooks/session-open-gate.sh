@@ -186,6 +186,62 @@ if [ "$AGENT_KEYED" = 1 ]; then
   done
 fi
 
+# Personal local history outside the IWE folder (issue #1658). The gate protects the
+# work products of IWE (governance, Pack, DS). A commit into a separate local git
+# repository that lies wholly outside $IWE_ROOT and has no remote is not such a
+# product: it needs no WP. The exemption is deliberately narrow, every condition
+# must hold for EVERY commit/push in the command, any doubt keeps the gate on:
+#  - only `git -C <dir> commit`, one `-C`, a literal path (no `$`, backticks, globs);
+#    a relative path is resolved against the hook payload `cwd`;
+#  - push is never exempt; `--git-dir`, `--work-tree`, `--namespace`, `-c` and
+#    GIT_* assignments in the command are never exempt (they can retarget the repo);
+#  - the repository top level AND its common git dir are disjoint from $IWE_ROOT
+#    (neither inside it nor above it), so a worktree of an IWE repository placed
+#    elsewhere is still guarded;
+#  - the repository has no remote at all: a clone of a real project, which could be
+#    pushed on, stays guarded.
+# `cd <dir> && git commit` is not recognised (the payload cwd is the cwd before the
+# command), so it stays blocked; the agent uses `git -C`.
+local_outside_commit_only() {
+  local commit_re segs seg dir top top_real common common_real root_real p n=0
+  commit_re="(^|[;&|(]) *(([A-Za-z_][A-Za-z0-9_]*=[^ ]+ *)*)(command |builtin |exec )?git( $GIT_GLOBAL_FLAGS_RE)* (commit|push)( |\$)"
+  segs=$(printf '%s' "$NORMALIZED_COMMAND" | grep -oE "$commit_re") || return 1
+  root_real=$(cd "$IWE_ROOT" 2>/dev/null && pwd -P) || return 1
+  while IFS= read -r seg; do
+    [ -n "$seg" ] || continue
+    n=$((n + 1))
+    [[ "$seg" =~ [[:space:]]commit[[:space:]]*$ ]] || return 1
+    [[ "$seg" =~ (GIT_[A-Za-z_]+=|--git-dir|--work-tree|--namespace|[[:space:]]-c[[:space:]]) ]] && return 1
+    [ "$(printf '%s' "$seg" | grep -oE ' -C ' | wc -l | tr -d ' ')" = 1 ] || return 1
+    dir=$(printf '%s' "$seg" | sed -nE 's/.* -C ([^ ]+) .*/\1/p')
+    [ -n "$dir" ] || return 1
+    dir=${dir#\"}; dir=${dir%\"}; dir=${dir#\'}; dir=${dir%\'}
+    case "$dir" in
+      *'$'*|*'`'*|*'*'*|*'?'*|*'['*|*'\'*|'') return 1 ;;
+      '~'/*) dir="$HOME/${dir#\~/}" ;;
+      /*) ;;
+      *)
+        local cwd
+        cwd=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null)
+        case "$cwd" in /*) dir="$cwd/$dir" ;; *) return 1 ;; esac
+        ;;
+    esac
+    top=$(env -u GIT_DIR -u GIT_WORK_TREE git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || return 1
+    common=$(env -u GIT_DIR -u GIT_WORK_TREE git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+    top_real=$(cd "$top" 2>/dev/null && pwd -P) || return 1
+    common_real=$(cd "$common" 2>/dev/null && pwd -P) || return 1
+    for p in "$top_real" "$common_real"; do
+      case "$p/" in "$root_real"/*) return 1 ;; esac
+      case "$root_real/" in "$p"/*) return 1 ;; esac
+    done
+    [ -z "$(env -u GIT_DIR -u GIT_WORK_TREE git -C "$dir" remote 2>/dev/null)" ] || return 1
+  done <<< "$segs"
+  [ "$n" -gt 0 ]
+}
+if local_outside_commit_only; then
+  exit 0
+fi
+
 # Opt-in skip for Windows / Git Bash (WP-7 Phase 271, issue #1281). session-guard.sh
 # cannot open a `--wp` semaphore there (no fcntl), so without a way out every
 # commit is blocked although PLATFORM-COMPAT.md calls Git Bash "best-effort".
