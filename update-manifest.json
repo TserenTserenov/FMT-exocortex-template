@@ -2097,11 +2097,11 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/07-irregular.md",
-      "sha256": "aac080e893a337dbe79a7ec8c7f0983dcbd4449db14ad5bfc6df641fa6739af7"
+      "sha256": "d127e34b349cd273251b1f90cc074898399d38e43b25d2ce83a72eddc9a2608e"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/08-confirm.md",
-      "sha256": "5682a884bd88cabcfe80948ec66a13e45ff01e7e5b5ba3a4aefc363797dbe165"
+      "sha256": "543901ef5f26baab46f6259d8040df773194646c668e024e803ebcc64ec90925"
     },
     {
       "path": "roles/strategist/prompts/strategy-session.md",
