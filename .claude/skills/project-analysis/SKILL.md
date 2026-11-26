@@ -13,6 +13,8 @@ interaction: multi-step
 gates_required: []
 gates_enforced: []
 gates_rationale: "операционный скилл, read-only: проект не меняет, РП не создаёт; WP Gate применим к работе по найденным пробелам, не к самому анализу"
+audience: user
+runs_on: [claude]
 triggers:
   slash:
     - /project-analysis
