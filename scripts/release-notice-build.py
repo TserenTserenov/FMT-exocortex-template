@@ -36,8 +36,11 @@ OPENROUTER_HEADERS = {
 }
 REQUEST_TIMEOUT_S = 300
 MAX_MESSAGE_CHARS = 3500  # Telegram limit is 4096; headroom for the bot boundary check
-MAX_ITEM_TEXT_CHARS = 300
-MIN_ITEMS, MAX_ITEMS = 4, 6
+MAX_ITEM_TEXT_CHARS = 180
+MAX_SUMMARY_CHARS = 220
+MIN_ITEMS, MAX_ITEMS = 3, 5
+# Commands, flags and file names do not belong in a notice for users (pilot decision 25.11.2026).
+TECHNICAL_TOKENS = re.compile(r"`|--[A-Za-z]|\b(?:git|bash|sh|python3?)\s+-|\b[\w./-]+\.(?:sh|py|json|yaml|md)\b|\bgit\s+\w")
 
 HOW_TO_UPDATE = (
     "<b>Как обновить:</b> скажите своему Claude <i>«обнови мой экзокортекс»</i> "
@@ -47,6 +50,7 @@ HOW_TO_UPDATE = (
 ITEMS_SCHEMA = {
     "type": "object",
     "properties": {
+        "summary": {"type": "string"},
         "items": {
             "type": "array",
             "items": {
@@ -59,9 +63,9 @@ ITEMS_SCHEMA = {
                 "required": ["title", "text", "source_index"],
                 "additionalProperties": False,
             },
-        }
+        },
     },
-    "required": ["items"],
+    "required": ["summary", "items"],
     "additionalProperties": False,
 }
 
@@ -82,25 +86,30 @@ EDITOR_SCHEMA = {
                 "additionalProperties": False,
             },
         },
+        "summary_ok": {"type": "boolean"},
+        "summary_problems": {"type": "array", "items": {"type": "string"}},
         "ok": {"type": "boolean"},
     },
-    "required": ["items", "ok"],
+    "required": ["items", "summary_ok", "summary_problems", "ok"],
     "additionalProperties": False,
 }
 
 GENERATOR_PROMPT = """Ты пишешь анонс нового выпуска IWE (шаблон рабочей среды для Claude Code) для подписчиков в Telegram.
-Читатель — пользователь, не разработчик: ему важно, что стало лучше для него.
+Стиль — заметки о выпуске у крупных вендоров (Apple, Notion, Linear): коротко, по делу, без внутренней кухни. Читатель — пользователь, не разработчик.
 
-Тебе дан пронумерованный список записей журнала изменений. Выбери от {min_items} до {max_items} самых заметных для пользователя изменений (если записей меньше — сколько есть) и для каждого напиши:
-- title: 2–5 слов, суть изменения;
-- text: одно-два предложения о пользе для пользователя, до {max_chars} символов;
-- source_index: номер записи журнала, на которой основан пункт.
+Тебе дан пронумерованный список записей журнала изменений. Верни:
+- summary: ОДНО короткое предложение (до {max_summary} символов) о теме всего выпуска. Честно по составу записей: если в основном исправления ошибок и надёжность, так и скажи («Этот выпуск посвящён исправлению ошибок и повышению надёжности: …») и назови главное. Не называй выпуск большим или важным и не обещай новых возможностей, если их нет среди выбранных записей.
+- items: от {min_items} до {max_items} самых заметных для пользователя изменений (если записей меньше, сколько есть). Для каждого:
+  - title: 2–4 слова, суть;
+  - text: ОДНО короткое предложение (до {max_chars} символов): что теперь работает иначе или что исправлено, словами пользователя;
+  - source_index: номер записи журнала, на которой основан пункт.
 
 Правила:
 - Только то, что есть в выбранной записи. Ничего не добавляй от себя, не обобщай сверх записи.
-- Без внутренних имён: номеров РП и PR, имён файлов, скриптов, переменных, хуков.
-- Простой грамотный русский язык. Без разметки — только текст.
-- Один пункт — одна запись; разные пункты — разные записи."""
+- Никаких команд, флагов, имён файлов, программ, переменных и технических терминов (git, хуки, API, названия режимов и т. п.), номеров РП и PR. Если запись техническая, назови её последствие для человека обычными словами («агент больше не просит подтверждения при записи в память»).
+- Оговорки и условия не перечисляй: подробности есть в описании выпуска по ссылке.
+- Простой грамотный русский, активный залог. Без разметки, только текст.
+- Один пункт одна запись; разные пункты разные записи."""
 
 EDITOR_PROMPT = """Ты редактор анонса выпуска. Проверь каждый пункт анонса по записи журнала изменений, на которую он ссылается.
 
@@ -110,7 +119,12 @@ EDITOR_PROMPT = """Ты редактор анонса выпуска. Прове
   Упрощение и опущенные подробности — не проблема: анонс короче журнала. Проблема — только утверждение, которого в записи нет или которое ей противоречит;
 - quote: дословная цитата из записи (5–25 слов), на которой держится пункт; копируй символы точно;
 - problems: список проблем — орфография, искажение смысла, утверждение без опоры в записи, внутренние имена, обрыв текста. Не считай проблемой то, что пункт короче записи. Пустой, если проблем нет.
-ok: true, только если у всех пунктов supported=true и problems пуст."""
+Дополнительно проверь «Сводку выпуска» (одно предложение о теме всего выпуска) по ВСЕМ записям журнала:
+- summary_ok: true, только если сводка честно описывает состав записей (например, «посвящён исправлению ошибок» — только если исправления действительно преобладают), не обещает ничего сверх записей, не содержит команд, имён файлов и технических терминов и состоит из одного предложения;
+- summary_problems: список проблем, пустой, если их нет.
+Если сводки нет, верни summary_ok: true и пустой список.
+Проблема пункта — также команда, флаг, имя файла или технический термин в тексте пункта, и текст длиннее одного предложения.
+ok: true, только если у всех пунктов supported=true, problems пуст и summary_ok=true."""
 
 
 class NoticeError(Exception):
@@ -163,16 +177,17 @@ def _text(value: str) -> str:
     return html.escape(value.strip(), quote=False)
 
 
-def render(version: str, items: list[dict]) -> str:
+def render(version: str, items: list[dict], summary: str = "") -> str:
     lines = [f"{n}. <b>{_text(item['title'])}</b> — {_text(item['text'])}" for n, item in enumerate(items, 1)]
+    lead = f"{_text(summary)}\n\n" if summary.strip() else ""
     return (
-        f"{header(version)}\n\n" + "\n\n".join(lines) + "\n\n"
+        f"{header(version)}\n\n{lead}" + "\n\n".join(lines) + "\n\n"
         f'<a href="{release_url(version)}">Все изменения выпуска</a>\n\n'
         f"{HOW_TO_UPDATE}"
     )
 
 
-def program_problems(items: list[dict], entries: list[str], message: str) -> list[str]:
+def program_problems(items: list[dict], entries: list[str], message: str, summary: str = "") -> list[str]:
     """Deterministic checks of the generated items and the rendered message."""
     problems = []
     expected_min = min(MIN_ITEMS, len(entries))
@@ -190,6 +205,12 @@ def program_problems(items: list[dict], entries: list[str], message: str) -> lis
             problems.append(f"пункт {n}: текст длиннее {MAX_ITEM_TEXT_CHARS} символов")
         if "```" in item["title"] + item["text"]:
             problems.append(f"пункт {n}: служебная разметка")
+        if TECHNICAL_TOKENS.search(item["title"] + " " + item["text"]):
+            problems.append(f"пункт {n}: команда или имя файла в тексте для пользователя")
+    if len(summary) > MAX_SUMMARY_CHARS:
+        problems.append(f"сводка длиннее {MAX_SUMMARY_CHARS} символов")
+    if TECHNICAL_TOKENS.search(summary):
+        problems.append("сводка: команда или имя файла в тексте для пользователя")
     if len(message) > MAX_MESSAGE_CHARS:
         problems.append(f"сообщение длиннее {MAX_MESSAGE_CHARS} символов")
     return problems
@@ -202,7 +223,7 @@ def _normalize(text: str) -> str:
     return " ".join(text.split()).casefold()
 
 
-def editor_problems(verdict: dict, items: list[dict], entries: list[str]) -> tuple[list[str], list[str], set[int]]:
+def editor_problems(verdict: dict, items: list[dict], entries: list[str], summary: str = "") -> tuple[list[str], list[str], set[int]]:
     """Return (problems, remarks, rejected): every reason to reject, the part the generator
     can fix, and the numbers of items that are not confirmed.
 
@@ -211,6 +232,10 @@ def editor_problems(verdict: dict, items: list[dict], entries: list[str]) -> tup
     is not sent back to the generator as a remark.
     """
     remarks, editor_faults, rejected = [], [], set()
+    if summary and (verdict.get("summary_ok", True) is False or verdict.get("summary_problems")):
+        remarks.extend(f"сводка: {p}" for p in verdict.get("summary_problems", []))
+        if not verdict.get("summary_problems"):
+            remarks.append("сводка: редактор не подтвердил её по записям журнала")
     by_number = {row["number"]: row for row in verdict["items"]}
     for n, item in enumerate(items, 1):
         row = by_number.get(n)
@@ -242,8 +267,9 @@ def salvage(version: str, attempts: list[dict], entries: list[str]) -> dict | No
             continue
         rejected = set(attempt["rejected"])
         kept = [item for n, item in enumerate(attempt["items"], 1) if n not in rejected]
-        message = render(version, kept)
-        if not program_problems(kept, entries, message):
+        summary = attempt.get("summary", "") if attempt.get("summary_ok", True) else ""
+        message = render(version, kept, summary)
+        if not program_problems(kept, entries, message, summary):
             candidates.append((len(kept), message, attempt["rejected"]))
     if not candidates:
         return None
@@ -292,20 +318,24 @@ def ask_json(client, model: str, system: str, user: str, schema: dict) -> dict:
         raise NoticeError(f"{model}: invalid JSON: {exc}") from exc
 
 
-def generate(client, entries: list[str], remarks: list[str]) -> list[dict]:
+def generate(client, entries: list[str], remarks: list[str]) -> tuple[list[dict], str]:
     user = "Записи журнала изменений:\n\n" + numbered(entries)
     if remarks:
         user += "\n\nПредыдущий вариант отклонён. Исправь замечания:\n" + "\n".join(f"- {r}" for r in remarks)
-    system = GENERATOR_PROMPT.format(min_items=MIN_ITEMS, max_items=MAX_ITEMS, max_chars=MAX_ITEM_TEXT_CHARS)
-    return ask_json(client, GENERATOR_MODEL, system, user, ITEMS_SCHEMA)["items"]
+    system = GENERATOR_PROMPT.format(min_items=MIN_ITEMS, max_items=MAX_ITEMS, max_chars=MAX_ITEM_TEXT_CHARS,
+                                     max_summary=MAX_SUMMARY_CHARS)
+    data = ask_json(client, GENERATOR_MODEL, system, user, ITEMS_SCHEMA)
+    return data["items"], str(data.get("summary", "")).strip()
 
 
-def review(client, items: list[dict], entries: list[str]) -> dict:
+def review(client, items: list[dict], entries: list[str], summary: str = "") -> dict:
     blocks = []
     for n, item in enumerate(items, 1):
         idx = item["source_index"]
         source = entries[idx - 1] if 1 <= idx <= len(entries) else "(нет такой записи)"
         blocks.append(f"Пункт {n}: {item['title']} — {item['text']}\nЗапись {idx}: {source}")
+    if summary:
+        blocks.append(f"Сводка выпуска: {summary}\n\nВсе записи журнала:\n{numbered(entries)}")
     return ask_json(client, EDITOR_MODEL, EDITOR_PROMPT, "\n\n".join(blocks), EDITOR_SCHEMA)
 
 
@@ -318,13 +348,15 @@ def build(version: str, entries: list[str], client) -> dict:
     for _ in range(2):
         attempt: dict = {"remarks_in": remarks}
         try:
-            items = generate(client, entries, remarks)
-            message = render(version, items)
-            attempt.update(items=items, program=program_problems(items, entries, message))
+            items, summary = generate(client, entries, remarks)
+            message = render(version, items, summary)
+            attempt.update(items=items, summary=summary, program=program_problems(items, entries, message, summary))
             if not attempt["program"]:
-                verdict = review(client, items, entries)
-                problems, editor_remarks, rejected = editor_problems(verdict, items, entries)
-                attempt.update(editor=verdict, editor_problems=problems, editor_remarks=editor_remarks, rejected=sorted(rejected))
+                verdict = review(client, items, entries, summary)
+                problems, editor_remarks, rejected = editor_problems(verdict, items, entries, summary)
+                summary_ok = verdict.get("summary_ok", True) is not False and not verdict.get("summary_problems")
+                attempt.update(editor=verdict, editor_problems=problems, editor_remarks=editor_remarks,
+                               rejected=sorted(rejected), summary_ok=summary_ok)
         except NoticeError as exc:
             attempt["error"] = str(exc)
             attempts.append(attempt)

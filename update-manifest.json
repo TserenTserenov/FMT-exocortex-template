@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "version": "0.42.1",
+  "version": "0.42.2",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
@@ -81,7 +81,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "f944b60b53f181773a64dff8cf91b091e7bf787bb29b44d4dfb850eacb57ef8c"
+      "sha256": "0429331e17e42273e20ff9350411b226643decb7954e19fa276cfc7b6d1b7be6"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -125,7 +125,7 @@
     },
     {
       "path": ".claude/hooks/memory-write-permission.sh",
-      "sha256": "a76ce8d65852cff3122a5bdbca1069691f86a0d6a779022aecddec585339bd8d"
+      "sha256": "3ab74ec1d2b79ee8882e12574fa6329896381f9945c626467aba1fc2e31b8757"
     },
     {
       "path": ".claude/hooks/pack-creator-spf-guard.sh",
@@ -189,7 +189,7 @@
     },
     {
       "path": ".claude/hooks/secret-file-read-block.sh",
-      "sha256": "665cbe42116eb2100db1b5b33caa93dd56bfb8f03ddac1a00391f938583ff7df"
+      "sha256": "daa0e72ac581bc4ba85634a5123ac19441d66ca580cb6586f43a21c921716811"
     },
     {
       "path": ".claude/hooks/secret-leak-block.sh",
@@ -205,7 +205,7 @@
     },
     {
       "path": ".claude/hooks/session-open-gate.sh",
-      "sha256": "e1925ec5e8e9fa86503e6b9310d7f4bcf4e0f7ab11728fbd3b2e039974235e72"
+      "sha256": "2e3d870f4c0eaecd65fbc6d5fa4039e291d0a371d677f63d105e1c6dd7f54318"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -281,7 +281,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-reader-overwrite.sh",
-      "sha256": "fddc29f4ea0ab14279e4cbff5428ca4f27db5a0a4f25a739f627c2ccb25134d2"
+      "sha256": "6a9c0723bc8f1278c668344bf752ec0f07dd46b929f87a2f665b064b93478887"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-windows-smoke.sh",
@@ -301,11 +301,11 @@
     },
     {
       "path": ".claude/hooks/tests/test-issue-1657-secret-file-read-block-kimi-envelope.sh",
-      "sha256": "a4d5ffa2e5988ff9c0f37aac30f09396287d0db0c30781b3d6491455e9825863"
+      "sha256": "67fb184f2f66d20b363519db644e600765321928f2ec84d6901a3a783bb4bf40"
     },
     {
       "path": ".claude/hooks/tests/test-memory-write-permission.sh",
-      "sha256": "fb0e1fb6bf99116c2fcf6e0b6479518cf2b739200c16f22fd5669ef12587d35e"
+      "sha256": "1c6aee25c5a0f16c04f6f93ce94f11c7b2b0f1dc9964a49aa38dfdd80d296ce4"
     },
     {
       "path": ".claude/hooks/tests/test-protocol-artifact-validate-mandatory-fail-closed.sh",
@@ -329,7 +329,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-session-open-gate.sh",
-      "sha256": "3cc8066595bde33be973c89d88088b520974465b5647949b360d3e39958961cf"
+      "sha256": "27b4c021bb70c3692791575ec4e4494961ec8b761108ae7c4bcabe206e9c4706"
     },
     {
       "path": ".claude/hooks/tests/test_issue_1184_stop_gate_block_once.sh",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "48cf53822fc8acec8c89097d3f04a4e89210aca47ed7f1dd4f2f6cb5663086e4"
+      "sha256": "fd4ca645a197075da1d1bb92b969f1de3861b54dc7367a73d76b4750c5a35105"
     },
     {
       "path": "CLAUDE.md",
@@ -3113,7 +3113,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "7cde0c8b84ff201245bc21ecee02a2d51f57d1341ed02d8f847dd6ad3e06a6dd"
+      "sha256": "e58a6938d23e82d1d2da977bbc6c1e0bd86eb457690de63ab6ccc3a27f1dddf0"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3380,6 +3380,10 @@
       "sha256": "08ebe1a872d0a02fbdd5ba92115773b919181eda541816286f9f4920e62b2024"
     },
     {
+      "path": "scripts/wp-inbox-close-gate.sh",
+      "sha256": "9d8625533ffc69b34a8e42c0c8f634c595ad3c705e684b8049b6ac236f46c1b6"
+    },
+    {
       "path": "scripts/wp-inbox.sh",
       "sha256": "43e9eefd89f0cf9f874de66914fd0b8e635e40a38f18a9cfe2071ec537aba2b9"
     },
@@ -3565,7 +3569,7 @@
     },
     {
       "path": "setup/install-dsh-skills.sh",
-      "sha256": "2810ceccfb99cf0a512822b5835acc70947b7a396c348a8b8ffaf24dcd9eb966"
+      "sha256": "fa5256a1e0b3ace438e9c088f495403315d411c8cdca6392ef76cd6d82caa138"
     },
     {
       "path": "setup/install-iwe-paths.sh",
@@ -3601,7 +3605,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "790304bbbeb4d47962c5b7c3674e21f30eeeaee4bda9d88e01640c38383cfbf3"
+      "sha256": "8ba62dd3bded2ae3071a20241b73e093f887bef6ee6db35e2d31bea77ac1bd3c"
     }
   ],
   "excluded_paths": [
@@ -3920,6 +3924,7 @@
     "scripts/tests/test_validate_skill_hook_claims_path.sh",
     "scripts/tests/test_wp568_strategist_auth_and_retry_message.sh",
     "scripts/tests/test_wp_inbox_bundle_signal.sh",
+    "scripts/tests/wp-inbox-close-gate-smoke.sh",
     "scripts/tests/wp-sync-bundle-origin-pinned-smoke.sh",
     "scripts/translate.py",
     "scripts/verify-template-integrity.sh",
