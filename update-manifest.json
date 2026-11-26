@@ -565,7 +565,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "51fb0d562d135891a12ed8bf24f6f1003df1dd43d3b16327354028c17d626fe9"
+      "sha256": "c8a939673cef08bf3ce3eb5b86367c39687f7d06ebecf42f1ca0c47388337074"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -829,7 +829,7 @@
     },
     {
       "path": ".claude/skills/run-protocol/SKILL.md",
-      "sha256": "a0f1a10a112cd62d687c0c31eb15ac2ac09d0b72f51171f1e84b27961352e555"
+      "sha256": "65efe396715aa77316aa00ad428c168f2ba1c3c7c50030441c4159c33297958c"
     },
     {
       "path": ".claude/skills/setup-wakatime/SKILL.md",
@@ -977,7 +977,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "3a41dee41f17e11c00e3baf5fcf27754e51a7464f048e7a62660f8014ad277e9"
+      "sha256": "19c0f40da7cfbf750e47363ca1502d65a85488759156c6d9719383e7918e065b"
     },
     {
       "path": ".gitignore",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "fd4ca645a197075da1d1bb92b969f1de3861b54dc7367a73d76b4750c5a35105"
+      "sha256": "5d9ab28bc61adecc4fe367378cf74f6c219a6d5a9e86a61f54ce81043bd35276"
     },
     {
       "path": "CLAUDE.md",
@@ -2452,6 +2452,10 @@
       "sha256": "343deaae3b5ffcc588ec44a4177b34ade73f168727db6915c7ba3922609a15c9"
     },
     {
+      "path": "scripts/close_verify_fallback.py",
+      "sha256": "88cbaf21f4446db5af24619a693f698d30dbad266e91776f9f0cc3fcf164cdd1"
+    },
+    {
       "path": "scripts/codex-peer-adapter.sh",
       "sha256": "8467c60856b3ee1c1d688757f418fc0049fa394451241631813be213254a53ff"
     },
@@ -3700,6 +3704,7 @@
     "scripts/tests/test_changelog_append_blank_lines.sh",
     "scripts/tests/test_check_card_terms.py",
     "scripts/tests/test_check_changelog_fields.py",
+    "scripts/tests/test_close_verify_fallback.py",
     "scripts/tests/test_copy_to_aisystant.py",
     "scripts/tests/test_critical_alert_notify_outcome.sh",
     "scripts/tests/test_day_close_prepare.py",
