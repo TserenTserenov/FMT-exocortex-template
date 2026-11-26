@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "7ec24447fbacfee2f1670d879f676ac0ca43a6bd02c5c952fffd4a742b086793"
+      "sha256": "d34bb4749667d391a3dd47bbf627681ee0249c68e559872e343662fcae5450e7"
     },
     {
       "path": "CLAUDE.md",
@@ -1197,7 +1197,7 @@
     },
     {
       "path": "docs/release-audit-log.md",
-      "sha256": "26b3a6be1643f06dd621a0fd3365e3c0d5088184a2d510610d2c5da23f8ed9b4"
+      "sha256": "0e7ca5867a3c92f094095b8f87b9470201a46e71a89b417b478b1c49bb4219df"
     },
     {
       "path": "docs/releases/0.42/README.md",
