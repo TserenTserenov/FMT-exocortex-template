@@ -228,6 +228,8 @@ if $SEND_TG; then
     while IFS= read -r line; do
         TG_MSG="$TG_MSG"$'\n'"$line"
     done < <(echo "$ISSUES_JSON" | jq -r '.[] | "  #\(.number): \(.title)\n    \(.url)"')
+    # WP-625 F14: a chat message must name the pilot's action (the gateway demotes one that does not).
+    TG_MSG="$TG_MSG"$'\n\n'"Что делать: открыть новую беседу с Claude и сказать «разбери проблемы шаблона IWE»"
 
     if ! NOTIFY_BIN=$(find_iwe_notify); then
         echo "_TG alert skipped:_ iwe-notify not found (\$IWE_NOTIFY_BIN, ~/IWE/scripts, next to this script)."
