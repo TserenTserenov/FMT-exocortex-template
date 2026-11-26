@@ -224,7 +224,8 @@ if $SEND_TG; then
     export TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-${TG_BOT_TOKEN:-}}"
     export TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-${TG_CHAT_ID:-}}"
 
-    TG_MSG="🔴 FMT issues требуют внимания ($COUNT):"$'\n'
+    # WP-625 F14: the action comes first, so a long issue list cannot cut it off (review 26.11).
+    TG_MSG="🔴 FMT issues требуют внимания ($COUNT):"$'\n'"Что делать: открыть новую беседу с Claude и сказать «разбери проблемы шаблона IWE»"$'\n'
     while IFS= read -r line; do
         TG_MSG="$TG_MSG"$'\n'"$line"
     done < <(echo "$ISSUES_JSON" | jq -r '.[] | "  #\(.number): \(.title)\n    \(.url)"')
