@@ -1369,7 +1369,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "c4106d2d6eb6119e6844f18cf53a96a2c4f80a618ab3f2abded8a93b3bda3f1d"
+      "sha256": "96b78fd9a4cc5121f9f70717060d3b1047dc2fb498743d4d7ac59b42cc0dcd29"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -3500,6 +3500,10 @@
       "sha256": "bc380db1c7cc5c9c44840bfd1815320dec1f850a4f47264e0510a87cb024f6ef"
     },
     {
+      "path": "seed/strategy/scripts/day-open-week-sync-patch.py",
+      "sha256": "4fcfc8223a69df3f1b8064f55460052da43a7fd94a09644641d03b2851b3a37c"
+    },
+    {
       "path": "seed/strategy/scripts/ds-publish.sh",
       "sha256": "bc29f00d631417d392e6c0365a69fabb8782b31898267a2a4e1df3ab6f508172"
     },
@@ -3528,8 +3532,16 @@
       "sha256": "8e5f0f9c6082a942fb699922c674dcd853b86e02254b66faa5ed6844a96e23f8"
     },
     {
+      "path": "seed/strategy/scripts/lib/compact_dashboard.py",
+      "sha256": "3c25bcce8bc4ce9a15344dee80ad445a77bc0f652bf9a3e6fadb37b6276a1c11"
+    },
+    {
       "path": "seed/strategy/scripts/lib/day-open-hooks.sh",
       "sha256": "4c1881f69c04b34810164dee70316502cf9dc76ef519fe3f35df3987af59957e"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/day_open_attention.py",
+      "sha256": "4de049a39a0a10e8592e521c513d32c772ed8ff363ebf7cc730ceb8a93526b8f"
     },
     {
       "path": "seed/strategy/scripts/lib/dayplan_sections.py",
@@ -3560,12 +3572,24 @@
       "sha256": "204f0cd09a835209dfaad780a9d761f831000d799d2aae5cb631af60a7b51397"
     },
     {
+      "path": "seed/strategy/scripts/lib/plan_hours.py",
+      "sha256": "8bdfdc7dda1c4378e44ff1b98abbafc77d65e625065962a4a3aa9cf36a7e1101"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/plan_table.py",
+      "sha256": "840532e73257e74001f932dd4cabc663e6c3ddb79bfb2a12b842a5851054d22e"
+    },
+    {
       "path": "seed/strategy/scripts/lib/publish-gate.sh",
       "sha256": "a9c2191dda6f55c0cd33d2ff99114caf7609b09244ffb7be4210dc783a82426c"
     },
     {
       "path": "seed/strategy/scripts/lib/telegram.sh",
       "sha256": "7f0bd85eb1950426d59e8580f86745813fe9fd4a93de4adf0f0a4dee080c5aed"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/week_pool.py",
+      "sha256": "bce877130fb5343f33265feeacc2d6a7d575af798fa9ac7a6f711714f8848779"
     },
     {
       "path": "seed/strategy/scripts/lib/wp_inbox.py",
