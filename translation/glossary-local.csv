@@ -137,3 +137,4 @@ IWE у разработчика,Developer IWE,change accounting (WP-611),approve
 Работа,Work,IWE development pipeline station,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),2,the name of the IWE development pipeline station
 Проверка,Verification,IWE development pipeline station and project board column,approved by pilot 2026-11-20 (WP-620); move to the graph (WP-617 Phase 5),2,the name of the IWE development pipeline station or of the project board column
 Верификатор,Verifier,IWE role VR.R.001 (in IWE: R23),approved by pilot 2026-11-20 (WP-620); English name is in the VR.R.001 card - drops out when the snapshot serves it,2,
+Тупик,Ceiling,diagnostic state,D.155 maps this state to Потолок; DP.ONT.001 records its English name,2,the second of the four practitioner states (stable results with no growth)

@@ -12,6 +12,8 @@ triggers:
 routing:
   executor: sonnet
   deterministic: false
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # Audit Docs (R24 Аудитор)

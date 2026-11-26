@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # iwe-notify — one Telegram notification from a standalone IWE script
-# (WP-568 Ф12 С4, ArchGate 06.11.2026).
+# (WP-568 Ф12 С4, ArchGate 06.11.2026, DRR: governance repo inbox/WP-568/DRR-f12.md).
 #
 # Usage:
 #   iwe-notify --source <source-id> "text"
@@ -48,18 +48,20 @@
 #     entities decoded), as it sends plain text.
 #   - Direct send: through TELEGRAM_PROXY (else ALL_PROXY) when set, and only
 #     a reply with "ok":true counts as sent (a 200 with ok:false is failed).
-#   - --direct: no gateway lookup at all, one direct send (reason
-#     direct-requested in direct-send-log.tsv). For a sender whose message is
-#     about the governance repo itself being stale or stuck: that repo's
-#     gateway and sender list must not decide whether the user hears about it.
+#   - --direct (WP-484 F316, 20.11): no gateway lookup at all, one direct send
+#     (reason direct-requested in direct-send-log.tsv). For a sender whose
+#     message is about the governance repo itself being stale or stuck
+#     (convergence-alarm.py): that repo's gateway and sender list must not
+#     decide whether the pilot hears about it.
 #   - --reply-markup <json>: inline buttons. The gateway cannot carry them,
 #     so with a gateway the text goes through it WITHOUT buttons (its verdict
 #     stays final, quarantine included); only without a gateway the single
 #     direct send carries the buttons.
 #
 # Gateway lookup: IWE_NOTIFY_GATEWAY (explicit path), else scripts/iwe-tg in
-# the governance repo of $IWE_ROOT: $IWE_GOVERNANCE_REPO, else the GOVERNANCE_REPO= line of the
-# workspace settings file written by setup.sh (read with grep, never sourced), else DS-strategy.
+# $IWE_ROOT/<governance repo>: $IWE_GOVERNANCE_REPO, else the GOVERNANCE_REPO= line of
+# $IWE_ROOT/.exocortex.env (read with grep, never sourced), else DS-strategy; then
+# any $IWE_ROOT/DS-* that carries the gateway (first found).
 set -uo pipefail
 
 # Template workspaces name their root IWE_WORKSPACE; the author host IWE_ROOT.
@@ -109,6 +111,14 @@ find_gateway() {
     printf '%s' "$IWE_ROOT/$repo/scripts/iwe-tg"
     return 0
   fi
+  # No usable name (timer or service without settings): take the first
+  # governance repo that carries the gateway, so no author name is baked in.
+  local found
+  for found in "$IWE_ROOT"/DS-*/scripts/iwe-tg; do
+    [ -f "$found" ] || continue
+    printf '%s' "$found"
+    return 0
+  done
   return 1
 }
 

@@ -22,6 +22,8 @@ interaction: multi-step
 gates_required: []
 gates_enforced: []
 gates_rationale: "операционный скилл; подключает чужой пак к локальной среде, РП не создаёт"
+audience: user
+runs_on: [claude]
 ---
 
 # /pack-subscribe — подписка на чужой пак

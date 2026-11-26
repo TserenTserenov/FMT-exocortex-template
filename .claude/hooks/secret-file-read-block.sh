@@ -1,6 +1,8 @@
 #!/bin/bash
 # Secret File Read Block Hook (B7.7c, WP-212 / WP-544 D6.4)
-# Event: PreToolUse (matcher: Read|Edit|MultiEdit|Grep)
+# Event: PreToolUse (matcher: Read|Edit|MultiEdit|Grep). Kimi Code tool names
+# (ReadFile, ReadMediaFile, WriteFile, StrReplaceFile; path in `path`) and an
+# envelope without hook_event_name / session_id are accepted too (issue #1657).
 #
 # Denies sensitive file paths before their content reaches Claude. The one-file
 # bypass is active only for a canonical existing regular file and needs three
@@ -140,6 +142,54 @@ self_test() {
   run_case missing_tool_name_fails_closed "error(rc=2)" "" file_path ".env"
   run_case wrong_type_file_path_fails_closed "error(rc=2)" Read file_path "123" 1 num
 
+  run_raw_case() {
+    # run_raw_case <name> <expect: deny|allow|error(rc=N)> <raw stdin>
+    local name expect raw out rc decision
+    name="$1"; expect="$2"; raw="$3"
+    out=$(printf '%s' "$raw" | "$0" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+      decision="error(rc=$rc)"
+    elif [ -z "$out" ]; then
+      decision="allow"
+    else
+      decision=$(printf '%s' "$out" | "$SECRET_BYPASS_JQ" -r '.hookSpecificOutput.permissionDecision // "allow"' 2>/dev/null)
+    fi
+    if [ "$decision" = "$expect" ]; then
+      printf 'PASS %s\n' "$name"
+    else
+      printf 'FAIL %s: expected=%s got=%s\n' "$name" "$expect" "$decision" >&2
+      failures=$((failures + 1))
+    fi
+  }
+
+  # Kimi Code envelope (issue #1657): own tool names, `path` instead of
+  # `file_path`, no hook_event_name / session_id. Secret paths still deny.
+  run_raw_case kimi_readfile_secret_denied deny '{"tool_name":"ReadFile","tool_input":{"path":".env"}}'
+  run_raw_case kimi_readfile_safe_allowed allow '{"tool_name":"ReadFile","tool_input":{"path":"README.md"}}'
+  run_raw_case kimi_strreplace_secret_denied deny '{"tool_name":"StrReplaceFile","tool_input":{"path":"id_rsa"}}'
+  run_raw_case kimi_writefile_secret_denied deny '{"tool_name":"WriteFile","tool_input":{"path":"config/secrets/db.yaml"}}'
+  run_raw_case kimi_readmedia_secret_denied deny '{"tool_name":"ReadMediaFile","tool_input":{"path":"server.pem"}}'
+  run_raw_case kimi_full_envelope_secret_denied deny '{"hook_event_name":"PreToolUse","session_id":"k1","tool_name":"ReadFile","tool_input":{"path":".env"}}'
+  run_raw_case kimi_grep_secret_dir_denied deny '{"tool_name":"Grep","tool_input":{"path":"/home/u/.secrets"}}'
+  run_raw_case claude_tool_without_session_denied deny '{"tool_name":"Read","tool_input":{"file_path":"id_rsa"}}'
+  run_raw_case path_only_secret_denied deny '{"tool_name":"Read","tool_input":{"path":".env"}}'
+  run_raw_case file_path_wins_over_path_denied deny '{"tool_name":"Read","tool_input":{"file_path":".env","path":"README.md"}}'
+  run_raw_case differing_file_path_and_secret_path_denied deny '{"tool_name":"ReadFile","tool_input":{"file_path":"README.md","path":".env"}}'
+  run_raw_case blank_session_id_allowed allow '{"session_id":"  ","tool_name":"Read","tool_input":{"file_path":"README.md"}}'
+  # The relaxed envelope must not relax anything else.
+  run_raw_case other_event_fails_closed "error(rc=2)" '{"hook_event_name":"PostToolUse","tool_name":"Read","tool_input":{"file_path":"README.md"}}'
+  run_raw_case non_string_event_fails_closed "error(rc=2)" '{"hook_event_name":5,"tool_name":"Read","tool_input":{"file_path":"README.md"}}'
+  run_raw_case non_string_session_fails_closed "error(rc=2)" '{"session_id":7,"tool_name":"Read","tool_input":{"file_path":"README.md"}}'
+  run_raw_case missing_tool_input_fails_closed "error(rc=2)" '{"tool_name":"ReadFile"}'
+  run_raw_case no_path_fails_closed "error(rc=2)" '{"tool_name":"ReadFile","tool_input":{"offset":1}}'
+  run_raw_case numeric_path_fails_closed "error(rc=2)" '{"tool_name":"ReadFile","tool_input":{"path":123}}'
+  run_raw_case numeric_file_path_hides_secret_path_fails_closed "error(rc=2)" '{"tool_name":"Read","tool_input":{"file_path":123,"path":".env"}}'
+  run_raw_case unknown_kimi_tool_fails_closed "error(rc=2)" '{"tool_name":"Shell","tool_input":{"command":"cat .env"}}'
+  run_raw_case array_input_fails_closed "error(rc=2)" '[]'
+  run_raw_case garbage_input_fails_closed "error(rc=2)" 'not json'
+  run_raw_case empty_input_fails_closed "error(rc=2)" ''
+
   [ "$failures" -eq 0 ]
 }
 
@@ -149,24 +199,55 @@ if [ "${1:-}" = "--self-test" ]; then
 fi
 
 input=$(cat) || security_failure
+# Envelope (issue #1657). Claude Code sends hook_event_name, session_id, tool_name
+# and tool_input. Kimi Code is not guaranteed to send the first two (its own
+# session-open-gate test payload has no session_id), and its file tools are named
+# ReadFile / ReadMediaFile / WriteFile / StrReplaceFile and take `path`. The two
+# fields that decide the verdict stay mandatory: tool_name (a known tool) and
+# tool_input (an object holding a string path). The event name and session id only
+# label the log, so they may be absent; a present value of the wrong type or a
+# different event is still a malformed envelope and fails closed.
 printf '%s' "$input" | "$SECRET_BYPASS_JQ" -e '
   type == "object"
-  and .hook_event_name == "PreToolUse"
-  and (.session_id | type == "string" and test("\\S"))
+  and (.hook_event_name | . == null
+       or (type == "string" and (ascii_downcase | gsub("[_-]"; "")) == "pretooluse"))
+  and (.session_id | . == null or type == "string")
   and (.tool_name | type == "string" and test("\\S"))
   and (.tool_input | type == "object")' >/dev/null 2>&1 || security_failure
 
 tool_name=$(printf '%s' "$input" | "$SECRET_BYPASS_JQ" -r '.tool_name')
-SESSION_ID=$(printf '%s' "$input" | "$SECRET_BYPASS_JQ" -r '.session_id')
+SESSION_ID=$(printf '%s' "$input" | "$SECRET_BYPASS_JQ" -r '(.session_id // "") | if test("\\S") then . else "unknown" end')
+# For file tools the path may sit in `file_path` (Claude Code) or `path` (Kimi Code);
+# `file_path` wins when both are present, as it does for Claude's own tools.
 case "$tool_name" in
-  Read|Edit|MultiEdit) fp_field='.tool_input.file_path' ;;
+  Read|Edit|MultiEdit|ReadFile|ReadMediaFile|WriteFile|StrReplaceFile)
+    fp_field='(.tool_input.file_path // .tool_input.path)' ;;
   Grep) fp_field='.tool_input.path' ;;
   *) security_failure ;;
 esac
 
+# Kimi reads `path`, Claude reads `file_path`: when a file tool carries BOTH string
+# fields and they differ, judge each path on its own (re-run this hook once per field);
+# the first deny wins, so an ordinary file_path cannot hide a secret path.
+if [ "$tool_name" != "Grep" ] && [ -z "${IWE_SECRET_READ_SPLIT:-}" ] && printf '%s' "$input" | "$SECRET_BYPASS_JQ" -e \
+  '(.tool_input.file_path | type) == "string" and (.tool_input.path | type) == "string" and .tool_input.file_path != .tool_input.path' >/dev/null 2>&1; then
+  for split_field in file_path path; do
+    # The jq program references a jq variable.
+    # shellcheck disable=SC2016
+    split_input=$(printf '%s' "$input" | "$SECRET_BYPASS_JQ" -c --arg f "$split_field" '.tool_input |= {($f): .[$f]}') || security_failure
+    split_out=$(printf '%s' "$split_input" | IWE_SECRET_READ_SPLIT=1 bash "$0") || security_failure
+    if [ -n "$split_out" ]; then
+      printf '%s\n' "$split_out"
+      exit 0
+    fi
+  done
+  exit 0
+fi
+
 fp_type=$(printf '%s' "$input" | "$SECRET_BYPASS_JQ" -r "$fp_field | type" 2>/dev/null) || security_failure
 case "$tool_name:$fp_type" in
   Read:string|Edit:string|MultiEdit:string|Grep:string|Grep:null) ;;
+  ReadFile:string|ReadMediaFile:string|WriteFile:string|StrReplaceFile:string) ;;
   *) security_failure ;;
 esac
 target=$(printf '%s' "$input" | "$SECRET_BYPASS_JQ" -r "$fp_field // empty" 2>/dev/null) || security_failure

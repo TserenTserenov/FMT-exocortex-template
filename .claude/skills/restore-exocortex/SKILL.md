@@ -18,6 +18,8 @@ routing:
   executor: script+judgment
   deterministic: false
   model_step: "Шаг 2 pre-flight: свежее устройство или населённая память, подтверждение пользователя перед --force; восстановление делает scripts/restore-from-exocortex.sh"
+audience: user
+runs_on: [claude]
 ---
 
 # /restore-exocortex — Восстановление памяти из exocortex

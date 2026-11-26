@@ -88,7 +88,7 @@ collect_wakatime() {
 
     local ENCODED
     ENCODED=$(echo -n "$WAKATIME_API_KEY" | base64)
-    local API="https://wakatime.com/api/v1/users/current"
+    local API="https://api.wakatime.com/api/v1/users/current"
 
     # Today
     local TODAY_RESP

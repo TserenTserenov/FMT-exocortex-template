@@ -1,6 +1,6 @@
 ---
 name: transcribe
-description: Transcribe audio/video files via MLX Whisper (Apple Silicon). Usage: /transcribe path/to/file.mp3
+description: "Transcribe audio/video files via MLX Whisper (Apple Silicon). Usage: /transcribe path/to/file.mp3"
 user_invocable: true
 version: 1.0.0
 layer: L1
@@ -14,6 +14,8 @@ routing:
   deterministic: true
   script_path: "scripts/iwe-transcribe.sh"
   optimization_priority: 2
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # Транскрипция аудио/видео

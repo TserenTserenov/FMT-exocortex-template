@@ -1,11 +1,36 @@
 """Tests for assemble_distribution: manifest-driven English tree assembly."""
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import assemble_distribution as ad  # noqa: E402
+
+
+def test_sync_staged_modes_preserves_translations_and_english_file_selection(tmp_path):
+    src, en = tmp_path / "src", tmp_path / "en"
+    for repo, label in [(src, "source"), (en, "translation")]:
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        paths = ["my helper.sh", "data", "link", label]
+        for name in paths:
+            (repo / name).write_text(label, encoding="utf-8")
+        subprocess.run(["git", "add", "--", *paths], cwd=repo, check=True)
+    subprocess.run(["git", "update-index", "--chmod=+x", "my helper.sh", "link"], cwd=src, check=True)
+    subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.org",
+                    "-c", "core.hooksPath=/dev/null", "commit", "--no-gpg-sign", "-qm", "source"], cwd=src, check=True)
+    subprocess.run(["git", "update-index", "--chmod=+x", "data", "translation"], cwd=en, check=True)
+    (en / "link").unlink()
+    (en / "link").symlink_to("data")
+    subprocess.run(["git", "add", "--", "link"], cwd=en, check=True)
+    assert ad.sync_staged_modes(src, en) == 2
+    tree = subprocess.check_output(["git", "write-tree"], cwd=en).strip().decode()
+    result = subprocess.check_output(["git", "ls-tree", tree], cwd=en, text=True)
+    modes = {line.split("\t")[1]: line.split()[0] for line in result.splitlines()}
+    assert modes == {"my helper.sh": "100755", "data": "100644", "link": "120000", "translation": "100755"}
+    assert subprocess.check_output(["git", "show", f"{tree}:my helper.sh"], cwd=en) == b"translation"
+    assert ad.sync_staged_modes(src, en) == 0
 
 
 def make_source(tmp_path, files, manifest_paths):
@@ -84,6 +109,29 @@ def test_check_mode_writes_nothing(tmp_path):
     out.mkdir()
     ad.assemble(src, out, write=False)
     assert list(out.iterdir()) == []
+
+
+def test_assembly_preserves_checkout_and_linked_worktree(tmp_path):
+    src = make_source(tmp_path / "src", {"scripts/helper.sh": "echo hello"}, ["scripts/helper.sh"])
+    repo = tmp_path / "repo"
+    linked = tmp_path / "linked"
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.org",
+                    "commit", "--no-gpg-sign", "--allow-empty", "-qm", "source"], cwd=repo, check=True)
+    subprocess.run(["git", "worktree", "add", "--detach", "-q", str(linked)], cwd=repo, check=True)
+
+    for output in (repo, linked):
+        (output / "stale.txt").write_text("old", encoding="utf-8")
+        head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=output)
+        for write in (False, True):
+            report = ad.assemble(src, output, write=write)
+            assert report["removed"] == ["stale.txt"]
+            assert report["cyrillic"] == []
+            assert subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=output) == head
+        assert not (output / "stale.txt").exists()
+        assert (output / "scripts/helper.sh").read_text(encoding="utf-8") == "echo hello"
+        subprocess.run(["git", "add", "--", "scripts/helper.sh"], cwd=output, check=True)
+        assert subprocess.check_output(["git", "show", ":scripts/helper.sh"], cwd=output) == b"echo hello"
 
 
 def test_adapted_files_are_not_copied_from_source(tmp_path):

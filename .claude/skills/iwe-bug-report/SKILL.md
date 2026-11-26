@@ -18,6 +18,8 @@ interaction: one-shot
 gates_required: []
 gates_enforced: []
 gates_rationale: "операционный скилл; WP Gate применим только при создании нового РП, не для операционных вызовов"
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # Отчёт об ошибке платформы IWE

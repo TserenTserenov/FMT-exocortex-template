@@ -14,6 +14,8 @@ routing:
   deterministic: true
   script_path: ".claude/skills/check-secret/check.sh"
   optimization_priority: 2
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # Check Secret — manual gate (WP-212)
