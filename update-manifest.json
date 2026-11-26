@@ -525,7 +525,7 @@
     },
     {
       "path": ".claude/skills/archgate/SKILL.md",
-      "sha256": "4d863a6fbd398d06daf02cec5063c219f6ea020781f79bd0727526b703291523"
+      "sha256": "1d27d9cc07654d6676999fcdc4bf96760ef8f99b9a4d38c75cf601b5efcb178d"
     },
     {
       "path": ".claude/skills/artifactor/SKILL.md",
@@ -589,7 +589,7 @@
     },
     {
       "path": ".claude/skills/decompose/SKILL.md",
-      "sha256": "8354ae0f2248949d1161444aae3bad0f5c626e2fdd33708c69f24a79d0651151"
+      "sha256": "d950041999e4249c277429c90a65da3ea6fc8dc860d00aefbed28b56947b2b62"
     },
     {
       "path": ".claude/skills/diagnose/SKILL.md",
@@ -873,7 +873,7 @@
     },
     {
       "path": ".claude/skills/think/SKILL.md",
-      "sha256": "1a9ec45627c212ab4c837cdd0b7fa75f03c2d798f4bb3b54a122bb0491beaf15"
+      "sha256": "94647899901f3b02821c9088c766b7675b1d773abddea8c3068c24176dea3656"
     },
     {
       "path": ".claude/skills/transcribe/SKILL.md",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "914a3d503c54203188af5c4d349012aed9b5560f339035ec50ee0b3a286054ef"
+      "sha256": "0714c6a72855d5f21c2807072730bcdb4aa7a7adc96c374d2839567b14d4af06"
     },
     {
       "path": "CLAUDE.md",
