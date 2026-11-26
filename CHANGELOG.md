@@ -84,7 +84,7 @@ Refs: WP-NNN
 
 ### Changed
 
-- [docs] (#PR) В журнал пострелизных аудитов (`docs/release-audit-log.md`) записан итог атаки на вышедшую версию 0.42.2: CAUTION, блокирующих находок нет; две существенные находки пути обновления вынесены в [#1688](https://github.com/TserenTserenov/FMT-exocortex-template/issues/1688) и [#1689](https://github.com/TserenTserenov/FMT-exocortex-template/issues/1689) (WP-529).
+- [docs] (#1690) В журнал пострелизных аудитов (`docs/release-audit-log.md`) записан итог атаки на вышедшую версию 0.42.2: CAUTION, блокирующих находок нет; две существенные находки пути обновления вынесены в [#1688](https://github.com/TserenTserenov/FMT-exocortex-template/issues/1688) и [#1689](https://github.com/TserenTserenov/FMT-exocortex-template/issues/1689) (WP-529).
   - Цель: 84 · Результат: служебное — запись вердикта проверки после выхода, как требует протокол выпуска
   - Как проверить: в `docs/release-audit-log.md` первая строка журнала — v0.42.2, completed, 2026-11-26
   - Как откатить: git revert слияния этого запроса
