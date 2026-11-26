@@ -37,6 +37,11 @@ Refs: WP-NNN
 
 ### Added
 
+- [behavior] (#1683) Agents that cannot start a sub-agent (Codex, Kimi Code) now have a fallback for the close-protocol check by a helper with a clean context (R23): `scripts/close_verify_fallback.py` sends the checklist, the changed file names and the summary through the peer-adapter filter to another agent's peer adapter and returns a strict JSON verdict with its own exit code per outcome (0 pass, 10 fail, 20 verifier unavailable, 21 filter refused, 22 bad reply, 23 environment denied). Both `run-protocol` (step 4) and `day-close` (step 11) describe the fallback in words
+  - Цель: 20 · Результат: служебное — закрытие сессии и дня в Codex и Kimi Code больше не упирается в отсутствие субагента: сверку делает другой агент отдельным процессом, а при отказе среды шаг честно останавливается, а не засчитывается
+  - Как проверить: `python3 -m pytest -q scripts/tests/test_close_verify_fallback.py` — 19 проверок проходят; живая проба: `python3 scripts/close_verify_fallback.py --verifier kimi --checklist … --files … --summary …` возвращает JSON с `verdict` и `independence`
+  - Как откатить: git revert слияния этого запроса; навыки возвращаются к прежнему тексту без запасного пути
+
 - [behavior] (#1680) Codex now sees the template skills: install and update put one relative symlink per skill into `<workspace>/.agents/skills` (the only folder Codex reads), for every user skill that lists `codex` in `runs_on` (`scripts/skill_links.py`, decision WP-592 Ф7). No copies: a skill is edited only in `.claude/skills`. Only the program's own links are created or removed; a foreign file or folder with a skill's name is left untouched and reported as `CONFLICT`; where a symlink cannot be created the skill is reported as `REFUSED` (no copy mode). `docs/AGENT-VENDOR-SETUP.md` step 5 explains the manual run.
   - Цель: 20 · Результат: служебное — после установки или обновления Codex находит навыки IWE в своей папке без ручных копий; навыки без запасного пути для Codex ему не раздаются
   - Как проверить: `python3 scripts/skill_links.py --workspace <рабочая папка> --dry-run` — «skill links: 34 new …» на чистой установке; `python3 -m pytest -q scripts/tests/test_skill_links.py` — 20 проверок проходят
