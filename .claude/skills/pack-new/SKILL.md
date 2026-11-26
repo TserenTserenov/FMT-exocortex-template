@@ -8,6 +8,8 @@ realized_by:
 routing:
   executor: sonnet
   deterministic: false
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # Pack New — создание нового Pack

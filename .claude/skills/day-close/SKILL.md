@@ -12,6 +12,8 @@ triggers:
 routing:
   executor: haiku
   deterministic: false
+audience: user
+runs_on: [claude, kimi]
 ---
 
 # Day Close (протокол закрытия дня)
@@ -175,6 +177,8 @@ HK_SEM="${IWE_ROOT:-$HOME/IWE}/.iwe-runtime/sessions/${AGENT}-housekeeping-day-c
 ### 11. Верификация (Haiku R23)
 Sub-agent Haiku R23 (context isolation): передать чеклист + черновик итогов + список обновлённых файлов. По ❌ — исправить до показа пользователю.
 
+**Запасной путь, если у агента нет запуска помощника с чистым контекстом** (нет субагента — Codex, Kimi Code): тот же, что в шаге 4 скилла `run-protocol` — `"$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" --stdlib-only)" "${IWE_SCRIPTS:-$HOME/IWE/scripts}/close_verify_fallback.py" --verifier <другой агент> --closer <ты> --checklist <чеклист Day Close> --files <список обновлённых файлов> --summary <черновик итогов>`; коды возврата, правило «ненулевой код, кроме 10, не значит прошло» и обязательные строки о применимости пунктов в резюме (раннер не запускался, возраст и размер карточек, статусы РП) — там же. Не тот же поставщик, что закрывающий, — иначе вердикт со слабой независимостью. В Kimi Code (расширение VS Code) путь не проверен.
+
 **EXTENSION POINT (checks):** `bash .claude/scripts/load-extensions.sh day-close checks` → exit 0: `Read` каждый файл → выполнить. Exit 1/3 (нет совпадений / нет каталога `extensions/` — штатно для новой установки, либо каталог повреждён) → пропустить молча.
 
 ---
@@ -200,7 +204,7 @@ Sub-agent Haiku R23 (context isolation): передать чеклист + че�
 - [ ] Видео: обработанные помечены (если video.enabled)
 - [ ] Governance: REPOSITORY-REGISTRY, navigation.md, MAP.002
 - [ ] Backup: `day-close.sh` выполнен
-- [ ] **Rule-engine FP-stats** (WP-272 Ф2.5): `[ -f ${IWE_WORKSPACE:-$HOME/IWE}/.claude/scripts/fp-stats.py ] && python3 ${IWE_WORKSPACE:-$HOME/IWE}/.claude/scripts/fp-stats.py --date $(date +%Y-%m-%d) || echo "skip: fp-stats.py требует rule-classifier.py"` → если есть `⚠️ REVISE` → **спросить пилота по факту флага** (WP-545 Ф5, 21.08 — заменяет прежний еженедельный R8-вопрос, который спрашивал вслепую по расписанию, не по конкретному сигналу): «правило `<X>` — это ложные срабатывания детектора, или реальный, но неудобный сигнал?» Ответ → в «Завтра начать с» вместе с решением (переформулировать правило / оставить как есть)
+- [ ] **Rule-engine FP-stats** (WP-272 Ф2.5): `[ -f ${IWE_WORKSPACE:-$HOME/IWE}/.claude/scripts/fp-stats.py ] && python3 ${IWE_WORKSPACE:-$HOME/IWE}/.claude/scripts/fp-stats.py --date $(date +%Y-%m-%d) || echo "skip: fp-stats.py не найден (rule-classifier.py для него не нужен)"` → если есть `⚠️ REVISE` → **спросить пилота по факту флага** (WP-545 Ф5, 21.08 — заменяет прежний еженедельный R8-вопрос, который спрашивал вслепую по расписанию, не по конкретному сигналу): «правило `<X>` — это ложные срабатывания детектора, или реальный, но неудобный сигнал?» Ответ → в «Завтра начать с» вместе с решением (переформулировать правило / оставить как есть)
 - [ ] Верификация compliance: /verify запускался сегодня?
 - [ ] WakaTime + Мультипликатор: часы / бюджет ПО ФАКТУ (sessions/00-index.md перечислен; ad-hoc оценены по ходам; сверхплановое — по факту); sanity check ≥10 peer-сессий
 - [ ] Итоги дня записаны в DayPlan **(postcondition 9a: grep подтверждён)** — **N/A на strategy_day** (шаг 0в)

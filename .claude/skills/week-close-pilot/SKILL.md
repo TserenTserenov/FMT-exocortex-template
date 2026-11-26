@@ -11,6 +11,8 @@ triggers:
 routing:
   executor: sonnet
   deterministic: false
+audience: author
+runs_on: [claude, kimi, codex]
 ---
 ## Guard
 

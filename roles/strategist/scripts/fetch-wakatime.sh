@@ -44,7 +44,7 @@ if [ -z "$WAKATIME_API_KEY" ]; then
 fi
 
 ENCODED=$(echo -n "$WAKATIME_API_KEY" | base64)
-API="https://wakatime.com/api/v1/users/current"
+API="https://api.wakatime.com/api/v1/users/current"
 
 waka_fetch() {
     local url="$1"

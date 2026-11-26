@@ -99,7 +99,7 @@ def day_seconds(body, target):
     return seconds
 
 
-API_BASE = "https://wakatime.com/api/v1/users/current"
+API_BASE = "https://api.wakatime.com/api/v1/users/current"
 NEON_HINT = "use Neon fallback: domain_event coding_time"
 
 
@@ -119,15 +119,17 @@ def status_bar_seconds(body, target):
         return None, "WakaTime status_bar: no data"
     day_range = data.get("range")
     day = day_range.get("date") if isinstance(day_range, dict) else None
+    total = data.get("grand_total")
+    seconds = total.get("total_seconds") if isinstance(total, dict) else None
+    if isinstance(seconds, bool) or not isinstance(seconds, (int, float)):
+        return None, f"no WakaTime status_bar total for {target}"
+    if seconds == 0 and day in (None, ""):
+        return 0, None
     if day != target:
         return None, (
             f"WakaTime status_bar answers for {day}, not {target} "
             "(account timezone differs?)"
         )
-    total = data.get("grand_total")
-    seconds = total.get("total_seconds") if isinstance(total, dict) else None
-    if isinstance(seconds, bool) or not isinstance(seconds, (int, float)):
-        return None, f"no WakaTime status_bar total for {target}"
     return round(seconds), None
 
 

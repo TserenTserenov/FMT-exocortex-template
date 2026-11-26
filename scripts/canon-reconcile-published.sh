@@ -108,11 +108,20 @@ GIT_DIR=$(git rev-parse --git-dir && printf x); GIT_DIR="${GIT_DIR%x}"; GIT_DIR=
 #   3. ${IWE_WORKSPACE:-$HOME/IWE}/.iwe-runtime
 # The result must be an absolute path without '..' components. Inside this repository it must
 # be ignored by git and hold no tracked files; nothing is created or removed to find out.
+strip_trailing_slashes() {  # <path> -> the path without trailing '/' ('/' itself stays)
+  local p="$1"
+  while [ "${#p}" -gt 1 ] && [ "${p%/}" != "$p" ]; do p="${p%/}"; done
+  printf '%s' "$p"
+}
 resolve_runtime_dir() {
   if [ -n "${IWE_RUNTIME_DIR:-}" ]; then
     printf '%s' "$IWE_RUNTIME_DIR"
   elif [ -n "${IWE_RUNTIME:-}" ] && [ "${IWE_RUNTIME#/}" != "$IWE_RUNTIME" ] && [ -d "$IWE_RUNTIME" ]; then
-    echo "canon-reconcile-published: IWE_RUNTIME used as a directory (legacy caller); set IWE_RUNTIME_DIR instead" >&2
+    # .iwe-paths itself exports IWE_RUNTIME="$IWE_WORKSPACE/.iwe-runtime" (#1625): that is the
+    # standard value, not a legacy caller. Compared lexically, trailing slashes ignored.
+    if [ "$(strip_trailing_slashes "$IWE_RUNTIME")" != "$(strip_trailing_slashes "${IWE_WORKSPACE:-$HOME/IWE}/.iwe-runtime")" ]; then
+      echo "canon-reconcile-published: IWE_RUNTIME used as a directory (legacy caller); set IWE_RUNTIME_DIR instead" >&2
+    fi
     printf '%s' "$IWE_RUNTIME"
   else
     printf '%s' "${IWE_WORKSPACE:-$HOME/IWE}/.iwe-runtime"
@@ -120,8 +129,7 @@ resolve_runtime_dir() {
 }
 LOG_NAME="canon-reconcile-published.log"
 runtime_dir_fatal() { echo "canon-reconcile-published: $1" >&2; exit 2; }
-RUNTIME_DIR=$(resolve_runtime_dir)
-while [ "${#RUNTIME_DIR}" -gt 1 ] && [ "${RUNTIME_DIR%/}" != "$RUNTIME_DIR" ]; do RUNTIME_DIR="${RUNTIME_DIR%/}"; done   # a trailing '/' would hide a symlink from the checks below
+RUNTIME_DIR=$(strip_trailing_slashes "$(resolve_runtime_dir)")   # a trailing '/' would hide a symlink from the checks below
 case "$RUNTIME_DIR" in
   /*) ;;
   *) runtime_dir_fatal "runtime dir must be absolute, got '$RUNTIME_DIR' (IWE_RUNTIME is a host name, not a path)" ;;
