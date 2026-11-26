@@ -14,6 +14,9 @@ import sys
 import argparse
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from dayplan_sections import section_body, section_heading, visible_headings  # noqa: E402
+
 try:
     import yaml as _yaml
     _YAML_AVAILABLE = True
@@ -21,7 +24,6 @@ except ImportError:
     _YAML_AVAILABLE = False
 
 PHYS_HOURS_CEILING = 14.0
-ATTENTION_HEADER_RE = re.compile(r"(<summary><b>Требует внимания</b></summary>\s*\n)")
 
 
 def parse_args():
@@ -61,19 +63,9 @@ def extract_plan_table(dayplan_text):
     «План на сегодня» table, not the whole file — a WP number can legitimately
     appear elsewhere (e.g. a cross-reference in another RP's row) without being
     IN the plan."""
-    lines = dayplan_text.splitlines()
-    out = []
-    in_section = False
-    for line in lines:
-        if "<summary><b>План на сегодня</b></summary>" in line:
-            in_section = True
-            continue
-        if in_section:
-            if "</details>" in line:
-                break
-            if line.startswith("|"):
-                out.append(line)
-    return out
+    return [line for line in section_body(dayplan_text, "plan_today").splitlines()
+            if line.startswith("|")]
+
 
 
 def missing_priority_wps(today_wps, plan_table):
@@ -105,9 +97,12 @@ def phys_hours_finding(priorities):
 
 
 def append_attention_lines(text, findings):
-    lines = "".join(f"- ⚠️ {f}\n" for f in findings)
-    patched, n = ATTENTION_HEADER_RE.subn(r"\1" + lines, text, count=1)
-    return patched if n else text
+    lines = "\n".join(f"- ⚠️ {finding}" for finding in findings)
+    heading = section_heading("attention").search(visible_headings(text))
+    if not heading:
+        return text
+    end = heading.end()
+    return text[:end] + "\n" + lines + text[end:]
 
 
 def main():

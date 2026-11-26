@@ -8,6 +8,8 @@ wakatime-day-total.py must:
      WAKATIME_OAUTH_TOKEN.
   4. WAKATIME_OAUTH_TOKEN set -> summaries with Bearer, token never printed.
   5. 200 summaries -> old result, status_bar not called.
+Issues #1631/#1637: both endpoints use the api.wakatime.com host.
+Issue #1632: a zero status_bar total with an empty date is not a timezone error.
 No network: urllib.request.urlopen is replaced by a fake.
 """
 
@@ -91,7 +93,9 @@ def status_bar_body(day, seconds):
 
 
 def summaries_body(day, seconds):
-    return {"data": [{"range": {"date": day}, "grand_total": {"total_seconds": seconds}}]}
+    return {
+        "data": [{"range": {"date": day}, "grand_total": {"total_seconds": seconds}}]
+    }
 
 
 def test_403_today_uses_status_bar_when_date_matches(monkeypatch, capsys):
@@ -145,3 +149,65 @@ def test_summaries_200_keeps_old_path(monkeypatch, capsys):
     assert (code, out) == (0, "4321")
     assert len(fake.requests) == 1 and "/summaries?" in fake.urls()[0]
     assert fake.requests[0].get_header("Authorization").startswith("Basic ")
+
+
+def test_api_host_is_used_for_summaries_and_status_bar(monkeypatch, capsys):
+    today = date.today().isoformat()
+    fake = FakeWakaTime(summaries_status=403, status_bar=status_bar_body(today, 60))
+    code, out, _ = run(monkeypatch, capsys, fake, today)
+    assert (code, out) == (0, "60")
+    prefix = "https://api.wakatime.com/api/v1/users/current/"
+    assert len(fake.urls()) == 2
+    assert all(url.startswith(prefix) for url in fake.urls())
+    assert all("//wakatime.com/" not in url for url in fake.urls())
+
+
+@pytest.mark.parametrize("seconds", [0, 0.0])
+@pytest.mark.parametrize("day", ["", None])
+def test_zero_status_bar_without_date_reports_no_time(
+    monkeypatch, capsys, seconds, day
+):
+    today = date.today().isoformat()
+    fake = FakeWakaTime(summaries_status=403, status_bar=status_bar_body(day, seconds))
+    code, out, _ = run(monkeypatch, capsys, fake, today)
+    assert code == 3
+    assert out == f"(no positive WakaTime time for {today})"
+    assert "timezone" not in out
+
+
+@pytest.mark.parametrize(
+    "day, seconds",
+    [("", 60), (None, 60), ("other", 0), ("", -1)],
+)
+def test_status_bar_date_mismatch_is_not_hidden(monkeypatch, capsys, day, seconds):
+    today = date.today().isoformat()
+    if day == "other":
+        day = (date.today() - timedelta(days=1)).isoformat()
+    fake = FakeWakaTime(summaries_status=403, status_bar=status_bar_body(day, seconds))
+    code, out, _ = run(monkeypatch, capsys, fake, today)
+    assert code == 3
+    assert "account timezone differs?" in out
+
+
+@pytest.mark.parametrize("seconds", ["0", None, True])
+def test_invalid_status_bar_total_precedes_empty_date(monkeypatch, capsys, seconds):
+    today = date.today().isoformat()
+    fake = FakeWakaTime(summaries_status=403, status_bar=status_bar_body("", seconds))
+    code, out, _ = run(monkeypatch, capsys, fake, today)
+    assert code == 3
+    assert out == f"(no WakaTime status_bar total for {today})"
+
+
+# Issue #1631: every program that calls the WakaTime API, not only this script,
+# must use the API host; corporate networks may block wakatime.com itself.
+def test_no_executable_file_calls_the_site_host_api():
+    repo = Path(__file__).resolve().parents[2]
+    offenders = [
+        str(path.relative_to(repo))
+        for pattern in ("*.py", "*.sh")
+        for path in repo.rglob(pattern)
+        if ".git" not in path.parts
+        and "tests" not in path.parts
+        and "https://wakatime.com/api/" in path.read_text(encoding="utf-8", errors="replace")
+    ]
+    assert offenders == []

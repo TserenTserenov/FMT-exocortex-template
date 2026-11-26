@@ -76,6 +76,15 @@ frontmatter_translate_keys:
 glossary:
   snapshot: translation/glossary-snapshot.csv
   local: translation/glossary-local.csv
+  # Public references to follow across runs, even when absent from both snapshots.
+  # Every code here may appear in the Actions report. Closed-source probes stay in the fetcher.
+  expected_public_codes:
+    - ZP.1
+    - U.Entity
+    - ECO.FM.001
+    - MIM.M.024
+    - ECO.PRIN.001
+    - GUIDE.33
   tier_by_level:
     zp: 1
     fpf: 1

@@ -22,6 +22,8 @@ interaction: multi-step
 gates_required: []
 gates_enforced: []
 gates_rationale: "операционный скилл не создаёт РП сам; при новой пир-сессии по существующему РП обязательна сверка контекста по memory/protocol-open.md §Сессия"
+audience: user
+runs_on: [claude]
 ---
 
 # Peer Conversation (DP.SC.154)

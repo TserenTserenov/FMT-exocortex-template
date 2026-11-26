@@ -8,6 +8,8 @@ browser_safe: false
 routing:
   executor: haiku
   deterministic: false
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # IWE Update (агент-обновитель)

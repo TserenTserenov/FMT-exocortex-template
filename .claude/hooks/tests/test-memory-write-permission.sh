@@ -21,7 +21,7 @@ MEM="$CONFIG/projects/$SLUG/memory"
 mkdir -p "$MEM" "$CONFIG/projects/$SLUG/memory-evil" "$CONFIG/projects/-other-project/memory"
 ln -s "$MEM" "$WS/memory"
 ln -s "$TMP/outside" "$MEM/escape"          # a symlink INSIDE memory pointing out of it
-mkdir -p "$MEM/sub"
+mkdir -p "$MEM/sub" "$MEM/.git/hooks" "$MEM/.claude" "$MEM/.ssh" "$MEM/.github" "$MEM/.gnupg" "$MEM/sub/.hidden"
 
 EXPECTED_ALLOW='{"hookSpecificOutput":{"decision":{"behavior":"allow"},"hookEventName":"PermissionRequest"}}'
 FAIL=0
@@ -89,6 +89,26 @@ expect_allow "MultiEdit through the symlink" "$(call auto MultiEdit "$WS/memory/
 expect_allow "NotebookEdit through the symlink" "$(call auto NotebookEdit "$WS/memory/n.ipynb")"
 expect_allow "file in an existing subfolder" "$(call auto Write "$WS/memory/sub/note.md")"
 expect_allow "extra slashes in the path" "$(call auto Write "$WS/memory//sub///note.md")"
+
+expect_allow "ordinary name containing git is fine" "$(call auto Write "$WS/memory/sub/my.github-notes.md")"
+
+# --- not approved: sensitive places inside memory keep their own confirmation
+expect_silent "git hook inside memory" "$(call auto Write "$WS/memory/.git/hooks/pre-commit")"
+# a link named .git inside memory, pointing to an ordinary folder: after resolving the name is gone,
+# but the written path still names it (rc.3 audit finding)
+rmdir "$MEM/.git/hooks" 2>/dev/null; rmdir "$MEM/.git" 2>/dev/null
+mkdir -p "$MEM/plain/hooks"
+ln -s "$MEM/plain" "$MEM/.git"
+expect_silent "link named .git to an ordinary folder" "$(call auto Write "$WS/memory/.git/hooks/pre-commit")"
+rm -f "$MEM/.git"; mkdir -p "$MEM/.git/hooks"
+expect_silent "dot-claude inside memory" "$(call auto Write "$WS/memory/.claude/settings.json")"
+expect_silent "dot-github inside memory" "$(call auto Write "$WS/memory/.github/workflows/x.yml")"
+expect_silent "dot-ssh inside memory" "$(call auto Write "$WS/memory/.ssh/authorized_keys")"
+expect_silent "dot-gnupg inside memory" "$(call auto Write "$WS/memory/.gnupg/x")"
+expect_silent "dotfile in memory root" "$(call auto Write "$WS/memory/.bashrc")"
+expect_silent "dotfile in a subfolder" "$(call auto Write "$WS/memory/sub/.env")"
+expect_silent "hidden subfolder" "$(call auto Write "$WS/memory/sub/.hidden/note.md")"
+expect_silent "upper-case .GIT component" "$(call auto Write "$WS/memory/.GIT/config")"
 
 # --- not approved: mode, tool, path shape
 expect_silent "default mode keeps the prompt" "$(call default Write "$WS/memory/note.md")"
