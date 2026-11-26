@@ -505,7 +505,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "b04bc22c87eb324bdca39eec5bbe296768623d1319847f64e64a99df817bf5c5"
+      "sha256": "356b4678638da9444b6ebf333daed361418bea67d40ed7a8f07748109387bb56"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -849,7 +849,7 @@
     },
     {
       "path": ".claude/skills/run-protocol/SKILL.md",
-      "sha256": "232f5d9d36cc04ff7166528dcb57ad9c03cb15729caa54698e362cd652809b2e"
+      "sha256": "50ac051cb2a119fb7f3adecd3e543e90575bc6fa736100f21a9e93d79a61a57a"
     },
     {
       "path": ".claude/skills/setup-wakatime/SKILL.md",
@@ -1025,7 +1025,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "a2bd5938a6b54c9b7dd10c5a521f001a3418ca8c47686e0a23f602450d7840b5"
+      "sha256": "22a0c725bc178a06ade9d90caa32e9b25e6668e360c98a6d541def7b20df8d41"
     },
     {
       "path": "CLAUDE.md",
@@ -1049,7 +1049,7 @@
     },
     {
       "path": "docs/AGENT-VENDOR-SETUP.md",
-      "sha256": "f6fbf5ec9bfb0073ac1891a0722272ef56cfd15803b410fa43f8f8557e82c300"
+      "sha256": "0931b939e1dd96794d0d748b3038c9884b662e66719fe0b117848794aade6cdc"
     },
     {
       "path": "docs/BRANCH-PROTECTION-EMERGENCY.md",
