@@ -7,7 +7,7 @@ routing:
   executor: sonnet
   deterministic: false
 audience: user
-runs_on: [claude, kimi]
+runs_on: [claude, kimi, codex]
 ---
 
 # Выполнение протокола
