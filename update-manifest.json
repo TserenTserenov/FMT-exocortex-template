@@ -565,7 +565,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "c234ce5d967792a756c258a93c44a17e93f90f92bca8417474c0e82c9f9037f4"
+      "sha256": "737a578198d57d0279d5574e088fb3bbadce464dea8175712121271b17963c5a"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -829,7 +829,7 @@
     },
     {
       "path": ".claude/skills/run-protocol/SKILL.md",
-      "sha256": "c145f0198abcf1d0f3d5664138dd4ce7d676940851ad04062ad7a59ae76e3574"
+      "sha256": "232f5d9d36cc04ff7166528dcb57ad9c03cb15729caa54698e362cd652809b2e"
     },
     {
       "path": ".claude/skills/setup-wakatime/SKILL.md",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f52c34939975edf06e7cef1a579e34e6ddcf966cb5306149bde25937375ff4d5"
+      "sha256": "427347523f98b5f3f0baa214e87a2816bcadbe15d2d8acfad020083615d750bd"
     },
     {
       "path": "CLAUDE.md",
