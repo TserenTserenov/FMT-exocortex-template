@@ -37,7 +37,7 @@ Refs: WP-NNN
 
 ### Added
 
-- [behavior] (#PRNUM) Method skills `think`, `archgate` and `decompose` now tell the agent to show the stages of the method under separate headings in their order (the "show the stages" line, decision "in the skill itself"); on a new task Codex 0.169 showed all stages with the line in 3 of 3 skills, Claude did so on `think`
+- [behavior] (#1686) Method skills `think`, `archgate` and `decompose` now tell the agent to show the stages of the method under separate headings in their order (the "show the stages" line, decision "in the skill itself"); on a new task Codex 0.169 showed all stages with the line in 3 of 3 skills, Claude did so on `think`
   - Цель: 20 · Результат: служебное — в Codex и других агентах ответы по методам `think`, `archgate`, `decompose` показывают этапы метода заголовками, так легче проверить, что метод исполнен, а не пересказан
   - Как проверить: в агенте без Claude дать задание навыку `think` — в ответе пять заголовков Abduction, Deduction, Induction, Audit, Decide по порядку; навыкам `decompose` и `archgate` — шаги алгоритма заголовками
   - Как откатить: git revert слияния этого запроса; навыки возвращаются к прежнему тексту без строки
