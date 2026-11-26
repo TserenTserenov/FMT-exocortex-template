@@ -21,7 +21,6 @@ day-open-llm-fill.py — WP-356: per-section LLM-заполнение PENDING-м
 
 import argparse
 import glob
-from html.parser import HTMLParser
 import json
 import os
 import re
@@ -34,6 +33,7 @@ import yaml
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
+from dayplan_sections import _DetailsSections, mask_code as _mask_code, section_body, section_heading  # noqa: E402
 from wp_inbox import wp_card_paths  # noqa: E402 — lib path set above
 
 DEFAULT_PROXY_URL = "http://localhost:18765"
@@ -179,13 +179,7 @@ def rebuild_compact_dashboard(text: str) -> str:
 
     # 1. Collect the top-7 WP rows from the 'План на сегодня' table
     plan_rows = []
-    in_plan = False
-    for ln in lines:
-        if "План на сегодня" in ln:
-            in_plan = True
-            continue
-        if not in_plan:
-            continue
+    for ln in section_body(text, "plan_today").splitlines():
         s = ln.strip()
         if s.startswith("|") and "**" in s and "🚦" not in s:
             plan_rows.append(s)
@@ -269,99 +263,6 @@ GATE_METRICS_SCRIPT = os.path.join(
 )
 GATE_SECTION_BEGIN = "<summary><b>Gate-метрики"
 GATE_SECTION_END = "</details>"
-
-def _mask_fenced_code(text: str) -> str:
-    """Hide Markdown code from HTML parsing while preserving every text offset."""
-    fence = ""
-    output = []
-    for line in text.splitlines(keepends=True):
-        marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line.rstrip("\r\n"))
-        masked = bool(fence or marker)
-        if marker:
-            token, tail = marker.groups()
-            if not fence:
-                fence = token
-            elif token[0] == fence[0] and len(token) >= len(fence) and not tail.strip():
-                fence = ""
-        output.append(re.sub(r"[^\r\n]", " ", line) if masked else line)
-    return "".join(output)
-
-
-class _DetailsSections(HTMLParser):
-    """Locate matched details/summary boundaries; comments and code are inert."""
-
-    def __init__(self, text: str):
-        super().__init__()
-        self.text = text
-        self.line_offsets = [0]
-        for line in text.splitlines(keepends=True):
-            self.line_offsets.append(self.line_offsets[-1] + len(line))
-        self.stack = []
-        self.openers = []
-        self.summary = None
-        self.sections = []
-        self.code_tags = []
-        self.code_start = None
-        self.code_spans = []
-
-    def _text_offset(self):
-        line, column = self.getpos()
-        return self.line_offsets[line - 1] + column
-
-    def handle_starttag(self, tag, attrs):
-        if tag in {"pre", "code"}:
-            if not self.code_tags:
-                self.code_start = self._text_offset()
-            self.code_tags.append(tag)
-            return
-        if self.code_tags:
-            return
-        if tag == "details":
-            section = {"start": self._text_offset(), "title_parts": []}
-            self.stack.append(section)
-            self.openers.append(section)
-        elif tag == "summary" and self.stack and "summary_end" not in self.stack[-1]:
-            self.summary = self.stack[-1]
-
-    def handle_data(self, data):
-        if self.summary is not None and not self.code_tags:
-            self.summary["title_parts"].append(data)
-
-    def handle_endtag(self, tag):
-        if self.code_tags:
-            if tag == self.code_tags[-1]:
-                self.code_tags.pop()
-                if not self.code_tags:
-                    self.code_spans.append((self.code_start, self.text.find(">", self._text_offset()) + 1))
-            return
-        if tag == "summary" and self.summary is not None:
-            self.summary["summary_end"] = self.text.find(">", self._text_offset()) + 1
-            self.summary["title"] = "".join(self.summary["title_parts"]).strip()
-            self.summary = None
-        elif tag == "details" and self.stack:
-            section = self.stack.pop()
-            if "summary_end" in section:
-                section["body_end"] = self._text_offset()
-                section["end"] = self.text.find(">", self._text_offset()) + 1
-                self.sections.append(section)
-
-
-def _mask_code(text: str) -> str:
-    visible = _mask_fenced_code(text)
-    visible = re.sub(r"(?<!`)(`+)(?!`)(.*?)(?<!`)\1(?!`)",
-                     lambda match: re.sub(r"[^\r\n]", " ", match.group()), visible, flags=re.DOTALL)
-    parser = _DetailsSections(visible)
-    parser.feed(visible)
-    if parser.code_tags:
-        parser.code_spans.append((parser.code_start, len(visible)))
-    parts = []
-    offset = 0
-    for start, end in parser.code_spans:
-        parts.extend([visible[offset:start], re.sub(r"[^\r\n]", " ", visible[start:end])])
-        offset = end
-    parts.append(visible[offset:])
-    return "".join(parts)
-
 
 def _parse_details(text: str) -> _DetailsSections:
     visible = _mask_code(text)
@@ -768,10 +669,23 @@ def fill_world_lens_inplace(chunk: dict, weekplan: str, active_wps: str,
 
 
 def is_today_plan_section(header: str, content: str) -> bool:
-    return (
-        "План на сегодня" in content or "today_plan" in content.lower()
-        or "План на сегодня" in header or "today_plan" in header.lower()
-    )
+    visible = _mask_code(content)
+    if re.search(r"<!--\s*PENDING:\s*today_plan\b", visible, re.I):
+        return True
+    heading = section_heading("plan_today")
+    if header.lstrip().startswith("#"):
+        return bool(heading.fullmatch(header) or re.fullmatch(r"#{1,6}\s+today_plan\s*", header, re.I))
+    if heading.fullmatch(header):
+        return True
+    for line in visible.splitlines():
+        line = line.strip()
+        if not line or re.fullmatch(r"<details(?:\s+open)?>", line, re.I):
+            continue
+        if line.lower().startswith("<summary"):
+            return bool(heading.fullmatch(line))
+        break
+    return bool(re.search(r"^\s*(?:<!--\s*PENDING:\s*)?today_plan\b", visible, re.I | re.M))
+
 
 
 def warn_today_plan_placeholders(text: str) -> None:

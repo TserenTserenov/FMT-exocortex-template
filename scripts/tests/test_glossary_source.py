@@ -407,3 +407,11 @@ def test_contract_scans_catch_realistic_regressions(tmp_path):
     probe.write_text("import importlib\nimportlib.import_module('glossary_' + 'live')\n", encoding="utf-8")
     names = {n.attr for n in ast.walk(ast.parse(probe.read_text(encoding="utf-8"))) if isinstance(n, ast.Attribute)}
     assert names & DYNAMIC_CODE_NAMES
+
+
+def test_supplier_failure_notice_does_not_pass_arg_to_gh_jq():
+    # gh's own --jq rejects "--arg" ("unknown arguments"); the failure step is continue-on-error,
+    # so a regression would silence the only alarm about a failed nightly run.
+    text = SUPPLIER_WORKFLOW.read_text(encoding="utf-8")
+    assert not re.search(r"--jq\s+--arg", text)
+    assert "| jq -r --arg key" in text

@@ -26,7 +26,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: glossary-supplier
+  group: glossary-supplier-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -34,6 +34,8 @@ permissions:
 
 env:
   BRANCH: glossary/snapshot-refresh
+  # A manual run on a review branch exercises the supplier without publishing or notifying.
+  PREVIEW: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   supply:
@@ -46,16 +48,18 @@ jobs:
     steps:
       - name: App token (canon-sync)
         id: app_token
+        if: env.PREVIEW == 'false'
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
           app-id: ${{ vars.CANON_SYNC_APP_ID }}
           private-key: ${{ secrets.CANON_SYNC_APP_KEY }}
 
-      - name: Checkout main
+      - name: Checkout supplier
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: main
-          token: ${{ steps.app_token.outputs.token }}
+          ref: ${{ env.PREVIEW == 'true' && github.sha || 'main' }}
+          token: ${{ steps.app_token.outputs.token || github.token }}
+          persist-credentials: ${{ env.PREVIEW == 'false' }}
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -68,11 +72,19 @@ jobs:
       - name: Walk the concept graph
         env:
           GLOSSARY_EXPORTER_MACHINE_TOKEN: ${{ secrets.GLOSSARY_EXPORTER_MACHINE_TOKEN }}
-        run: python3 scripts/fetch-glossary-concepts.py --output "$RUNNER_TEMP/concepts.json"
+        run: |
+          # CLI diagnostics can contain names from a rejected graph row. Keep them off public logs.
+          umask 077
+          if ! python3 scripts/fetch-glossary-concepts.py --output "$RUNNER_TEMP/concepts.json" \
+            > "$RUNNER_TEMP/glossary-fetch.log" 2>&1; then
+            echo "::error::The glossary graph walk failed."
+            exit 1
+          fi
 
       - name: Find the open merge request of the supplier
         # Filtered by the head repository owner: a fork may have a branch of the same name (public repo, many forks).
         id: open
+        if: env.PREVIEW == 'false'
         env:
           GH_TOKEN: ${{ steps.app_token.outputs.token }}
           OWNER: ${{ github.repository_owner }}
@@ -97,11 +109,44 @@ jobs:
           python3 scripts/glossary_supplier.py refresh \
             --input "$RUNNER_TEMP/concepts.json" \
             --announced-meta "$RUNNER_TEMP/announced-meta.json" \
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --coverage-out "$RUNNER_TEMP/glossary-coverage.json" \
             --body-out "$RUNNER_TEMP/pr-body.md" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Save public coverage decisions for this run
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: glossary-coverage-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/glossary-coverage.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Verify a second refresh with an unchanged snapshot
+        if: env.PREVIEW == 'true'
+        run: |
+          # Preserve this run's expectations: the first refresh may have removed codes from the CSV.
+          python3 - <<'PYTHON'
+          import json
+          import os
+          from pathlib import Path
+          import yaml
+          path = Path("translation-manifest.yaml")
+          manifest = yaml.safe_load(path.read_text())
+          report = json.loads((Path(os.environ["RUNNER_TEMP"]) / "glossary-coverage.json").read_text())
+          manifest["glossary"]["expected_public_codes"] = [row["code"] for row in report["rows"]]
+          path.write_text(yaml.safe_dump(manifest, allow_unicode=True))
+          PYTHON
+          python3 scripts/glossary_supplier.py refresh \
+            --input "$RUNNER_TEMP/concepts.json" \
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --coverage-out "$RUNNER_TEMP/unchanged-coverage.json" \
+            --body-out "$RUNNER_TEMP/replay-body.md" | grep -Fx 'changed=false'
+          cmp "$RUNNER_TEMP/glossary-coverage.json" "$RUNNER_TEMP/unchanged-coverage.json"
+          echo 'Unchanged snapshot: refresh reported changed=false and reproduced the saved coverage file byte for byte.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Close an outdated merge request
         # The graph is back to what main has: yesterday's request would apply a stale snapshot.
-        if: steps.refresh.outputs.changed == 'false' && steps.open.outputs.number != ''
+        if: env.PREVIEW == 'false' && steps.refresh.outputs.changed == 'false' && steps.open.outputs.number != ''
         env:
           GH_TOKEN: ${{ steps.app_token.outputs.token }}
           PR: ${{ steps.open.outputs.number }}
@@ -109,7 +154,7 @@ jobs:
           gh pr close "$PR" --delete-branch --comment "Граф снова совпадает со снимком в main — запрос устарел, закрыт поставщиком."
 
       - name: Commit the snapshot onto the supplier branch
-        if: steps.refresh.outputs.changed == 'true'
+        if: env.PREVIEW == 'false' && steps.refresh.outputs.changed == 'true'
         run: |
           git config user.name "canon-sync[bot]"
           git config user.email "canon-sync[bot]@users.noreply.github.com"
@@ -121,7 +166,7 @@ jobs:
 
       - name: Open the merge request when there is none
         id: pr
-        if: steps.refresh.outputs.changed == 'true'
+        if: env.PREVIEW == 'false' && steps.refresh.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ steps.app_token.outputs.token }}
           OPEN: ${{ steps.open.outputs.number }}
@@ -138,7 +183,7 @@ jobs:
           echo "number=$PR" >> "$GITHUB_OUTPUT"
 
       - name: Changelog entry and delivery manifest
-        if: steps.refresh.outputs.changed == 'true'
+        if: env.PREVIEW == 'false' && steps.refresh.outputs.changed == 'true'
         env:
           PR: ${{ steps.pr.outputs.number }}
         run: |
@@ -151,7 +196,7 @@ jobs:
       - name: Publish the branch when its content differs
         # An identical tree is not pushed: every push restarts the checks of the open request and
         # dismisses a stale approval, and the job runs daily.
-        if: steps.refresh.outputs.changed == 'true'
+        if: env.PREVIEW == 'false' && steps.refresh.outputs.changed == 'true'
         run: |
           if git fetch --quiet origin "$BRANCH" 2>/dev/null \
             && [ "$(git rev-parse 'HEAD^{tree}')" = "$(git rev-parse 'FETCH_HEAD^{tree}')" ]; then
@@ -161,7 +206,7 @@ jobs:
           fi
 
       - name: Description of the merge request
-        if: steps.refresh.outputs.changed == 'true'
+        if: env.PREVIEW == 'false' && steps.refresh.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ steps.app_token.outputs.token }}
           PR: ${{ steps.pr.outputs.number }}
@@ -170,7 +215,7 @@ jobs:
       - name: Conflict label
         # Cosmetic: the label needs the app's issues permission, which the conflict path has not exercised yet.
         # The conflict itself is already in the request body, so a failure here must not turn the run red.
-        if: steps.refresh.outputs.changed == 'true'
+        if: env.PREVIEW == 'false' && steps.refresh.outputs.changed == 'true'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ steps.app_token.outputs.token }}
@@ -198,7 +243,7 @@ jobs:
         # confuse "run 123" with "run 1234"): a retry of the same run comments on
         # the same issue instead of opening a duplicate; a new run opens a new issue
         # even if an older one from a different run is still open.
-        if: failure()
+        if: failure() && env.PREVIEW == 'false'
         # The canon-sync App's issues permission is unexercised elsewhere in this
         # file too (see "Conflict label" above) — continue-on-error keeps a
         # permission gap from being the one thing that aborts a step whose whole
@@ -214,10 +259,11 @@ jobs:
         run: |
           gh label create glossary-supplier-failed --description "Scheduled glossary-supplier run failed" --color B60205 2>/dev/null || true
           KEY="(run $RUN_ID)"
-          # $key below is a jq variable bound via --arg, not a shell expansion.
+          # gh's own --jq cannot bind variables (--arg is rejected: "unknown arguments"), so the
+          # filter runs in standalone jq. $key below is a jq variable, not a shell expansion.
           # shellcheck disable=SC2016
           EXISTING=$(gh issue list --label glossary-supplier-failed --state open --limit 200 --json number,title \
-            --jq --arg key "$KEY" '[.[] | select(.title | endswith($key))][0].number // empty')
+            | jq -r --arg key "$KEY" '[.[] | select(.title | endswith($key))][0].number // empty')
           if [ -z "$EXISTING" ]; then
             ASSIGN_ARGS=()
             [ -n "$ASSIGNEE" ] && ASSIGN_ARGS=(--assignee "$ASSIGNEE")
@@ -231,7 +277,7 @@ jobs:
       - name: Notice to the pilot channel (optional, fail-open)
         # Same channel as release-watchdog.yml: off until PILOT_NOTICE_ENDPOINT is set.
         # A conflict is announced once: when the list differs from the one in the open request (or main).
-        if: always() && vars.PILOT_NOTICE_ENDPOINT != '' && (failure() || steps.refresh.outputs.announce == 'true')
+        if: always() && env.PREVIEW == 'false' && vars.PILOT_NOTICE_ENDPOINT != '' && (failure() || steps.refresh.outputs.announce == 'true')
         continue-on-error: true
         env:
           ENDPOINT: ${{ vars.PILOT_NOTICE_ENDPOINT }}

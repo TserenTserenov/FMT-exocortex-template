@@ -49,6 +49,7 @@ ADDITIONAL_ISSUE_TESTS=(
     ".claude/hooks/tests/test-issue-1411-stop-gate-blocked-skill.sh"
     "scripts/tests/test_kimi_standalone_preflight.sh"
     "scripts/tests/peer-fanout-smoke.sh"
+    "scripts/tests/wp-inbox-close-gate-smoke.sh"
 )
 
 run_shell_test() {

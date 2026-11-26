@@ -6,6 +6,8 @@ browser_safe: true
 routing:
   executor: opus
   deterministic: false
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # ADI-цикл рассуждения
@@ -13,6 +15,8 @@ routing:
 > FPF B.5 (ADI). Доверие к данным: F-G-R (B.3) — факт/предположение/слух. Сравнение вариантов: A.19 — одинаковые критерии для всех.
 
 Задача: $ARGUMENTS
+
+В ответе покажи все пять этапов метода под отдельными заголовками в их порядке (Abduction, Deduction, Induction, Audit, Decide).
 
 ## 1. Abduction (генерация гипотез)
 

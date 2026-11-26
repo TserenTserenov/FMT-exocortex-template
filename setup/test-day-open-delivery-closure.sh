@@ -89,6 +89,13 @@ for rel in $STRATEGY_REFS; do
         if echo "$IMPORTS" | grep -q "^$mod$" && [ -f "$libfile" ]; then
           pass "local import satisfied: $rel -> lib/$mod.py"
           [ -f "$SEED_SCRIPTS/lib/$mod.py" ] && pass "seed mirror: lib/$mod.py" || fail "lib/$mod.py not mirrored into seed"
+          for shipped in "scripts/lib/$mod.py" "seed/strategy/scripts/lib/$mod.py"; do
+            if grep -Fq "\"path\": \"$shipped\"" "$MANIFEST"; then
+              pass "manifest delivers $shipped for $rel"
+            else
+              fail "manifest omits $shipped required by $rel"
+            fi
+          done
         else
           # Missing local module is only a failure if some scripts/lib/<mod>.py
           # exists nowhere AND the import is known-local (wp_inbox, ledger_path
@@ -114,6 +121,43 @@ for rel in $STRATEGY_REFS; do
       ;;
   esac
 done
+
+# Exercise the shipped tree, so source-only dependencies cannot hide gaps in
+# the manifest. Translation completeness is checked separately by the pipeline.
+echo "=== 2a. DayPlan readers start from the assembled distribution ==="
+if python3 - "$REPO_ROOT" <<'PY'
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+root = Path(sys.argv[1])
+sys.path.insert(0, str(root / "scripts"))
+from assemble_distribution import assemble
+
+env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+for key in ("PYTHONPATH", "IWE_ROOT", "IWE_WORKSPACE", "IWE_TEMPLATE", "IWE_LOCALE_DIR"):
+    env.pop(key, None)
+with tempfile.TemporaryDirectory(prefix="dayplan-delivery-") as temporary:
+    output = Path(temporary)
+    assemble(root, output)
+    for folder in ("scripts", "seed/strategy/scripts"):
+        for reader in ("day-open-llm-fill.py", "day-open-priorities-patch.py"):
+            command = output / folder / reader
+            result = subprocess.run(
+                [sys.executable, str(command), "--help"], cwd=output, env=env,
+                capture_output=True, text=True,
+            )
+            if result.returncode:
+                raise SystemExit(f"{folder}/{reader}: {result.stderr}")
+            assert "usage:" in result.stdout.lower(), command
+PY
+then
+  pass "both DayPlan readers start from the assembled source and seed copies"
+else
+  fail "a DayPlan reader cannot start from the assembled distribution"
+fi
 
 # --- 2b. Pipeline-own dependencies invisible to $SCRIPT_HOME extraction -------
 # find-python3.sh is sourced via $(dirname BASH_SOURCE)/lib/ — not a

@@ -19,6 +19,8 @@ gates_required: []
 gates_enforced: []
 gates_rationale: "операционный скилл не создаёт РП и не меняет файлы рабочей папки; раздаёт текстовые подзадачи и собирает ответы"
 related: ["/peer-conversation"]
+audience: user
+runs_on: [claude]
 routing:
   executor: script+judgment
   deterministic: false

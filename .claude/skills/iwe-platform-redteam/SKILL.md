@@ -22,6 +22,8 @@ metadata:
   revised: "2026-08-26"
   compatibility: "Requires repository read access, Git, and Bash; GitHub CLI and disposable containers are optional."
   iwe_integration_revised: "2026-08-27 (peer-session 2026-08-27-05, Claude+Codex); 2026-10-02 (WP-529 F19 finding disposition)"
+audience: author
+runs_on: [claude, kimi, codex]
 ---
 
 # IWE Platform Red Team

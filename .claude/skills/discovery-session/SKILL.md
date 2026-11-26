@@ -13,6 +13,8 @@ triggers:
 routing:
   executor: opus
   deterministic: false
+audience: user
+runs_on: [claude, kimi]
 ---
 
 # Discovery Session — разговор-распаковка неудовлетворённостей

@@ -8,6 +8,8 @@ browser_safe: false
 routing:
   executor: sonnet
   deterministic: false
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # /extend — Каталог расширяемости IWE
