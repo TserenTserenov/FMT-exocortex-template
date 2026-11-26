@@ -977,7 +977,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "b9a6475e654bfbebb9a293b055c3de077ed0f17a6f7e703f07a5ef3bc58767c1"
+      "sha256": "3a41dee41f17e11c00e3baf5fcf27754e51a7464f048e7a62660f8014ad277e9"
     },
     {
       "path": ".gitignore",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2a0d9e8fdfb314366e62b7f7a254179804ab963f632183f4ce91fa7ad10a4d00"
+      "sha256": "fd4ca645a197075da1d1bb92b969f1de3861b54dc7367a73d76b4750c5a35105"
     },
     {
       "path": "CLAUDE.md",
@@ -1029,7 +1029,7 @@
     },
     {
       "path": "docs/AGENT-VENDOR-SETUP.md",
-      "sha256": "e5d2b1b7ffa24be14234501a3f38779bfc065bb8b139bd15ab861eaee8f59c43"
+      "sha256": "f6fbf5ec9bfb0073ac1891a0722272ef56cfd15803b410fa43f8f8557e82c300"
     },
     {
       "path": "docs/BRANCH-PROTECTION-EMERGENCY.md",
@@ -3020,6 +3020,10 @@
       "sha256": "614143fcdababe03b57dbeff21b5b75bc16f4d524614e963ad897778d1f8d76e"
     },
     {
+      "path": "scripts/skill_links.py",
+      "sha256": "4a3f9147930774046e74f9588a7acaebe28d600f18194cee12a7eef80a60b9a0"
+    },
+    {
       "path": "scripts/skills-pull.sh",
       "sha256": "730b84210e5b59ac83cb5c61370a6a71881506270554d382ef935c0424d1c77b"
     },
@@ -3557,7 +3561,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "b8aa43f2648e3a6a054dc2507c8ba7d8f80e811de375735ad3fde77cffb6b728"
+      "sha256": "b2d57fa71346b46155c8ccb91fe42c4e9b85479071ea0cdc1c9c7207e458babd"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3601,7 +3605,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "210e0af8381dcdbff8caf77048f278d5e611f791b89019bf2e9a686dbf3ba466"
+      "sha256": "8ba62dd3bded2ae3071a20241b73e093f887bef6ee6db35e2d31bea77ac1bd3c"
     }
   ],
   "excluded_paths": [
@@ -3901,6 +3905,7 @@
     "scripts/tests/test_session_guard_unknown_flag.sh",
     "scripts/tests/test_setup_runtime_isolation.sh",
     "scripts/tests/test_skill_agents.py",
+    "scripts/tests/test_skill_links.py",
     "scripts/tests/test_skill_promote.py",
     "scripts/tests/test_skills_script_paths.sh",
     "scripts/tests/test_sync_banner.py",
