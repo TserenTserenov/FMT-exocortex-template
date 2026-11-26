@@ -37,7 +37,7 @@ Refs: WP-NNN
 
 ### Added
 
-- [behavior] (#PRNUM) Step-by-step instruction (version 1) for moving IWE skills to Codex in `docs/AGENT-VENDOR-SETUP.md` (links, check, a task by a skill, closing without Claude through the close-check fallback, Kimi Code in the terminal); `run-protocol` now runs on Codex (`runs_on` gets `codex`, so install and update put its link), because its close-check fallback passed a live probe; `day-close` and the other closings follow after their own probes
+- [behavior] (#1687) Step-by-step instruction (version 1) for moving IWE skills to Codex in `docs/AGENT-VENDOR-SETUP.md` (links, check, a task by a skill, closing without Claude through the close-check fallback, Kimi Code in the terminal); `run-protocol` now runs on Codex (`runs_on` gets `codex`, so install and update put its link), because its close-check fallback passed a live probe; `day-close` and the other closings follow after their own probes
   - Цель: 20 · Результат: человек без участия автора по инструкции переносит навыки IWE в Codex и закрывает сессию без Claude; у возможности появляется версия инструкции для записи в учёте возможностей
   - Как проверить: пройти шаги 1-4 инструкции на чистой установке — в `~/IWE/.agents/skills` есть `think`, `archgate`, `decompose`, `run-protocol`, `wp-new`; `python3 scripts/skill_agents.py --check .claude/skills` — «OK»
   - Как откатить: git revert слияния этого запроса; ссылка на `run-protocol` для Codex снимется при следующем обновлении
