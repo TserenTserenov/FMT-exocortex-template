@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "567571103313f49732e05b2bd577a1556ab0baadf3d5a265b6344b346e38a44a"
+      "sha256": "7ec24447fbacfee2f1670d879f676ac0ca43a6bd02c5c952fffd4a742b086793"
     },
     {
       "path": "CLAUDE.md",
@@ -2585,7 +2585,7 @@
     },
     {
       "path": "scripts/fmt-critical-alert.sh",
-      "sha256": "369bdc410ee869c0329a1df12d7dc05be8d6b2eb6c06bf0b6879aa16c11837fb"
+      "sha256": "baf30d755825b1ef5fb6cb50269ddc1072af2e712dd6bc7fe5a64e2d15e11f43"
     },
     {
       "path": "scripts/gate-metrics.sh",
