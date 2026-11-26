@@ -1,5 +1,134 @@
-files_translated: []
-last_run_utc: '2026-11-26T12:55:38Z'
-last_synced_sha: b7b82d69d626286b82d21b90ea0c6138349ce9f0
+files_translated:
+- docs/release-audit-log.md
+last_run_utc: '2026-11-26T13:50:50Z'
+last_synced_sha: 2e10552ae59c6ccca50910bdcc0100d98edd7dc2
 schema_version: 1
-unapproved_terms: []
+unapproved_terms:
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Audit
+  term_ru: Аудит
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Backlog
+  term_ru: Бэклог
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Closing
+  term_ru: Закрытие
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Manifest
+  term_ru: Манифест
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Method
+  term_ru: Метод
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Migration
+  term_ru: Миграция
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Opening
+  term_ru: Открытие
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Assessment
+  term_ru: Оценка
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Memory
+  term_ru: Память
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Protocol
+  term_ru: Протокол
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Registry
+  term_ru: Реестр
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Session
+  term_ru: Сессия
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Hook
+  term_ru: Хук
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Step
+  term_ru: Шаг
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Change
+  term_ru: Изменение
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Fix
+  term_ru: Исправление
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Release
+  term_ru: Релиз
+- file: docs/release-audit-log.md
+  source: local-glossary
+  term_en: Verification
+  term_ru: Проверка
+- file: docs/release-audit-log.md
+  source: model
+  term_en: adversarial audit
+  term_ru: состязательный аудит
+- file: docs/release-audit-log.md
+  source: model
+  term_en: post-release
+  term_ru: пострелизный
+- file: docs/release-audit-log.md
+  source: model
+  term_en: receipt
+  term_ru: квитанция
+- file: docs/release-audit-log.md
+  source: model
+  term_en: Layer 5 / Layer 6
+  term_ru: слой 5 / слой 6
+- file: docs/release-audit-log.md
+  source: model
+  term_en: disposable installation
+  term_ru: одноразовая установка
+- file: docs/release-audit-log.md
+  source: model
+  term_en: migrated issues
+  term_ru: мигрированные issues
+- file: docs/release-audit-log.md
+  source: model
+  term_en: disposable audit
+  term_ru: одноразовый аудит
+- file: docs/release-audit-log.md
+  source: model
+  term_en: red/green control
+  term_ru: красный/зелёный контроль
+- file: docs/release-audit-log.md
+  source: model
+  term_en: accepted exception
+  term_ru: принятая оговорка
+- file: docs/release-audit-log.md
+  source: model
+  term_en: live (as in "live scheduler", "live installation")
+  term_ru: живой
+- file: docs/release-audit-log.md
+  source: model
+  term_en: smoldering finding class
+  term_ru: тлеющий класс находок
+- file: docs/release-audit-log.md
+  source: model
+  term_en: per-file justification
+  term_ru: пофайловое обоснование
+- file: docs/release-audit-log.md
+  source: model
+  term_en: independent re-run
+  term_ru: независимый повтор
+- file: docs/release-audit-log.md
+  source: model
+  term_en: Eugene (name kept as proper noun)
+  term_ru: Евгений
