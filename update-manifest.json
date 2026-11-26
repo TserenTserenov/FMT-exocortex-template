@@ -869,7 +869,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "b134dc78d0eb3e977360935a164a1cef1c206b26d983b543e9a04de7836e7e3a"
+      "sha256": "00d58cfd3db1986099b7a092493504f714330dbc755cf8ffae6301c98d73d4df"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "096a6bd1d7d6c4cda1b581c9e26d6be87a985e38683a9b983d3395ef6c1c5f35"
+      "sha256": "7f7426ac6777c1282f2d4db0b358e8e6c09f459bde7099b4bba63038c996a4bd"
     },
     {
       "path": "CLAUDE.md",
@@ -2061,7 +2061,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/02-inbox.md",
-      "sha256": "894d7d1e71d0ad3949677ed8129743503a81252e8d6092e273dee84366ecde1a"
+      "sha256": "babc298b01dc413dafaae56acc2f0edfdcc37c1175d6a3129653748236f627e3"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/03-dissatisfactions.md",
@@ -2085,7 +2085,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06a-pool.md",
-      "sha256": "ecadd5da82a4e94be048cfc1b3d2e8960d6d6d1e7fd557b628c884cbda454934"
+      "sha256": "0fa33d4b85fb89441bd208eb487a8a0171aff6d6bba213fb69aea312e2b5bddd"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06b-budget.md",
