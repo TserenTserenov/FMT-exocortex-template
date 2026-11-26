@@ -94,6 +94,10 @@ DP.D.380,"Гейт до действия ≠ гейт после действи�
 DP.D.381,Остановка в ожидании человека ≠ успешное завершение,Stopped waiting for a human decision ≠ completed successfully,pack,DP,ok,name-en-publishable/1
 DP.D.384,Поле записи каталога для ИИ: строгий отбор ≠ смысловой поиск ≠ отдача ИИ человека,A catalog record field served to an AI: strict filter ≠ semantic index ≠ text delivered to the user's AI,pack,DP,ok,name-en-publishable/1
 DP.D.385,"Копия индекса на читателя ≠ копия на источник: у личного источника они совпадают, у общего расходятся",A per-reader index copy is not a per-source copy: they coincide for a single-owner source and diverge for a shared one,pack,DP,ok,name-en-publishable/1
+DP.D.386,Исходный код ≠ Промпт,Source code ≠ Prompt,pack,DP,ok,name-en-publishable/1
+DP.D.387,Род сущности ≠ Роль в работе,Entity kind ≠ Role in a work,pack,DP,ok,name-en-publishable/1
+DP.D.388,Предписание ≠ Вход,Prescription ≠ Input,pack,DP,ok,name-en-publishable/1
+DP.D.389,Версия навыков разработчика ≠ Общая версия для других агентов,Developer skill version ≠ Shared agent version,pack,DP,ok,name-en-publishable/1
 DP.ECON.001,Points Engine — движок начисления баллов,Points Engine,pack,DP,ok,name-en-publishable/1
 DP.EXOCORTEX.001,Модульный экзокортекс,Modular Exocortex,pack,DP,ok,name-en-publishable/1
 DP.IWE.001,Intellectual Work Environment (IWE),Intellectual Work Environment (IWE),pack,DP,ok,name-en-publishable/1
@@ -115,8 +119,20 @@ DP.METHOD.264,Проверка готовности агента перед ра
 DP.METHOD.265,Принципы формирования структуры репозитория,Repository structure principles,pack,DP,ok,name-en-publishable/1
 DP.NAV.001,Навигация знаний,Knowledge Navigation,pack,DP,ok,name-en-publishable/1
 DP.ROLE.001,ИИ-системы,AI Systems,pack,DP,ok,name-en-publishable/1
+DP.ROLE.032,Регистратор событий,Event Ingester,pack,DP,ok,name-en-publishable/1
+DP.ROLE.034,Начислитель баллов,Rewards Projector,pack,DP,ok,name-en-publishable/1
+DP.ROLE.035,Сторож исправности,Platform Observer,pack,DP,ok,name-en-publishable/1
 DP.ROLE.037,Учётчик работы,Work Recorder,pack,DP,ok,name-en-publishable/1
+DP.ROLE.038,Подборщик инструментов,MCP Tool Consumer,pack,DP,ok,name-en-publishable/1
+DP.ROLE.039,Соработник,Peer Agent,pack,DP,ok,name-en-publishable/1
+DP.ROLE.040,Распорядитель подключений,OAuth Orchestrator,pack,DP,ok,name-en-publishable/1
 DP.ROLE.044,Почтальон,Postman,pack,DP,ok,name-en-publishable/1
+DP.ROLE.045,Диспетчер задач агентов,Agent Task Dispatcher,pack,DP,ok,name-en-publishable/1
+DP.ROLE.047,Архивариус решений,Trace Recorder,pack,DP,ok,name-en-publishable/1
+DP.ROLE.048,Воспроизводитель сессий,Replay Engine,pack,DP,ok,name-en-publishable/1
+DP.ROLE.049,Координатор путей,Path Coordinator,pack,DP,ok,name-en-publishable/1
+DP.ROLE.050,Старатель паттернов,Pattern Miner,pack,DP,ok,name-en-publishable/1
+DP.ROLE.051,Погаситель бонусов,Points Redeemer,pack,DP,ok,name-en-publishable/1
 DP.ROLE.054,R30 Аналитик ограничений,Constraint Analyst,pack,DP,ok,name-en-publishable/1
 DP.ROLE.055,Агент поддержки IWE,Helpdesk Support Agent,pack,DP,ok,name-en-publishable/1
 DP.ROLE.056,R32 Мейнтейнер скиллов,Skill Maintainer,pack,DP,ok,name-en-publishable/1
@@ -130,6 +146,8 @@ DP.ROLE.067,Онбордер,Onboarder,pack,DP,ok,name-en-publishable/1
 DP.ROLE.073,Хранитель реестра стилей,Style Registry Keeper,pack,DP,ok,name-en-publishable/1
 DP.ROLE.074,Диспетчер стилей,Style Dispatcher,pack,DP,ok,name-en-publishable/1
 DP.ROLE.075,Распорядитель доставки,Delivery Arbiter,pack,DP,ok,name-en-publishable/1
+DP.ROLE.079,Распорядитель агентных сессий,Bot Agent Session Orchestrator,pack,DP,ok,name-en-publishable/1
+DP.ROLE.083,Выдающий пропуска,External Access Grantor,pack,DP,ok,name-en-publishable/1
 DP.ROLE.088,Маршрутизатор знаний,Knowledge Router,pack,DP,ok,name-en-publishable/1
 DP.ROLE.091,Сторож данных (data-gap watchdog),Data-gap watchdog,pack,DP,ok,name-en-publishable/1
 DP.ROLE.092,Аудитор знаний (knowledge-audit watchdog),Knowledge-audit watchdog,pack,DP,ok,name-en-publishable/1
@@ -163,6 +181,9 @@ DP.ROLE.124,Планировщик выпусков,Release Scheduler,pack,DP,ok
 DP.ROLE.125,Диспетчер очереди,Delivery Queue Dispatcher,pack,DP,ok,name-en-publishable/1
 DP.ROLE.126,Учётчик доставки,Delivery Recorder,pack,DP,ok,name-en-publishable/1
 DP.ROLE.127,Визионер,Visionary,pack,DP,ok,name-en-publishable/1
+DP.ROLE.128,Камердинер,Valet,pack,DP,ok,name-en-publishable/1
+DP.ROLE.129,Переводчик для ИИ-агентов,AI Agent Translator,pack,DP,ok,name-en-publishable/1
+DP.ROLE.130,Часовщик,Clockmaker,pack,DP,ok,name-en-publishable/1
 DP.RUNBOOK.001,Runbook: Aist Bot Errors,Runbook: Aist Bot Errors,pack,DP,ok,name-en-publishable/1
 DP.SC.001,Планирование дня,Day Planning,pack,DP,ok,name-en-publishable/1
 DP.SC.002,Планирование и ревью недели,Week Planning and Review,pack,DP,ok,name-en-publishable/1
@@ -228,7 +249,7 @@ DP.SC.117,Асинхронная проверка и обсуждение ДЗ,A
 DP.SC.118,Ассистент упоминаний в каналах,Channel Mention Assistant,pack,DP,ok,name-en-publishable/1
 DP.SC.119,Рабочее пространство из браузера,Browser-Based Workspace,pack,DP,ok,name-en-publishable/1
 DP.SC.133,Симулятор траектории Созидателя,Creator trajectory simulator,pack,DP,ok,name-en-publishable/1
-DP.SC.134,Доставка выпуска в канал,Release delivery to channel,pack,DP,ok,name-en-publishable/1
+DP.SC.134,Доставка отправления адресату,Delivery of a parcel to its addressee,pack,DP,ok,name-en-publishable/1
 DP.SC.152,Анализ ограничения ИТ-платформы (platform-bottleneck),Platform Constraint Analysis,pack,DP,ok,name-en-publishable/1
 DP.SC.153,Скилл-система IWE,IWE Skill System,pack,DP,ok,name-en-publishable/1
 DP.SC.154,Мульти-агентная диалоговая сессия,Multi-agent conversational session,pack,DP,ok,name-en-publishable/1
@@ -250,7 +271,7 @@ DP.SC.205,Верификатор реестра классов допуска,Ad
 DP.SC.207,Человек видит и отзывает согласие на учёт и показ своих данных,Person sees and revokes consent to tracking and display of own data,pack,DP,ok,name-en-publishable/1
 DP.SC.209,Переход на новый адрес подключения без потери входа,Moving to a new connection address without losing sign-in,pack,DP,ok,name-en-publishable/1
 DP.SC.210,Уход с платформы с удалением и выгрузкой своих данных,Leaving the platform with deletion and export of own data,pack,DP,ok,name-en-publishable/1
-DP.SC.211,Проверенный релиз шаблона IWE через Выпускающего,Verified IWE template release through the Release Manager,pack,DP,ok,name-en-publishable/1
+DP.SC.211,Проверенный релиз шаблона IWE через Выпускающего,Verified IWE template release through the Release Owner,pack,DP,ok,name-en-publishable/1
 DP.SC.212,"Гость понимает, что предлагает экосистема, и делает следующий шаг",Guest understands what the ecosystem offers and takes the next step,pack,DP,ok,name-en-publishable/1
 DP.SC.213,Несколько ИИ-агентов работают на одного человека без столкновений и на виду,Several AI agents work for one person without collisions and in plain sight,pack,DP,ok,name-en-publishable/1
 DP.SC.214,"Постоянная ИИ-личность, которую узнаёшь и которая не теряет себя",A persistent AI persona you recognise and that does not lose itself,pack,DP,ok,name-en-publishable/1
@@ -270,6 +291,13 @@ DP.SC.228,Рейтинг с согласием участника,Ranking with p
 DP.SC.229,Свои уведомления и виджеты,Own notifications and widgets,pack,DP,ok,name-en-publishable/1
 DP.SC.230,Утверждённые английские имена в текстах,Approved English names in texts,pack,DP,ok,name-en-publishable/1
 DP.SC.231,Новые возможности каждый день — в свою деятельность,Daily new possibilities turned into own activity,pack,DP,ok,name-en-publishable/1
+DP.SC.232,Утреннее приветствие,Morning greeting,pack,DP,ok,name-en-publishable/1
+DP.SC.233,Путь к своей ИИ-среде,Path to your own AI environment,pack,DP,ok,name-en-publishable/1
+DP.SC.234,Десятки и сотни одновременных сессий людей и агентов,Tens and hundreds of simultaneous sessions started by people and agents,pack,DP,ok,name-en-publishable/1
+DP.SC.235,Работа возобновляется после смены ответственного человека,Work resumes after the responsible person changes,pack,DP,ok,name-en-publishable/1
+DP.SC.236,Результаты параллельных сессий собираются в одну версию,Results of parallel sessions are assembled into one consistent version,pack,DP,ok,name-en-publishable/1
+DP.SC.237,Видно состояние дела,The state of the work item is visible,pack,DP,ok,name-en-publishable/1
+DP.SC.238,После приёмки сохраняется способ со свидетельствами,The method and its evidence are kept after acceptance,pack,DP,ok,name-en-publishable/1
 DP.SC.NNN,"{""Название обещания""}",{Service Promise Name},pack,DP,ok,name-en-publishable/1
 DP.SOTA.001,DDD Strategic (Khononov),DDD Strategic (Khononov),pack,DP,ok,name-en-publishable/1
 DP.SOTA.002,Context Engineering,Context Engineering,pack,DP,ok,name-en-publishable/1
@@ -294,6 +322,7 @@ DP.SOTA.040,"Релиз — переключатель версии догово
 DP.SOTA.041,"GitHub Actions schedule: время в cron — самый ранний момент старта, а не гарантия; срок, обещанный человеку, считать от измеренных стартов","GitHub Actions schedule: the cron time is the earliest start, not a guarantee; derive human-facing deadlines from measured start times",pack,DP,ok,name-en-publishable/1
 DP.SOTA.042,"claude.ai, по отчёту в трекере, не передаёт модели общую инструкцию MCP-сервера: правила, без которых сценарий ломается, класть в описания операций",claude.ai reportedly does not pass the MCP server instructions to the model: put scenario-critical rules into tool descriptions,pack,DP,ok,name-en-publishable/1
 DP.SOTA.043,"Фоновый Claude в недоверенном рабочем каталоге, по наблюдению автора прогона, не применяет permissions.allow из настроек проекта: стенд зеркалит разрешения флагом --allowedTools",Headless Claude in an untrusted workspace was observed not to apply project permissions.allow; benches mirror permissions with --allowedTools,pack,DP,ok,name-en-publishable/1
+DP.SOTA.044,Виджеты Telegram Bot API 10.4: HTML-интерфейс в сообщении с обновлением данных,Telegram Bot API 10.4 widgets: an HTML interface in a message with data updates,pack,DP,ok,name-en-publishable/1
 DP.SYS.001,Детерминированные системы,Deterministic Systems,pack,DP,ok,name-en-publishable/1
 DP.TERM.w-рефлексия,W-рефлексия,W-reflection,pack,DP,ok,name-en-publishable/1
 DP.TERM.активный-вывод,Активный вывод,Active Inference,pack,DP,ok,name-en-publishable/1
@@ -359,6 +388,7 @@ ECO.MAP.003,Пять документов экосистемы,Five Ecosystem Do
 ECO.MAP.004,Указатель объектов внимания,Attention Objects Index,pack,ECO,ok,name-en-publishable/1
 ECO.PRIN.001,Свод принципов экосистемы развития интеллекта,Intelligence Development Ecosystem Principles,pack,ECO,ok,name-en-publishable/1
 ECO.SC.009,Ты не останешься один на пути развития,You will not be alone on the path of development,pack,ECO,ok,name-en-publishable/1
+ECO.SC.010,Обучим культуре работы с ИИ самостоятельно и в команде,"We will teach the culture of working with AI, alone and in a team",pack,ECO,ok,name-en-publishable/1
 ECO.SOTA.001,EdTech Seed Funding Environment (2024-2026),EdTech Seed Funding Environment (2024-2026),pack,ECO,ok,name-en-publishable/1
 ECO.SOTA.002,Freemium Models in EdTech (2025-2026),Freemium Models in EdTech (2025-2026),pack,ECO,ok,name-en-publishable/1
 LS.D.003,Агент-агентный стиль (база),Agent-to-agent style (base),pack,LS,ok,name-en-publishable/1
@@ -376,6 +406,8 @@ LS.FORM.009,Регистр универсального руководства (
 LS.FORM.010,Регистр Telegram (новичок),Telegram register,pack,LS,ok,name-en-publishable/1
 LS.FORM.011,Регистр браузера (пилот),Browser register,pack,LS,ok,name-en-publishable/1
 LS.FORM.012,Регистр пошаговой инструкции (от имени автора),Step-by-step instruction register,pack,LS,ok,name-en-publishable/1
+LS.FORM.013,Ведение практикума,Practicum facilitation,pack,LS,ok,name-en-publishable/1
+LS.FORM.014,Рабочее сообщение команде,Team message,pack,LS,ok,name-en-publishable/1
 MIM.FM.001,Послушал = научился,Heard = Learned,pack,MIM,ok,name-en-publishable/1
 MIM.FM.002,Заучивание ошибок,Learning Errors by Rote,pack,MIM,ok,name-en-publishable/1
 MIM.FM.003,Застревание на повторе,Stuck in Repetition,pack,MIM,ok,name-en-publishable/1
