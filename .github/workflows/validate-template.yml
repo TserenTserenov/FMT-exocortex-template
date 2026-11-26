@@ -1095,6 +1095,15 @@ jobs:
       # "the test exists, CI does not know about it"). WP-7 Phase 284: 8 more files (agent
       # panel, rehearsal gate, glossary snapshot, etc.) were previously run only by a
       # non-blocking step in the gateway CI on a pinned template revision.
+      # WP-592 Ф7: every skill header must parse as YAML and declare audience
+      # (user|author) and runs_on (claude/kimi/codex). The skill-link program
+      # exposes skills to Codex and Kimi from the same fields, so a bad header
+      # here means a skill silently missing (or wrongly shared) for users.
+      - name: Validate skill audience and runs_on (WP-592)
+        run: |
+          python3 -c "import yaml" >/dev/null 2>&1 || python3 -m pip install --user pyyaml
+          python3 scripts/skill_agents.py --check .claude/skills
+
       - name: Run issue-regression python tests (pytest, WP-529 Ф6)
         run: |
           python3 -c "import pytest, markdown_it, yaml" >/dev/null 2>&1 || python3 -m pip install --user pytest markdown-it-py pyyaml
@@ -1122,6 +1131,9 @@ jobs:
             scripts/tests/test_check_changelog_fields.py \
             scripts/tests/test_day_open_week_sync_patch.py \
             scripts/tests/test_week_pool.py \
+            scripts/tests/test_skill_agents.py \
+            scripts/tests/test_skill_links.py \
+            scripts/tests/test_close_verify_fallback.py \
             roles/extractor/tests/test_extractor_pipeline.py \
             roles/extractor/tests/test_extractor_branches_prune.py
           # The skill directory contains a hyphen, so pytest cannot import it

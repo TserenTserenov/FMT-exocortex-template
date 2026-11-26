@@ -17,6 +17,8 @@ interaction: multi-step
 gates_required: []
 gates_enforced: []
 gates_rationale: "операционный скилл; состояние пользователя не двигает, РП не создаёт"
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 <!--

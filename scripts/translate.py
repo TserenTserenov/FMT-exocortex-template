@@ -515,11 +515,17 @@ def _translatable_text(file_path: Path, translate_keys: list[str]) -> str:
 def local_terms_used(text: str, unapproved: dict[str, str]) -> list[tuple[str, str]]:
     """Local-glossary candidates whose Russian form occurs in the source text.
 
-    Exact case-insensitive match outside code; an inflected form is not caught
-    (known limit — the model is also asked to list terms it had to name itself).
+    Match whole terms outside code, ignoring case and allowing Markdown emphasis.
+    The model is also asked to report names it chose for inflected forms.
     """
     haystack = strip_code_for_guard(text).casefold()
-    return [(ru, en) for ru, en in unapproved.items() if ru.casefold() in haystack]
+    used = []
+    for ru, en in unapproved.items():
+        # Allow Markdown emphasis at a word boundary, including in multiword spans.
+        pattern = rf"(?<!\w)_{{0,3}}{re.escape(ru.casefold())}_{{0,3}}(?!\w)"
+        if re.search(pattern, haystack):
+            used.append((ru, en))
+    return used
 
 
 def bold_spans(text: str) -> list[str]:

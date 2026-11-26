@@ -17,10 +17,11 @@
   "format.month_genitive.9": "September",
   "recognition.close_day": "close the day|closing the day|day close",
   "recognition.close_session": "close the session|close session|push and close",
+  "recognition.dayplan.section.attention": "Needs Attention|Requires Attention",
   "recognition.dayplan.section.calendar": "Calendar",
   "recognition.dayplan.section.notes_review": "Notes Review",
   "recognition.dayplan.section.overnight": "IWE Overnight",
-  "recognition.dayplan.section.plan_today": "Plan for Today|Today.s Plan",
+  "recognition.dayplan.section.plan_today": "Plan for Today|Today['’]s Plan",
   "recognition.dayplan.section.yesterday": "Yesterday",
   "recognition.push_only": "push the changes"
 }

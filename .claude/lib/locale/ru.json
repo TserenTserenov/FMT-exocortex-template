@@ -17,6 +17,7 @@
   "format.month_genitive.9": "сентября",
   "recognition.close_day": "итоги дня|закрываю день|закрывай день",
   "recognition.close_session": "закрывай|закрываю|закрывай сессию",
+  "recognition.dayplan.section.attention": "Требует внимания",
   "recognition.dayplan.section.calendar": "Календарь",
   "recognition.dayplan.section.notes_review": "Разбор заметок",
   "recognition.dayplan.section.overnight": "IWE за ночь",
