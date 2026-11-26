@@ -24,6 +24,8 @@ triggers:
 routing:
   executor: sonnet
   deterministic: false
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # /skill-creator — create an IWE skill

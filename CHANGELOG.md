@@ -37,6 +37,11 @@ Refs: WP-NNN
 
 ### Added
 
+- [behavior] (#1679) Every skill header now declares who the skill is for (`audience: user|author`) and which agents run it correctly today (`runs_on: [claude, kimi, codex]`), per the skill inventory approved on 2026-11-25. `scripts/skill_agents.py --check .claude/skills` validates every header as YAML and runs as a release check; `--for <agent>` lists the skills to expose to that agent (34 for Codex now; closing protocols, `verify`, `audit-installation`, `pack-creator`, `day-open`, `discovery-session` and `platform-bottleneck` wait for a fallback). The headers of `org-dev` and `transcribe` are now valid YAML (#1676). The skill scaffold (`_template`) explains both fields.
+  - Цель: 20 · Результат: служебное — основа для поштучных ссылок на навыки в `.agents/skills`, по которым Codex и Kimi Code увидят только навыки, которые выполняют правильно
+  - Как проверить: `python3 scripts/skill_agents.py --check .claude/skills` — «OK: 52 skill headers declare audience and runs_on»; `python3 -m pytest -q scripts/tests/test_skill_agents.py` — 20 проверок проходят
+  - Как откатить: git revert слияния этого запроса; заголовки навыков вернутся без двух полей, шаг проверки исчезнет
+
 - [optional] Почтальон: `scripts/postman.py deliver --to WP-N --from "..." --pointer "..." --summary "..."` кладёт заявку в ящик другого РП по адресной книге (`scripts/postman-address-book.yaml`, проверка и разбор адреса — `scripts/postman-address-book.py`). Повтор той же записи вторую не создаёт; закрытый РП получает исход «отвергнуто» с адресом списка отложенного. Правило в инструкциях агента ссылается на эту команду, а в шаблоне её не было (WP-418 Ф14). (#1662)
   - Цель: 10 · Результат: служебное — сессия одного РП передаёт заявку в ящик другого без ручной правки чужих файлов.
   - Как проверить: `python3 scripts/tests/test-postman.py` и `python3 scripts/tests/test-postman-address-book.py` — обе печатают «все проверки прошли».
