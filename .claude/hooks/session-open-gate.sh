@@ -186,6 +186,77 @@ if [ "$AGENT_KEYED" = 1 ]; then
   done
 fi
 
+# Personal local history outside the IWE folder (issue #1658). The gate protects the
+# work products of IWE (governance, Pack, DS). A commit into a separate local git
+# repository that lies wholly outside $IWE_ROOT and has no remote is not such a
+# product: it needs no WP. The exemption is deliberately narrow, every condition
+# must hold for EVERY commit/push in the command, any doubt keeps the gate on:
+#  - the WHOLE command is one `git -C <dir> add|commit ...` or several joined by ` && `: no `;`, `|`,
+#    other `&`, substitution, redirection, `export`/`env`/`cd`/function statements, one `-C` per
+#    call, a literal path (no `$`, backticks, globs, quotes inside); a relative path is resolved
+#    against the hook payload `cwd`;
+#  - push is never exempt; `--git-dir`, `--work-tree`, `--namespace`, `-c` and
+#    GIT_* assignments in the command are never exempt (they can retarget the repo);
+#  - the repository top level AND its common git dir are disjoint from $IWE_ROOT
+#    (neither inside it nor above it), so a worktree of an IWE repository placed
+#    elsewhere is still guarded;
+#  - the repository has no remote at all: a clone of a real project, which could be
+#    pushed on, stays guarded.
+# `cd <dir> && git commit` is not recognised (the payload cwd is the cwd before the
+# command), so it stays blocked; the agent uses `git -C`.
+local_outside_commit_only() {
+  local cmd="$NORMALIZED_COMMAND" parts part kind args quoted dir top top_real common common_real root_real p n=0 cwd
+  # The whole command must be a plain chain of `git -C <dir> add|commit ...` joined by ` && `
+  # (rc.2 red team and code audit: the exemption used to judge only the matched fragment, so an
+  # earlier `export GIT_DIR=...;`, a shell function named git, `cd <IWE repo> && git -C . commit`
+  # or a tail such as `env git commit` retargeted or hid a commit). Any other statement,
+  # separator, substitution, redirection or retargeting name keeps the gate on.
+  [[ "$cmd" =~ (GIT_[A-Za-z_]+|--git-dir|--work-tree|--namespace) ]] && return 1
+  [[ "$cmd" == *';'* || "$cmd" == *'|'* || "$cmd" == *'`'* || "$cmd" == *'$'* || "$cmd" == *'('* \
+     || "$cmd" == *')'* || "$cmd" == *'<'* || "$cmd" == *'>'* || "$cmd" == *'\'* ]] && return 1
+  parts=${cmd// \&\& /$'\n'}
+  [[ "$parts" == *'&'* ]] && return 1
+  root_real=$(cd "$IWE_ROOT" 2>/dev/null && pwd -P) || return 1
+  while IFS= read -r part; do
+    part=${part# }; part=${part% }
+    [[ "$part" =~ ^git\ -C\ ([^[:space:]]+)\ (add|commit)([[:space:]].*)?$ ]] || return 1
+    dir=${BASH_REMATCH[1]}; kind=${BASH_REMATCH[2]}; args=${BASH_REMATCH[3]:-}
+    [[ "$args" =~ (^|[[:space:]])-[Cc]([[:space:]]|$) ]] && return 1
+    # add is never gated and the commit below is checked on its own
+    [ "$kind" = commit ] || continue
+    n=$((n + 1))
+    # a path may carry one pair of surrounding quotes and no other quote character; the shell
+    # does not expand `~` inside quotes, so a quoted tilde path is a literal relative path
+    quoted=0
+    case "$dir" in
+      \"*\") dir=${dir#\"}; dir=${dir%\"}; quoted=1 ;;
+      \'*\') dir=${dir#\'}; dir=${dir%\'}; quoted=1 ;;
+    esac
+    case "$dir" in
+      *'"'*|*"'"*|*'*'*|*'?'*|*'['*|'') return 1 ;;
+      '~'*) [ "$quoted" = 0 ] && [[ "$dir" == '~/'* ]] || return 1; dir="$HOME/${dir#\~/}" ;;
+      /*) ;;
+      *)
+        cwd=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null)
+        case "$cwd" in /*) dir="$cwd/$dir" ;; *) return 1 ;; esac
+        ;;
+    esac
+    top=$(env -u GIT_DIR -u GIT_WORK_TREE git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || return 1
+    common=$(env -u GIT_DIR -u GIT_WORK_TREE git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+    top_real=$(cd "$top" 2>/dev/null && pwd -P) || return 1
+    common_real=$(cd "$common" 2>/dev/null && pwd -P) || return 1
+    for p in "$top_real" "$common_real"; do
+      case "$p/" in "$root_real"/*) return 1 ;; esac
+      case "$root_real/" in "$p"/*) return 1 ;; esac
+    done
+    [ -z "$(env -u GIT_DIR -u GIT_WORK_TREE git -C "$dir" remote 2>/dev/null)" ] || return 1
+  done <<< "$parts"
+  [ "$n" -gt 0 ]
+}
+if local_outside_commit_only; then
+  exit 0
+fi
+
 # Opt-in skip for Windows / Git Bash (WP-7 Phase 271, issue #1281). session-guard.sh
 # cannot open a `--wp` semaphore there (no fcntl), so without a way out every
 # commit is blocked although PLATFORM-COMPAT.md calls Git Bash "best-effort".
@@ -269,6 +340,7 @@ if [ "$AGENT_KEYED" = 1 ]; then
 else
   echo "[session-open-gate] session=$SESSION_ID_SAFE no semaphore with both harness_session_id: $SESSION_ID and a wp: field or an allowed housekeeping reason (${SESSION_DIR}/${SEM_GLOB}) — blocking direct git commit/push" >&2
 fi
+echo "[session-open-gate] Личный репозиторий вне папки IWE и без remote сохраняется без сессии только простой командой: git -C <абсолютный путь> commit -m \"одна строка\" (при необходимости git -C <путь> add … && git -C <путь> commit …); цепочки с ;, |, подстановками, переносами и многострочные сообщения этим исключением не покрываются." >&2
 
 cat >&2 <<EOF
 🚫 Session Open Gate (WP-561/S-68): прямой git commit/push без привязки к РП заблокирован.

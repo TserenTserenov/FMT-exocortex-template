@@ -240,6 +240,12 @@ def write_snapshot(included: list[dict], meta: dict, output_csv: Path) -> None:
         tmp_meta.replace(meta_path)
 
 
+def input_digest(rows: list[dict]) -> str:
+    """Bind diagnostic decisions to this walk, including rows the public snapshot omits."""
+    encoded = json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def build_meta(payload: dict, included: list[dict], excluded: Counter, as_of: str, allowlist_path: Path) -> dict:
     meta = {
         "as_of": as_of,
@@ -247,6 +253,7 @@ def build_meta(payload: dict, included: list[dict], excluded: Counter, as_of: st
         "excluded": dict(sorted(excluded.items())),
         "included": len(included),
         "input_rows": len(payload["rows"]),
+        "input_sha256": input_digest(payload["rows"]),
         "rules_version": included[0]["rules_version"],
         "schema": SCHEMA,
     }
