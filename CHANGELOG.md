@@ -37,7 +37,7 @@ Refs: WP-NNN
 
 ### Added
 
-- [behavior] (#PRNUM) The close-check fallback now tells the caller to state in the summary, as checkable facts, which checklist lines are not applicable without the close runner (runner not started, card age and size, РП status, onboarding and docs impact, where the new artifact lives); `run-protocol` step 4 and `day-close` step 11
+- [behavior] (#1684) The close-check fallback now tells the caller to state in the summary, as checkable facts, which checklist lines are not applicable without the close runner (runner not started, card age and size, РП status, onboarding and docs impact, where the new artifact lives); `run-protocol` step 4 and `day-close` step 11
   - Цель: 20 · Результат: служебное — сверка закрытия в Codex и Kimi Code не проваливает пункты только из-за того, что во входе нет фактов о применимости; настоящие пробелы по-прежнему ловятся
   - Как проверить: в первой живой пробе 26.11 без этих строк 8 из 9 пунктов остались неподтверждёнными, с ними 6 из 9 прошли, три упавших были настоящими пробелами сессии
   - Как откатить: git revert слияния этого запроса
