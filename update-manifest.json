@@ -505,7 +505,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "90ba1e7e23fbc71951280a39ead209c3ea6eafb54fb053762f69526ff95ff6b6"
+      "sha256": "bacd24a1c8aff3fe1cef1378065ea048819068e752faf7c833ea9af4859616d4"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -1009,7 +1009,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "6945f48406a823f6fc09e5febe65ca150e8de0db663f743da7f3048c2b76ed93"
+      "sha256": "b17c6cb862fa30de6a72f906184d185bc5f7a1291d5e87257684c3a0a96822e2"
     },
     {
       "path": "CLAUDE.md",
@@ -1201,7 +1201,7 @@
     },
     {
       "path": "docs/release-audit-log.md",
-      "sha256": "26b3a6be1643f06dd621a0fd3365e3c0d5088184a2d510610d2c5da23f8ed9b4"
+      "sha256": "0e7ca5867a3c92f094095b8f87b9470201a46e71a89b417b478b1c49bb4219df"
     },
     {
       "path": "docs/releases/0.42/README.md",
