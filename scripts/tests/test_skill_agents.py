@@ -100,9 +100,10 @@ def test_every_template_skill_declares_audience_and_runs_on() -> None:
 
 def test_template_keeps_codex_away_from_skills_without_fallback() -> None:
     codex = set(skill_agents.select_for("codex", ROOT / ".claude" / "skills"))
-    # Closing protocols need an isolated-context checker Codex does not have yet (inventory 25.11).
-    assert not codex & {"run-protocol", "day-close", "week-close", "month-close", "verify"}
-    assert {"think", "wp-new", "org-dev", "transcribe"} <= codex
+    # Closing protocols need an isolated-context checker. run-protocol got its fallback
+    # (close_verify_fallback.py, live probe 26.11); the others follow after their own probe.
+    assert not codex & {"day-close", "week-close", "month-close", "verify"}
+    assert {"think", "wp-new", "org-dev", "transcribe", "run-protocol"} <= codex
 
 
 def test_unhashable_runs_on_is_a_header_error_not_a_crash(tmp_path: Path) -> None:

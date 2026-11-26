@@ -37,6 +37,11 @@ Refs: WP-NNN
 
 ### Added
 
+- [behavior] (#PRNUM) Step-by-step instruction (version 1) for moving IWE skills to Codex in `docs/AGENT-VENDOR-SETUP.md` (links, check, a task by a skill, closing without Claude through the close-check fallback, Kimi Code in the terminal); `run-protocol` now runs on Codex (`runs_on` gets `codex`, so install and update put its link), because its close-check fallback passed a live probe; `day-close` and the other closings follow after their own probes
+  - Цель: 20 · Результат: человек без участия автора по инструкции переносит навыки IWE в Codex и закрывает сессию без Claude; у возможности появляется версия инструкции для записи в учёте возможностей
+  - Как проверить: пройти шаги 1-4 инструкции на чистой установке — в `~/IWE/.agents/skills` есть `think`, `archgate`, `decompose`, `run-protocol`, `wp-new`; `python3 scripts/skill_agents.py --check .claude/skills` — «OK»
+  - Как откатить: git revert слияния этого запроса; ссылка на `run-protocol` для Codex снимется при следующем обновлении
+
 - [behavior] (#1686) Method skills `think`, `archgate` and `decompose` now tell the agent to show the stages of the method under separate headings in their order (the "show the stages" line, decision "in the skill itself"); on a new task Codex 0.169 showed all stages with the line in 3 of 3 skills, Claude did so on `think`
   - Цель: 20 · Результат: служебное — в Codex и других агентах ответы по методам `think`, `archgate`, `decompose` показывают этапы метода заголовками, так легче проверить, что метод исполнен, а не пересказан
   - Как проверить: в агенте без Claude дать задание навыку `think` — в ответе пять заголовков Abduction, Deduction, Induction, Audit, Decide по порядку; навыкам `decompose` и `archgate` — шаги алгоритма заголовками
