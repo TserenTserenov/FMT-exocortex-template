@@ -1157,6 +1157,28 @@ else
     fi
 fi
 
+# === 4h. Skills for Codex: per-skill links in .agents/skills (WP-592 F7) ===
+# Codex reads skills only from <workspace>/.agents/skills. One relative symlink per
+# skill whose header lists codex in runs_on; no copies, so the skill is edited in
+# one place. Foreign files there are left untouched and reported. Never blocks install.
+if [ -z "$YAML_PYTHON3" ]; then
+    echo "  ⚠ навыки для Codex не подключены: нет python3 с PyYAML (см. предупреждение выше)."
+elif $DRY_RUN; then
+    # In a dry run step 4b copied nothing, so a fresh workspace has no skills yet.
+    if [ -d "$WORKSPACE_DIR/.claude/skills" ]; then
+        "$YAML_PYTHON3" "$TEMPLATE_DIR/scripts/skill_links.py" --workspace "$WORKSPACE_DIR" --dry-run 2>&1 | tail -1 | sed 's/^/  /'
+    else
+        echo "  [DRY RUN] Would link template skills for Codex in $WORKSPACE_DIR/.agents/skills"
+    fi
+else
+    echo "[4h] Connecting template skills to Codex..."
+    if ! SKILL_LINKS_OUTPUT=$("$YAML_PYTHON3" "$TEMPLATE_DIR/scripts/skill_links.py" --workspace "$WORKSPACE_DIR" 2>&1); then
+        echo "  ⚠ навыки для Codex не подключены — запусти вручную:"
+        echo "    $YAML_PYTHON3 $TEMPLATE_DIR/scripts/skill_links.py --workspace $WORKSPACE_DIR"
+    fi
+    printf '%s\n' "$SKILL_LINKS_OUTPUT" | grep -E '^(unlink|CONFLICT|REFUSED|skill links|ERROR)' | sed 's/^/  /'
+fi
+
 # === 5. Install roles (autodiscovery via role.yaml) ===
 # Role install.sh scripts pick their own scheduler: launchd on macOS,
 # systemd --user or cron on Linux (WSL2 included, #454). Issue #1441: this

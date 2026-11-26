@@ -22,6 +22,8 @@ triggers:
 routing:
   executor: sonnet
   deterministic: false
+audience: user
+runs_on: [claude, kimi]
 ---
 
 # /pack-creator — сопровождение автора PACK-X по SPF-циклу

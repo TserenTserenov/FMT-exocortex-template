@@ -12,6 +12,8 @@ triggers:
 routing:
   executor: haiku
   deterministic: false
+audience: user
+runs_on: [claude, kimi]
 ---
 
 # Day Close (протокол закрытия дня)

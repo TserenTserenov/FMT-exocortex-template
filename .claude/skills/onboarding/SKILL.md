@@ -19,6 +19,8 @@ interaction: multi-step
 gates_required: []
 gates_enforced: []
 gates_rationale: "разговор с новым человеком до его первого результата; рабочий продукт не создаётся, WP Gate не применяется"
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # /onboarding — лёгкий онбординг

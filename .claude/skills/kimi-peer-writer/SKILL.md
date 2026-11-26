@@ -22,6 +22,8 @@ interaction: multi-step
 gates_required: []
 gates_enforced: []
 gates_rationale: "операционный скилл; WP Gate применим только при создании нового РП, не для операционных вызовов"
+audience: user
+runs_on: [kimi]
 ---
 
 # Kimi Peer Writer (DP.SC.154)

@@ -22,6 +22,8 @@ routing:
   executor: script
   deterministic: true
   script_path: "scripts/agent-fault/iwe_checklist_memory.py"
+audience: user
+runs_on: [claude, kimi, codex]
 ---
 
 # /agent-fault — регистрация косяка агента
