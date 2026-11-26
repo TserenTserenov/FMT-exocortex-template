@@ -177,7 +177,7 @@ HK_SEM="${IWE_ROOT:-$HOME/IWE}/.iwe-runtime/sessions/${AGENT}-housekeeping-day-c
 ### 11. Верификация (Haiku R23)
 Sub-agent Haiku R23 (context isolation): передать чеклист + черновик итогов + список обновлённых файлов. По ❌ — исправить до показа пользователю.
 
-**Запасной путь, если у агента нет запуска помощника с чистым контекстом** (нет субагента — Codex, Kimi Code): тот же, что в шаге 4 скилла `run-protocol` — `python3 scripts/close_verify_fallback.py --verifier <другой агент> --closer <ты> --checklist <чеклист Day Close> --files <список обновлённых файлов> --summary <черновик итогов>`; коды возврата и правило «ненулевой код, кроме 10, не значит прошло» — там же. Не тот же поставщик, что закрывающий, — иначе вердикт со слабой независимостью. В Kimi Code (расширение VS Code) путь не проверен.
+**Запасной путь, если у агента нет запуска помощника с чистым контекстом** (нет субагента — Codex, Kimi Code): тот же, что в шаге 4 скилла `run-protocol` — `"$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" --stdlib-only)" "${IWE_SCRIPTS:-$HOME/IWE/scripts}/close_verify_fallback.py" --verifier <другой агент> --closer <ты> --checklist <чеклист Day Close> --files <список обновлённых файлов> --summary <черновик итогов>`; коды возврата и правило «ненулевой код, кроме 10, не значит прошло» — там же. Не тот же поставщик, что закрывающий, — иначе вердикт со слабой независимостью. В Kimi Code (расширение VS Code) путь не проверен.
 
 **EXTENSION POINT (checks):** `bash .claude/scripts/load-extensions.sh day-close checks` → exit 0: `Read` каждый файл → выполнить. Exit 1/3 (нет совпадений / нет каталога `extensions/` — штатно для новой установки, либо каталог повреждён) → пропустить молча.
 
