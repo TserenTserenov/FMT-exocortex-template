@@ -37,6 +37,11 @@ Refs: WP-NNN
 
 ### Added
 
+- [behavior] (#1684) The close-check fallback now tells the caller to state in the summary, as checkable facts, which checklist lines are not applicable without the close runner (runner not started, card age and size, РП status, onboarding and docs impact, where the new artifact lives); `run-protocol` step 4 and `day-close` step 11
+  - Цель: 20 · Результат: служебное — сверка закрытия в Codex и Kimi Code не проваливает пункты только из-за того, что во входе нет фактов о применимости; настоящие пробелы по-прежнему ловятся
+  - Как проверить: в первой живой пробе 26.11 без этих строк 8 из 9 пунктов остались неподтверждёнными, с ними 6 из 9 прошли, три упавших были настоящими пробелами сессии
+  - Как откатить: git revert слияния этого запроса
+
 - [behavior] (#1683) Agents that cannot start a sub-agent (Codex, Kimi Code) now have a fallback for the close-protocol check by a helper with a clean context (R23): `scripts/close_verify_fallback.py` sends the checklist, the changed file names and the summary through the peer-adapter filter to another agent's peer adapter and returns a strict JSON verdict with its own exit code per outcome (0 pass, 10 fail, 20 verifier unavailable, 21 filter refused, 22 bad reply, 23 environment denied). Both `run-protocol` (step 4) and `day-close` (step 11) describe the fallback in words
   - Цель: 20 · Результат: служебное — закрытие сессии и дня в Codex и Kimi Code больше не упирается в отсутствие субагента: сверку делает другой агент отдельным процессом, а при отказе среды шаг честно останавливается, а не засчитывается
   - Как проверить: `python3 -m pytest -q scripts/tests/test_close_verify_fallback.py` — 19 проверок проходят; живая проба: `python3 scripts/close_verify_fallback.py --verifier kimi --checklist … --files … --summary …` возвращает JSON с `verdict` и `independence`
