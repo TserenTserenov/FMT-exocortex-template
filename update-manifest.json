@@ -505,7 +505,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "7cbebd92f9003ece04fe744db3a5f845742e1ce20e5264573b4cfb5e42387341"
+      "sha256": "ee0561d213f0bf9714a8fe9dce6f938fa7589cd5ce5d142286fa14f8f8612e39"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -1025,7 +1025,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "6318378ecfcd3593181804512ffe648272e45cef9924e2e7aecd8b454c41fa28"
+      "sha256": "e4360c38b64132b72159023aba17f59f61f5b8542a2cfe460c07c813fac960a3"
     },
     {
       "path": "CLAUDE.md",
@@ -1069,7 +1069,7 @@
     },
     {
       "path": "docs/DATA-DOMAINS-REGISTRY.yaml",
-      "sha256": "f9f66aabdd81f5d6689660732cffcca8d8f27fa6cdda94f1b54f4a55d1fbe1d6"
+      "sha256": "1d06fc5ed4e09c7ff58bf7f0d1afa4911eae08fd8519dd2cfa71b5043fc0b57c"
     },
     {
       "path": "docs/DATA-POLICY.md",
@@ -1153,7 +1153,7 @@
     },
     {
       "path": "docs/adr/ADR-004-data-domain-map.md",
-      "sha256": "cfeab57782be82694fc2ceb74a7b788df3e8b54531dc2db4d1e33f3d490f65ea"
+      "sha256": "79da1be7bcc2f84c281b93e3e9494011091ca8b6154b3a0d1fbef258cdb7036b"
     },
     {
       "path": "docs/agent-coordination-manifest.md",
