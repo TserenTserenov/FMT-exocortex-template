@@ -105,7 +105,7 @@ TASK_COUNT=$(wc -l < "$SEEN_IDS_FILE" | tr -d ' ')
 vendor_cli_available() {
   local vendor="$1" override_var candidate base
   command -v "$vendor" >/dev/null 2>&1 && return 0
-  override_var="${vendor^^}_BIN"
+  override_var="$(printf %s "$vendor" | tr "[:lower:]" "[:upper:]")_BIN"
   candidate="${!override_var:-}"
   [ -n "$candidate" ] && [ -x "$candidate" ] && return 0
   case "$vendor" in
@@ -137,7 +137,7 @@ while IFS= read -r line || [ -n "$line" ]; do
   adapter="$ADAPTERS_DIR/${vendor}-peer-adapter.sh"
   [ -f "$adapter" ] && [ -x "$adapter" ] || fail_preflight "adapter missing or not executable: $adapter"
   if [ "${IWE_FANOUT_SKIP_CLI_CHECK:-}" != "1" ] && [ "$vendor" != "hermes" ]; then
-    vendor_cli_available "$vendor" || fail_preflight "CLI '$vendor' not found in PATH, in \$${vendor^^}_BIN or in the places the adapter also looks (needed by $adapter)"
+    vendor_cli_available "$vendor" || fail_preflight "CLI '$vendor' not found in PATH, in the <VENDOR>_BIN override or in the places the adapter also looks (needed by $adapter)"
   fi
 done < "$TASKS_FILE"
 
