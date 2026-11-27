@@ -57,8 +57,10 @@ done
 
 | Директория | Содержание |
 |------------|------------|
-| `docs/` | Долгоживущие документы: Strategy.md, Dissatisfactions.md, Session Agenda.md |
+| `docs/` | Долгоживущие документы: Strategy.md, Dissatisfactions.md, WP-REGISTRY.md, Backlog.md, Routing-Map.md (карта маршрутизации), Session Agenda.md |
 | `current/` | Регулярно обновляемые: WeekPlan (с секцией «Итоги W{N}»), DayPlan |
 | `archive/` | Старые планы и отчёты |
-| `inbox/` | Входящие заметки, черновики |
+| `inbox/` | Входящие заметки, черновики, карточки РП (`WP-<номер>/WP-<номер>.md`) |
 | `exocortex/` | Backup memory/ + CLAUDE.md |
+
+> **Ключевые места и что куда класть** — в личной карте маршрутизации `docs/Routing-Map.md`: стратегия, неудовлетворённости, реестр РП (`docs/WP-REGISTRY.md`), карточки РП (`inbox/WP-<номер>/WP-<номер>.md`), планы (`current/`), отложенное (`docs/Backlog.md`), входящие (`inbox/`). Карта — единственное место, где записано, куда у этого человека что класть; нет строки для материала — спроси и допиши её в карту.

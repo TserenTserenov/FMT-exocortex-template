@@ -869,7 +869,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "cc5db532775e69903c55d0fad12522756cbd2c1f48a05937a87d633b8eb0b00d"
+      "sha256": "e0ea3fc3a54445e80058aa7c34135f9f5663ee62f245ea9ea0a7fbfee8e58efc"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "efc11f15c3a8ae4a91ab0a74e0cb78e7547b0a59d360dabe8d7e164c862d2603"
+      "sha256": "9c7db8245d74b43a714db062e857e3efcd8f6df013e3e6830df7bb6fef583674"
     },
     {
       "path": "CLAUDE.md",
@@ -1761,7 +1761,7 @@
     },
     {
       "path": "memory/navigation.md",
-      "sha256": "a07ba9c2796b9d8b8203ed3c1c61120c6dbbe27ae1f5666a16d7b95edb710803"
+      "sha256": "bdd0fe35c6f91731b59a4207443295e6f8b8ee1cb0ee7fd0ef13a1ed259658df"
     },
     {
       "path": "memory/protocol-close.md",
@@ -2061,7 +2061,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/02-inbox.md",
-      "sha256": "b7fb515e0880ffa024a44696e9aad942125560a1ed8a4d8888007446412f8955"
+      "sha256": "fd9a92d41c40282639cc291749b8cb43f7f710cae99870a86a0a280eb6c655d0"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/03-dissatisfactions.md",
