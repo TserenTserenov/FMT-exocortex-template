@@ -81,7 +81,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "0429331e17e42273e20ff9350411b226643decb7954e19fa276cfc7b6d1b7be6"
+      "sha256": "82a63c47da1b3bea2c5a004eb0dcb145d58263c0d92e6cf294598bd43b443e00"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -236,6 +236,10 @@
       "sha256": "361afee4f84c5cb5a11615631e8187693813054c6f9175d9c436f686320628d3"
     },
     {
+      "path": ".claude/hooks/tests/test-codex-guard-adapter.py",
+      "sha256": "16e74087b18214df9102e59ca8facf3cbd25e2e49e08862902e02b65eb42f7de"
+    },
+    {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
       "sha256": "3a654e30e5b62d17eb0f405e69c60139eb7f966a636b4dce4552a579f8576a47"
     },
@@ -290,6 +294,10 @@
     {
       "path": ".claude/hooks/tests/test-destructive-mcp-guard-malformed-json.sh",
       "sha256": "2cde8950a400719a688132669aae108638e95ede9c59e37a916cc14bfa2e5f30"
+    },
+    {
+      "path": ".claude/hooks/tests/test-guard-readiness.sh",
+      "sha256": "c22c5b8a37b182b9bf3130bd1be5859b874ad79b8c8b0e3eca800340d380469c"
     },
     {
       "path": ".claude/hooks/tests/test-issue-1183-precompact-checkpoint.sh",
@@ -472,6 +480,10 @@
       "sha256": "f9784c2ac2aa91f566ef3fc8abcbadddc889917d72b5f205c3d000fabd729e60"
     },
     {
+      "path": ".claude/scripts/guard-readiness.sh",
+      "sha256": "64c7e0fff0fa448a2e712c8db37a2e9e351493d23aedbe8db487e5ce2dac3780"
+    },
+    {
       "path": ".claude/scripts/light-onboarding-state.sh",
       "sha256": "afa919acc131b8132e00081cd94749006d3d9c0acfd495463c019f869de5b856"
     },
@@ -505,7 +517,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "ee0561d213f0bf9714a8fe9dce6f938fa7589cd5ce5d142286fa14f8f8612e39"
+      "sha256": "c5096e2d0be7d54f608a04e7f2dc1c82a2f9cde8b053e1f653f96861dbcbbbfb"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -968,6 +980,14 @@
       "sha256": "54356facf8d596bad78889791927b0d8977d75a836cffbcc184d7611905af673"
     },
     {
+      "path": ".codex/hooks.json",
+      "sha256": "8fb1d6fee3864a63e5145efcab02c86f3528a7f0c75811dec283abffe74c7580"
+    },
+    {
+      "path": ".codex/hooks/guard_adapter.py",
+      "sha256": "faaeb9da2a08b93dd47d8a9372178ab0352a519d94fa93fa6e6b47ca812656b4"
+    },
+    {
       "path": ".githooks/commit-msg",
       "sha256": "4bc0f833362989055169a5343999d581d870fe2a9cb89ac6f90d227eea645946"
     },
@@ -997,7 +1017,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "dae112cd0df4117ea26d22da3b45909eee0fc0a3938e4d208ea7b24627696304"
+      "sha256": "93d859039915ab16fef5e48f984b567f2a4b3acd4a24d905bfa689f8e91da0cf"
     },
     {
       "path": ".gitignore",
@@ -1025,7 +1045,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e4360c38b64132b72159023aba17f59f61f5b8542a2cfe460c07c813fac960a3"
+      "sha256": "582befb3f25be8a44de59a4103378ecc739565d252278c5d893d7808c6638a7d"
     },
     {
       "path": "CLAUDE.md",
@@ -1061,7 +1081,7 @@
     },
     {
       "path": "docs/CHATGPT-CODEX-SETUP.md",
-      "sha256": "634a124429b20640a0c95f6a94a0f92985088d06810b0f426b4c150a79d207b8"
+      "sha256": "58d5f177ed06c5d07fe0852bb935afa30ff6732d2abd0350abcc1cf950904ec6"
     },
     {
       "path": "docs/CLOUD-SCHEDULER.md",
