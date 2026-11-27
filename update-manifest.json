@@ -945,7 +945,7 @@
     },
     {
       "path": "docs/adr/ADR-004-data-domain-map.md",
-      "sha256": "9761b6c186a10aa08e94a4e00814668b01e67db45168bfbf68bc38a83ead4347"
+      "sha256": "f66210b361d817ffe0e68c358923c3f945ab9cc016e5f8d2f6e15370ad2a86fd"
     },
     {
       "path": "docs/agent-coordination-manifest.md",
