@@ -405,6 +405,69 @@ verify_delivery_postcondition() {  # <scenario> <origin/$GIT_DEFAULT_BRANCH sha 
 # semaphore covering a path authorises it, so the model needs no session of its own and cannot
 # invent one (28.09: `--wp week-review-w39`). A housekeeping semaphore has no wp and is skipped by
 # the commit barrier: it grants rights, it never blocks anyone.
+# issue #1674: session-prep moves last week's files into archive/. A move done with plain `mv` and
+# committed by its new paths only leaves the deletions of the old paths uncommitted: HEAD then holds
+# both copies, and the run was still logged SUCCESS. A scenario listed here must not leave a NEW
+# uncommitted change in the governance checkout. Only paths that became dirty during the run count:
+# the checkout is shared, and a change somebody else left before the run is not this run's leftover.
+LEFTOVER_CHANGES_RC=78
+
+requires_clean_finish() {  # <scenario>; 0 = the scenario must leave no new uncommitted change
+    case "$1" in
+        session-prep) return 0 ;;
+    esac
+    return 1
+}
+
+# -> "XY path" per changed path in $WORKSPACE (raw path, no quoting), sorted; non-zero if git failed.
+# Read from the NUL-separated form: the line form quotes paths with spaces and folds a rename into
+# "old -> new". A staged rename yields both of its paths, because the runner unstages everything after
+# the model and the same rename then reads as a deletion plus an untracked file.
+dirty_paths() {
+    local raw_file rec xy orig lines=""
+    raw_file=$(mktemp "${TMPDIR:-/tmp}/iwe-strategist-dirty.XXXXXX") || return 1
+    if ! git -C "$WORKSPACE" status --porcelain -z --untracked-files=normal > "$raw_file" 2>>"$LOG_FILE"; then
+        rm -f "$raw_file"
+        return 1
+    fi
+    while IFS= read -r -d '' rec; do
+        xy="${rec:0:2}"
+        lines="$lines$xy ${rec:3}"$'\n'
+        case "$xy" in
+            R*|C*) IFS= read -r -d '' orig && lines="$lines$xy $orig"$'\n' ;;
+        esac
+    done < "$raw_file"
+    rm -f "$raw_file"
+    printf '%s' "$lines" | LC_ALL=C sort
+}
+
+# <scenario> <dirty_paths before the run> <"ok" if that snapshot was taken>; 0 = clean finish or not required.
+# Compares by path, not by the status letters: the runner unstages everything after the model, so a
+# path staged before the run reads as unstaged afterwards without being a new change.
+verify_no_leftover_changes() {
+    local scenario="$1" before="$2" before_ok="$3" after line path new=""
+    requires_clean_finish "$scenario" || return 0
+    if [ "$before_ok" != ok ]; then
+        log "LEFTOVER scenario: $scenario -- состояние рабочей копии перед запуском прочитать не удалось, проверить, всё ли сохранено, нельзя"
+        return 1
+    fi
+    if ! after=$(dirty_paths); then
+        log "LEFTOVER scenario: $scenario -- git status после запуска не удался, проверить, всё ли сохранено, нельзя"
+        return 1
+    fi
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        path="${line:3}"
+        printf '%s\n' "$before" | cut -c4- | grep -qxF -- "$path" || new="$new$line"$'\n'
+    done <<< "$after"
+    [ -n "$new" ] || return 0
+    log "LEFTOVER scenario: $scenario -- после запуска в рабочей копии остались несохранённые изменения, которых до запуска не было; перенос в archive/ записан не целиком (удаление старого пути не попало в коммит?). Сохраните их отдельным коммитом (git add <путь>; git commit):"
+    while IFS= read -r line; do
+        [ -n "$line" ] && log "LEFTOVER   $line"
+    done <<< "$new"
+    return 1
+}
+
 SESSION_OPEN_FAILED_RC=71
 RUNNER_SESSION_OPEN=0
 RUNNER_SESSION_CLEANUP_REGISTERED=0
@@ -926,6 +989,11 @@ ${prompt}"
     # WP-561 Phase 25: origin/main before the model starts, the reference point for the delivery postcondition.
     local delivery_pre_origin
     delivery_pre_origin=$(delivery_baseline "$command_file") || { log "ERROR: не удалось прочитать базу доставки"; return 1; }
+    # issue #1674: what was already uncommitted before the model starts is not this run's leftover.
+    local dirty_before="" dirty_before_ok=""
+    if requires_clean_finish "$command_file"; then
+        dirty_before=$(dirty_paths) && dirty_before_ok=ok
+    fi
 
     if ! open_runner_session "$command_file"; then
         log "FAILED scenario: $command_file (rc=$SESSION_OPEN_FAILED_RC) -- сессия охраны не открыта (причина в строках выше), модель не запускалась"
@@ -1013,6 +1081,9 @@ ${prompt}"
     # on it, so an undelivered run must not mark the day done (a manual rerun stays possible).
     if [ $rc -eq 0 ] && ! verify_delivery_postcondition "$command_file" "$delivery_pre_origin"; then
         rc=$DELIVERY_POSTCONDITION_RC
+    fi
+    if [ $rc -eq 0 ] && ! verify_no_leftover_changes "$command_file" "$dirty_before" "$dirty_before_ok"; then
+        rc=$LEFTOVER_CHANGES_RC
     fi
     if [ $rc -eq 0 ]; then
         log "SUCCESS scenario: $command_file"
