@@ -977,7 +977,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "19c0f40da7cfbf750e47363ca1502d65a85488759156c6d9719383e7918e065b"
+      "sha256": "1d3f1c8256b9106991a10e087e3ceaa7cc930f6654c29c3acb8e536e01021e35"
     },
     {
       "path": ".gitignore",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "46c996ea96adc097e3fdc9552a552b673acf42cbafdca70b39a5c0299a5ca9a7"
+      "sha256": "4f152e89596858c0160de38f1c40e581e6e43a9143866dfeaeff7f6fcf87daa8"
     },
     {
       "path": "CLAUDE.md",
@@ -2029,7 +2029,7 @@
     },
     {
       "path": "roles/strategist/prompts/session-prep.md",
-      "sha256": "ab969406c84903855bbf763334363f54ef3c879adfc466dc328611c971fdc035"
+      "sha256": "7c4856d52adbe61565e4aa8d13e136f26800cac5821c55410c666981cf18d187"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-monthly.md",
@@ -2141,7 +2141,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "191364c8fe0016b2622b846c0c308d590f84a436fa8678246af4763bfe80a3dd"
+      "sha256": "6e2c17fe2f46e4d8f1cde8caa5eadb22d8762c6a39668649be9cc80f1226d63d"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -4019,6 +4019,7 @@
     "setup/test-next-rc-tag.sh",
     "setup/test-rc-upgrade-from-release.sh",
     "setup/test-scheduler-interval-slack.sh",
+    "setup/test-session-prep-leftover-changes.sh",
     "setup/test-strategist-isolated-scenarios.sh",
     "setup/test-strategist-mark-done.sh",
     "setup/test-strategist-notereview-migration.py",
