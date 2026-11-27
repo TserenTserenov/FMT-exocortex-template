@@ -2,7 +2,7 @@
 # see DP.SC.153
 # НЕ редактировать вручную — перегенерировать через generate-skills-catalog.sh
 #
-generated: 2026-11-21T11:05:24Z
+generated: 2026-11-27T21:10:09Z
 skills_dir: .claude/skills
 
 skills:
@@ -48,6 +48,7 @@ skills:
     - extend
     - verify
     - bottleneck-pick
+    - project-analysis
     - archgate
     - decompose
   - id: artifactor
@@ -62,6 +63,7 @@ skills:
     depends_on: []
     invoked_by:
     - protocol-open
+    - project-analysis
     - artifactor
     - wp-new
   - id: audit-docs
@@ -100,7 +102,6 @@ skills:
         - /author-mode
     depends_on: []
     invoked_by:
-    - CLAUDE.md
     - author-mode
   - id: bottleneck-pick
     name: "bottleneck-pick"
@@ -114,6 +115,7 @@ skills:
     depends_on: []
     invoked_by:
     - bottleneck-pick
+    - project-analysis
     - repo-new
     - platform-bottleneck
   - id: check-secret
@@ -158,6 +160,7 @@ skills:
     - peer-conversation
     - day-close
     - setup-wakatime
+    - project-analysis
     - audit-installation
     - kimi-peer-writer
   - id: day-open
@@ -178,6 +181,7 @@ skills:
     - peer-conversation
     - day-close
     - week-close-pilot
+    - project-analysis
     - kimi-peer-writer
     - day-open
     - onboarding
@@ -194,6 +198,7 @@ skills:
     invoked_by:
     - protocol-open
     - bottleneck-pick
+    - project-analysis
     - decompose
   - id: diagnose
     name: "diagnose"
@@ -208,6 +213,7 @@ skills:
     invoked_by:
     - org-dev
     - diagnose
+    - project-analysis
     - pack-creator
   - id: discovery-session
     name: "discovery-session"
@@ -221,6 +227,7 @@ skills:
     depends_on: []
     invoked_by:
     - discovery-session
+    - strategy-session
   - id: extend
     name: "extend"
     description: "IWE extensibility catalog: what can be customized, which extension points exist, which parameters are available, how to install a third-party extension."
@@ -375,7 +382,7 @@ skills:
   - id: mentor-participant-brief
     name: "mentor-participant-brief"
     description: "Помощник наставника МИМ: по имени, нику или пересланному сообщению участника находит его среди потоков, доступных этому наставнику, собирает одну сводку по обязательному шаблону (переписка, заметки, ступень, квалификация, активность, чек-лист, баллы — у каждого поля источник и дата или причина отсутствия), предлагает черновик ответа и после подтверждения фактической отправки сохраняет текст заметкой. Используй, когда наставник или админ МИМ пишет о конкретном участнике практикума или консультации: «помоги ответить ученику…», «что известно о …», «подготовь ответ участнику», пересылает сообщение участника."
-    version: 0.3.3
+    version: 0.3.4
     layer: L1
     status: experimental
     triggers:
@@ -384,6 +391,7 @@ skills:
     depends_on: []
     invoked_by:
     - mentor-participant-brief
+    - project-analysis
   - id: month-close
     name: "month-close"
     description: "Протокол закрытия месяца (Month Close). Стадия 7 каскада ВДВ v9 (PD.METHOD.008). Запускается в первый Пн месяца, до Strategy Session."
@@ -413,6 +421,7 @@ skills:
         - /onboarding
     depends_on: []
     invoked_by:
+    - CLAUDE.md
     - diagnose
     - onboarding
   - id: org-dev
@@ -507,6 +516,18 @@ skills:
     depends_on: []
     invoked_by:
     - platform-bottleneck
+  - id: project-analysis
+    name: "project-analysis"
+    description: "Анализ проекта (Аудитор VR.R.002, VR.SC.007): за один проход проверяет проект по блоку «дела и проекты» Чек-листа защиты этапа S0–S3 программы «Личное развитие», ставит уровень со свидетельством по каждому пункту, называет три главных пробела и по каждому даёт направление «роль + метод» (скилл — если есть). Используй, когда участник, наставник или автор просит проверить или проанализировать конкретный проект."
+    version: 0.6.0
+    layer: L3
+    status: experimental
+    triggers:
+      slash:
+        - /project-analysis
+    depends_on: []
+    invoked_by:
+    - project-analysis
   - id: repo-new
     name: "repo-new"
     description: "Гейт создания любого нового репозитория IWE (экосистемного или личного пространства). Проводит запрос через: классификацию намерения (Pack / SpacePlan / именованный проект / экосистемный DS), проверку имени и класса, разметку данных (типы 2.1-2.4, карантин), объявление писатель/владелец/читатели, решение о публичности, обязательный Decision Gate (по умолчанию — одобрение пилота, для CI — ограниченное делегирование), затем исполнение (создание, регистрация, развёртывание скелета). Используй когда пилот хочет создать новый репозиторий, или спрашивает, куда и как разместить новый вид данных. Не для расширения существующего репозитория (→ Repo-Touch/Residency Gate) и не для Pack-репозиториев (делегируется `/pack-new`)."
@@ -571,11 +592,12 @@ skills:
     invoked_by:
     - verify-hypotheses
     - mentor-participant-brief
+    - project-analysis
     - skill-creator
     - repo-new
   - id: strategy-session
     name: "strategy-session"
-    description: "Стратегическая сессия — диспетчер. День-0 (маркер IWE-INITIAL-NEEDED или нет Strategy.md/WeekPlan) → initial flow (цели, неудовлетворённости, первый WeekPlan). Первая сессия календарного месяца или прямая просьба пилота о полной сессии → полный monthly flow (стратегическая сверка + линза калибра). Остальные дни → короткий weekly flow (требует черновик от session-prep). Триггеры — «проведём стратегическую сессию», «первая стратегическая сессия», «strategy session», «давай стратегировать»."
+    description: "Стратегическая сессия — диспетчер. День-0 (маркер IWE-INITIAL-NEEDED или нет Strategy.md/WeekPlan) → initial flow (разметка принесённого, цели, неудовлетворённости, первый WeekPlan). Первая сессия календарного месяца или прямая просьба пилота о полной сессии → полный monthly flow (стратегическая сверка + линза калибра). Остальные дни → короткий weekly flow (требует черновик от session-prep). Триггеры — «проведём стратегическую сессию», «первая стратегическая сессия», «strategy session», «давай стратегировать»."
     version: 1.0.0
     layer: L1
     status: active
@@ -587,6 +609,7 @@ skills:
     - extend
     - discovery-session
     - strategy-session
+    - project-analysis
   - id: think
     name: "think"
     description: "ADI-cycle structured reasoning (Abduction-Deduction-Induction-Audit-Decide). Use for complex decisions when multiple hypotheses need to be considered."
@@ -596,7 +619,8 @@ skills:
     triggers:
       slash: []
     depends_on: []
-    invoked_by: []
+    invoked_by:
+    - project-analysis
   - id: transcribe
     name: "transcribe"
     description: "Transcribe audio/video files via MLX Whisper (Apple Silicon). Usage: /transcribe path/to/file.mp3"
@@ -624,6 +648,7 @@ skills:
     depends_on: []
     invoked_by:
     - vdv
+    - project-analysis
     - skill-creator
     - repo-new
   - id: verify-hypotheses
@@ -658,6 +683,7 @@ skills:
     - day-close
     - verify
     - mentor-participant-brief
+    - project-analysis
     - kimi-peer-writer
     - pack-new
     - skill-creator
@@ -720,6 +746,7 @@ skills:
         - /wp-new
     depends_on: []
     invoked_by:
+    - CLAUDE.md
     - strategy-session
     - artifactor
     - wp-new
