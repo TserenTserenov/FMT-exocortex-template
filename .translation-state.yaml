@@ -1,5 +1,178 @@
-files_translated: []
-last_run_utc: '2026-11-27T12:47:51Z'
-last_synced_sha: cd1b326bd913ed28ea80c5feb35349bf8e8917bf
+files_translated:
+- docs/adr/ADR-004-data-domain-map.md
+last_run_utc: '2026-11-27T15:58:07Z'
+last_synced_sha: a05b126a4cea1b055747f7453878b19e64a6df43
 schema_version: 1
-unapproved_terms: []
+unapproved_terms:
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Artifact
+  term_ru: Артефакт
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Knowledge
+  term_ru: Знание
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Infrastructure
+  term_ru: Инфраструктура
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Concept
+  term_ru: Концепция
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Method
+  term_ru: Метод
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Migration
+  term_ru: Миграция
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Memory
+  term_ru: Память
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Flow/Stream
+  term_ru: Поток
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Projection
+  term_ru: Проекция
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Profile
+  term_ru: Профиль
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Repository
+  term_ru: Репозиторий
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Session
+  term_ru: Сессия
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Script
+  term_ru: Скрипт
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Requirement
+  term_ru: Требование
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Template
+  term_ru: Шаблон
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Requirement
+  term_ru: Необходимость
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: local-glossary
+  term_en: Work
+  term_ru: Работа
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: WP-526 (used as work-product identifier consistent with WP-NNN pattern)
+  term_ru: РП-526
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: Exocortex
+  term_ru: экзокортекс
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: EMOGSSB profile
+  term_ru: профиль ЭМОГССБ
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: Security (as a critical architectural characteristic)
+  term_ru: Безопасность
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: Evolvability (as a critical architectural characteristic)
+  term_ru: Эволюционируемость
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: F2/F4/F5 (phase labels in WP-526)
+  term_ru: Ф2/Ф4/Ф5
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: Stage 6
+  term_ru: Этап 6
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: peer session
+  term_ru: пир-сессия
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: 'Status:'
+  term_ru: 'Статус:'
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: 'Date:'
+  term_ru: 'Дата:'
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: 'Context:'
+  term_ru: 'Контекст:'
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: recommended
+  term_ru: рекомендуемую
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: 'Related document:'
+  term_ru: 'Смежный документ:'
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: semantics (added 2026-08-18, WP-526).
+  term_ru: Семантика  (добавлено 2026-08-18, WP-526).
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: 'Expansion precedent: ADR-006'
+  term_ru: 'Прецедент расширения: ADR-006'
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: Amendment 2026-08-18 (pilot decision, WP-526 F5, third pass evening 2026-08-18)
+    — domains 2.5/2.6 moved from  to .
+  term_ru: Поправка 2026-08-18 (решение пилота, WP-526 Ф5, третий заход 18.08 вечер)
+    — домены 2.5/2.6 переехали из  в .
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: Amendment 2026-11-27 (pilot decisions, WP-526 F14; revision of the August
+    decision per method DP.M.643 "IWE Structure Formation Method", PACK-digital-platform).
+  term_ru: Поправка 2026-11-27 (решения пилота, WP-526 Ф14; пересмотр решения августа
+    по методу DP.M.643 «Метод формирования структуры IWE», PACK-digital-platform).
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: Codes 2.5/2.6 removed.
+  term_ru: Коды 2.5/2.6 сняты.
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: Home for raw knowledge 2.3.
+  term_ru: Дом сырых знаний 2.3.
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: Starter storage set.
+  term_ru: Стартовый набор хранилищ.
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: Dialogue storage for a new user.
+  term_ru: Хранилище диалогов новичка.
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: This ADR does not plan or provide automatic migration
+  term_ru: Автоматического переноса нет и не планируется этим ADR
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: 'Bug found along the way (not an imaginary risk — already in the code):'
+  term_ru: 'Найденный попутно баг (не выдуманный риск — уже в коде):'
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: 'Resulting behavior ( in ):'
+  term_ru: 'Итоговое поведение ( в ):'
+- file: docs/adr/ADR-004-data-domain-map.md
+  source: model
+  term_en: 'Accepted residual risk:'
+  term_ru: 'Осознанно принятый остаточный риск:'
