@@ -977,7 +977,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "1d3f1c8256b9106991a10e087e3ceaa7cc930f6654c29c3acb8e536e01021e35"
+      "sha256": "7a084b138741291dcfdd9ccc5db5ba4daa6e23b62e69447d5be9d327a38aa1bf"
     },
     {
       "path": ".gitignore",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "c6aa554bc2441ed0d9d7a309004eefcc1d4ee1d3a7b7e2b637b86559083a43f2"
+      "sha256": "e62bd89db89b1a2b735f82baf3d8402ecc8467fc6f97fc03a4609447d3102e7b"
     },
     {
       "path": "CLAUDE.md",
@@ -3609,7 +3609,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "53632056797f04910c37f9bbcabfe5236bd440bd9ff15893963301304b680399"
+      "sha256": "5695fec50b03e5debc14a2dc4a81a7fbf66afab83d4dadffc1b6d2ba2029b95e"
     }
   ],
   "excluded_paths": [
@@ -4039,6 +4039,7 @@
     "setup/test-update-linux-scheduler.sh",
     "setup/test-update-manifest-fetch.sh",
     "setup/test-update-modified-hook.sh",
+    "setup/test-update-modified-skill.sh",
     "setup/test-update-plan-executor.sh",
     "setup/test-update-publish-gate-delivery.sh",
     "setup/test-update-rc-channel.sh",
