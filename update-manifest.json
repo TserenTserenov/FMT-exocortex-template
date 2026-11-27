@@ -917,7 +917,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "bb995e82ab69d944b31730aba0b9cc9f833d27cbafd372fc22b55881865a4feb"
+      "sha256": "fdf4593df14dc6fa532d542c1709b7b76517f02e278beaaebfeddd015408d1d5"
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "0c0998d21a261105890f9c4a71480149aa13aaee76dfaf5c290a714e6ae8184f"
+      "sha256": "40849f692ce0d28d68aa6a108603e086dd11d4e6c5e9cd9e3d71cdb63198c33d"
     },
     {
       "path": "CLAUDE.md",
@@ -2421,7 +2421,7 @@
     },
     {
       "path": "scripts/check-repo-residue.sh",
-      "sha256": "1e432744dc1cafba8a4d95ec7ef8d8a2cd29e8cf9a716f02f7a2dca7112829ba"
+      "sha256": "48874d2056865d2e49b6826bac14bdfb84f6714ad5d485adf6f5dec9259218a6"
     },
     {
       "path": "scripts/check-script-collisions.sh",

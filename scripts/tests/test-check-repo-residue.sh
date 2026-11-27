@@ -127,6 +127,18 @@ check "нет серверной копии — сказано прямо" expec
 n=$(printf '%s' "$out" | grep -c "ветка-без-публикации noremote" || true)
 [ "$n" -eq 0 ] && pass "ветки этого репозитория не дублируют находку" || fail "веток продублировано: $n"
 
+echo "6a. Ветка с именем папки репозитория не теряется"
+mkrepo "$ROOT/repos/dirname" "https://example.com/dirname.git"
+mkdir -p "$ROOT/repos/dirname/docs"
+printf 'x\n' > "$ROOT/repos/dirname/docs/a.txt"
+git -C "$ROOT/repos/dirname" add docs/a.txt
+git -C "$ROOT/repos/dirname" commit -q -m "папка docs"
+git -C "$ROOT/repos/dirname" push -q origin HEAD 2>/dev/null
+git -C "$ROOT/repos/dirname" checkout -q -b docs
+commit_in "$ROOT/repos/dirname" "неопубликованный коммит в ветке docs"
+out=$(run)
+check "ветка с именем папки найдена" expect-found "ветка-без-публикации docs: 2 коммитов" "$out"
+
 echo "7. Файл принятых решений с лишним пробелом"
 printf 'spaces \tданные-вне-git\tplain.dump \tпроверка пробела\t2030-01-01\n' > "$ACCEPTED"
 out=$(run)
