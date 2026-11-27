@@ -42,6 +42,11 @@ Refs: WP-NNN
 
 ### Added
 
+- [behavior] (#1694) Method skills `vdv` and `integration-gate` now tell the agent to show the steps of the method under separate headings in their order and to stop at a step that waits for the user instead of showing later steps as done (the "show the stages" line, decision "in the skill itself"); `vdv` build step 5 now points to audit steps 1-4 (it said 1-5, audit has four steps)
+  - Цель: 20 · Результат: служебное — в Codex ответы по `vdv` и `integration-gate` показывают шаги метода и останавливаются там, где нужен ответ человека; проверить исполнение метода проще
+  - Как проверить: в Codex без Claude дать `/vdv audit` описание с двумя конечными результатами — в ответе заголовки шагов 1 и 2 и вопрос, какой результат считать обещанием, без прогона шести принципов; `/integration-gate` на новый инструмент без подробностей — четыре заголовка шагов, шаги 2–4 «не выполнен: ожидает шага N». Проба 27.11 (Codex 0.169, 4 сценария): со строкой шаги и остановки на месте во всех четырёх, без строки шаги свёрнуты во всех четырёх и в аудите с двумя результатами Codex не остановился
+  - Как откатить: git revert слияния этого запроса; навыки возвращаются к прежнему тексту без строки
+
 - [behavior] (#1687) Step-by-step instruction (version 1) for moving IWE skills to Codex in `docs/AGENT-VENDOR-SETUP.md` (links, check, a task by a skill, closing without Claude through the close-check fallback, Kimi Code in the terminal); `run-protocol` now runs on Codex (`runs_on` gets `codex`, so install and update put its link), because its close-check fallback passed a live probe; `day-close` and the other closings follow after their own probes
   - Цель: 20 · Результат: служебное — человек без участия автора по инструкции переносит навыки IWE в Codex и закрывает сессию без Claude; у возможности появляется версия инструкции для записи в учёте возможностей
   - Как проверить: пройти шаги 1-4 инструкции на чистой установке — в `~/IWE/.agents/skills` есть `think`, `archgate`, `decompose`, `run-protocol`, `wp-new`; `python3 scripts/skill_agents.py --check .claude/skills` — «OK»
