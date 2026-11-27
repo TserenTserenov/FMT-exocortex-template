@@ -2061,7 +2061,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/02-inbox.md",
-      "sha256": "fd9a92d41c40282639cc291749b8cb43f7f710cae99870a86a0a280eb6c655d0"
+      "sha256": "800c0888fe79da9e1406eadc3a2d513d9ae00bb5a38978c1804067936b7e5623"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/03-dissatisfactions.md",
