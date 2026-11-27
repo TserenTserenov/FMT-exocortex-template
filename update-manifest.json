@@ -2537,7 +2537,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "5622bbed694a3f442ccd817c0acd75efaa9bf2bd4307cfb04570f75634618efc"
+      "sha256": "1d8459cd8a824c716ce4559ae117d2907e5341ed3b0dbb7060071d323a2b3f4a"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -2653,7 +2653,7 @@
     },
     {
       "path": "scripts/install-hooks.sh",
-      "sha256": "80f856ba356a49b4d2d0635235b9edb8bd725178a687c0fce23af2e8b44184e8"
+      "sha256": "bd9cbb7dbce1d54fda98df22e1a4393c7a09ebaa04cf9b852783c641c9f14113"
     },
     {
       "path": "scripts/isolate-push.sh",
@@ -2665,7 +2665,7 @@
     },
     {
       "path": "scripts/iwe-audit.sh",
-      "sha256": "aa57ee872c4052a49d801f01556b977dba09442798a32345c565c07498a0733e"
+      "sha256": "de4fe05eb4b9753e8766be3ec65d8a51a03fc736dc633d25b5111b4519964f5e"
     },
     {
       "path": "scripts/iwe-backup-check.sh",
@@ -3197,7 +3197,7 @@
     },
     {
       "path": "scripts/tests/test_install_hooks.py",
-      "sha256": "afe084887934053e9208edd7702b9e25e14cf855dc17fc513012aeb0cd83aacd"
+      "sha256": "b5c36f8d133293a6ab30f91bac37aacec290741bd7b8b591090721f68e176586"
     },
     {
       "path": "scripts/tests/test_issue_1032_strategy_session_offline.sh",
@@ -3457,7 +3457,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "c5c390913913e19efc70f757c6ead650cb48d1eced8d04f62bebac2a5f68ea60"
+      "sha256": "62ab0a4dbe9f971b3a9f8509013d2955de3b512172d9de1d94ae121a120a2112"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
@@ -3485,7 +3485,7 @@
     },
     {
       "path": "seed/strategy/scripts/install-hooks.sh",
-      "sha256": "80f856ba356a49b4d2d0635235b9edb8bd725178a687c0fce23af2e8b44184e8"
+      "sha256": "bd9cbb7dbce1d54fda98df22e1a4393c7a09ebaa04cf9b852783c641c9f14113"
     },
     {
       "path": "seed/strategy/scripts/isolate-push.sh",
@@ -3577,7 +3577,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "9636c9998fdc859f8d2fe035dd8b610e061892739520e0ff8cae21411befb24d"
+      "sha256": "f0a86fbc34a679dde09a1b6f0d403a13c7d1e1961cdb36672ad71b2e89c47932"
     },
     {
       "path": "setup/lib/apply-op.sh",
@@ -3609,7 +3609,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "8ba62dd3bded2ae3071a20241b73e093f887bef6ee6db35e2d31bea77ac1bd3c"
+      "sha256": "53632056797f04910c37f9bbcabfe5236bd440bd9ff15893963301304b680399"
     }
   ],
   "excluded_paths": [
@@ -3802,6 +3802,7 @@
     "scripts/tests/test_issue_1577_1578_isolate_root.sh",
     "scripts/tests/test_issue_1606_name_registry.sh",
     "scripts/tests/test_issue_1625_runtime_warning.sh",
+    "scripts/tests/test_issue_1688_hooks_path_kept.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",

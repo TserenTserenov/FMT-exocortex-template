@@ -1514,7 +1514,13 @@ fi
 # ============================================
 if [ -d "$DS_STRATEGY/.githooks" ] && [ -n "$(ls -A "$DS_STRATEGY/.githooks" 2>/dev/null)" ]; then
   CURRENT_HOOKS_PATH=$(git -C "$DS_STRATEGY" config core.hooksPath 2>/dev/null || echo "")
-  if [ "$CURRENT_HOOKS_PATH" != ".githooks" ]; then
+  # issue #1688: self-heal only an unset value (a fresh or reprovisioned clone).
+  # A value the user set (.husky, a shared hooks folder) is their choice: name
+  # it in the log, do not replace it; install-hooks.sh keeps it as well.
+  if [ -n "$CURRENT_HOOKS_PATH" ] && [ "$CURRENT_HOOKS_PATH" != ".githooks" ]; then
+    echo "=== 1.2. Git hooks: core.hooksPath='$CURRENT_HOOKS_PATH' set by the user -- kept; platform checks in .githooks/ (force-push guard, WP inbox close gate) are not active ==="
+    echo "  To switch them on: git -C \"$DS_STRATEGY\" config --local core.hooksPath .githooks"
+  elif [ -z "$CURRENT_HOOKS_PATH" ]; then
     echo "=== 1.2. Git hooks: core.hooksPath='$CURRENT_HOOKS_PATH' (expected .githooks) — self-healing ==="
     if bash "$SCRIPT_HOME/install-hooks.sh" "$DS_STRATEGY" >/dev/null 2>&1; then
       echo "  Fixed: core.hooksPath=.githooks (force-push guard now active)"

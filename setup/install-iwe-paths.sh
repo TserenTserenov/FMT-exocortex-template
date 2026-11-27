@@ -246,11 +246,21 @@ fi
 
 # Auto-enable pre-commit hooks for IWE repos that have .githooks/
 # (Claude peer-review, 2026-05-26 — BFS3)
+# issue #1688: only an unset core.hooksPath is wired. A value the user set
+# (local or global, e.g. .husky or a shared hooks folder) is kept and named,
+# never replaced: replacing it silently switched off the user's own hooks.
 for repo_dir in "$WORKSPACE_DIR"/* "$WORKSPACE_DIR"/*/*; do
     [ -d "$repo_dir/.git" ] || continue
     [ -d "$repo_dir/.githooks" ] || continue
-    if [ "$(git -C "$repo_dir" config --local core.hooksPath 2>/dev/null)" != ".githooks" ]; then
-        git -C "$repo_dir" config --local core.hooksPath .githooks
-        $QUIET || echo "  ✓ $repo_dir → core.hooksPath=.githooks"
-    fi
+    current_hooks_path=$(git -C "$repo_dir" config --get core.hooksPath 2>/dev/null) || current_hooks_path=""
+    case "$current_hooks_path" in
+        .githooks|.githooks/|./.githooks|./.githooks/) ;;
+        "")
+            git -C "$repo_dir" config --local core.hooksPath .githooks
+            $QUIET || echo "  ✓ $repo_dir → core.hooksPath=.githooks"
+            ;;
+        *)
+            echo "  ⚠ $repo_dir: core.hooksPath уже задан («${current_hooks_path}») — оставлен как есть; проверки из .githooks/ в нём не активны. Включить: git -C \"$repo_dir\" config --local core.hooksPath .githooks"
+            ;;
+    esac
 done
