@@ -237,7 +237,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-codex-guard-adapter.py",
-      "sha256": "53a38c7dd8bd990dfb9b2045e679e8d58204c7f64cabd408e73e2f172e19d271"
+      "sha256": "16e74087b18214df9102e59ca8facf3cbd25e2e49e08862902e02b65eb42f7de"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
@@ -965,7 +965,7 @@
     },
     {
       "path": ".codex/hooks/guard_adapter.py",
-      "sha256": "493ac737eb8f0b9384c1afdc64ac812f6ac5027dfcfafb0c16c53cb79884897a"
+      "sha256": "faaeb9da2a08b93dd47d8a9372178ab0352a519d94fa93fa6e6b47ca812656b4"
     },
     {
       "path": ".githooks/commit-msg",

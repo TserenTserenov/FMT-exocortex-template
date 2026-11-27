@@ -18,8 +18,9 @@ The copy must end where Codex's write ends, so the adapter accepts only what it 
 Codex does: a hunk or an "@@" anchor is placed only by an exact line match, which Codex also tries
 first from the same position. Codex's looser matches (trailing or all spacing, look-alike characters)
 could land elsewhere, so a hunk that needs one is a deny, as is anything else the adapter cannot read
-unambiguously. A patch sent through the shell is read only when the command is apply_patch itself;
-behind cd or another command the paths would be relative to a folder the adapter does not know.
+unambiguously. Through the shell only `apply_patch <<'EOF'` alone, with a quoted delimiter, is read;
+any other command that names apply_patch is a deny (cd, expansion, a pipe or a file could make Codex
+write a path or text the adapter does not see).
 
 The guard may answer in any of the Claude Code forms: exit 2 with a reason on stderr, or exit 0 with
 JSON permissionDecision "deny"/"ask", decision "block" or continue false. Codex has no prompt for
@@ -40,7 +41,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DEADLINE = 50  # seconds for the whole call, below the 60 s hook timeout in .codex/hooks.json
-SHELL_PATCH = re.compile(r"(?s)\A\s*apply_?patch\b[^\n]*\n(\*\*\* Begin Patch\n.*\n\*\*\* End Patch)")
+SHELL_PATCH = re.compile(r"(?s)\A\s*apply_?patch\s*<<\s*(['\"])(\w+)\1[ \t]*\n(\*\*\* Begin Patch\n.*\n\*\*\* End Patch)\n\2\s*\Z")
+LENIENT = re.compile(r"(?s)\A\s*<<\s*(['\"]?)(\w+)\1[ \t]*\n(.*)\n\2\s*\Z")
 PATCH_WORD = re.compile(r"\bapply_?patch\b")
 
 
@@ -64,6 +66,9 @@ def answer(event, reason):
 
 def parse_patch(text):
     """[{op, path, move, add_lines, chunks}]; a chunk is {anchor, lines: [(kind, text)], eof}."""
+    wrapped = LENIENT.match(text)
+    if wrapped:  # Codex accepts a patch wrapped in <<'EOF' ... EOF inside apply_patch itself
+        text = wrapped.group(3)
     lines = [line[:-1] if line.endswith("\r") else line for line in text.strip().split("\n")]
     if len(lines) < 2 or lines[0].strip() != "*** Begin Patch" or lines[-1].strip() != "*** End Patch":
         raise AdapterError("заплатка не обрамлена строками «*** Begin Patch» и «*** End Patch»")
@@ -77,16 +82,14 @@ def parse_patch(text):
                                         ("update", "*** Update File: ")) if head.startswith(m)), None)
         if op is None:
             raise AdapterError(f"строка «{head[:60]}» не заголовок файла")
-        section = {"op": op, "path": head.split(": ", 1)[1].strip(), "move": None, "add_lines": [], "chunks": []}
-        if not section["path"]:
-            raise AdapterError("в заголовке файла нет пути")
+        section = {"op": op, "path": header_path(head.split(": ", 1)[1]), "move": None, "add_lines": [], "chunks": []}
         if op == "add":
             while i < len(body) and body[i].startswith("+"):
                 section["add_lines"].append(body[i][1:])
                 i += 1
         elif op == "update":
             if i < len(body) and body[i].startswith("*** Move to: "):
-                section["move"] = body[i][len("*** Move to: "):].strip()
+                section["move"] = header_path(body[i][len("*** Move to: "):])
                 i += 1
             i = parse_chunks(body, i, section["chunks"])
             if not section["chunks"]:
@@ -95,6 +98,20 @@ def parse_patch(text):
     if not sections:
         raise AdapterError("в заплатке нет файлов")
     return sections
+
+
+def header_path(value):
+    """The path of a header as Codex takes it: everything after the marker, right-trimmed.
+
+    Codex keeps leading spaces: " /../x" is a relative path for it (the segment " " and then ".."),
+    while a stripped "/../x" points outside the workspace. Such a path is refused, not guessed.
+    """
+    path = value.rstrip()
+    if not path:
+        raise AdapterError("в заголовке файла нет пути")
+    if path[0].isspace():
+        raise AdapterError("путь в заголовке начинается с пробела")
+    return path
 
 
 def parse_chunks(body, i, chunks):
@@ -106,7 +123,7 @@ def parse_chunks(body, i, chunks):
             anchor = line[3:].rstrip() if line.startswith("@@ ") else ""  # leading spaces kept, as Codex
             current = {"anchor": anchor or None, "lines": [], "eof": False}
             chunks.append(current)
-        elif line == "*** End of File" and current is not None:
+        elif line.rstrip() == "*** End of File" and current is not None:
             current["eof"] = True
         elif line[:1] in (" ", "+", "-") or line == "":
             if current is None:  # Codex allows the first hunk without "@@"
@@ -123,6 +140,8 @@ class FileText:
     """A file as lines without their endings, each ending kept (CRLF or LF), the way Codex keeps them."""
 
     def __init__(self, text):
+        if re.search(r"\r(?!\n)", text):
+            raise AdapterError("в файле одиночный символ CR — строки делятся иначе, чем видит проверка")
         raw = text.split("\n")
         self.final_newline = raw[-1] == ""
         if self.final_newline:
@@ -175,13 +194,23 @@ def seek(f, pattern, start, eof, deadline):
     if not pattern:
         return None
     if eof and len(f.keys) >= len(pattern):
-        start = len(f.keys) - len(pattern)
+        start = max(start, len(f.keys) - len(pattern))
     k = scan(f.keys, pattern, start, None, deadline)
     for n, norm in enumerate(LOOSER):
         j = scan(f.normalized(n, norm), [norm(p) for p in pattern], start, None if k is None else k + 1, deadline)
         if j is not None and j != k:
             raise AdapterError("место правки находится только нестрогим совпадением — где его применит Codex, неоднозначно")
     return k
+
+
+def without_trailing_empty(lines):
+    """Drop the last empty old line and, if the new text then ends with an empty line, that one too."""
+    lines = list(lines)
+    for side in ((" ", "-"), (" ", "+")):
+        idx = next((n for n in range(len(lines) - 1, -1, -1) if lines[n][0] in side), None)
+        if idx is not None and lines[idx][1] == "":
+            del lines[idx]
+    return lines
 
 
 def apply_chunks(text, chunks, path, deadline):
@@ -200,9 +229,9 @@ def apply_chunks(text, chunks, path, deadline):
             replacements.append((len(f.keys), seq, 0, lines))
             continue
         k = seek(f, old, cursor, c["eof"], deadline)
-        if k is None and old[-1] == "":  # Codex retries without a trailing empty line
-            lines = lines[:-1] if lines and lines[-1] == (" ", "") else lines
-            old = old[:-1]
+        if k is None and old[-1] == "":  # Codex retries without the trailing empty old and new line
+            lines = without_trailing_empty(lines)
+            old = [t for kind, t in lines if kind in (" ", "-")]
             k = seek(f, old, cursor, c["eof"], deadline)
         if k is None:
             raise AdapterError(f"кусок правки не ложится на {path} точным совпадением")
@@ -287,11 +316,13 @@ def claude_calls(envelope, event, deadline):
         if not isinstance(command, str):
             raise AdapterError("у apply_patch нет текста заплатки")
         own, patches = [], [command]
-    elif tool == "Bash" and isinstance(command, str) and PATCH_WORD.search(command) and "*** Begin Patch" in command:
+    elif tool == "Bash" and isinstance(command, str) and PATCH_WORD.search(command):
+        # Any other shell form (unquoted heredoc, $(...), a pipe, a file) can write a path or text
+        # the adapter does not see: only the one literal form is read, the rest is a deny.
         shell = SHELL_PATCH.match(command)
         if not shell:
-            raise AdapterError("заплатку через оболочку передавай отдельной командой apply_patch, без cd и других команд перед ней")
-        patches = [shell.group(1)]
+            raise AdapterError("заплатку через оболочку передавай только отдельной командой apply_patch <<'EOF' … EOF")
+        patches = [shell.group(3)]
     return own + [dict(envelope, tool_name=name, tool_input=ti)
                   for patch in patches for name, ti in patch_calls(patch, cwd, event, deadline)]
 
