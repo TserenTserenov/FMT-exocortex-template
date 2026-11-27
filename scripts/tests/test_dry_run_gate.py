@@ -635,6 +635,7 @@ def test_wrapper_options_keywords_and_tampering_blocked(isolated_gate, command):
         "ls # see; ./setup.sh",
         "git status # then (./x.sh)",
         "${IWE_SCRIPTS}/check-dirty-repos.sh",
+        "${IWE_SCRIPTS}/check-repo-residue.sh",
         "x=$(( 1 << 3 ))\ngit status",
     ],
 )
