@@ -909,7 +909,7 @@
     },
     {
       "path": "docs/QUICK-START.md",
-      "sha256": "16671df2086cabbfc1ae840b8c550434f4445103722ead91a5ec410d5d6ee440"
+      "sha256": "3a32a4316fe3c76292cf823956288766b37d50f9b85f452516329e3676781a2b"
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
@@ -925,7 +925,7 @@
     },
     {
       "path": "docs/SETUP-GUIDE.md",
-      "sha256": "f898ac32e8fae0e6743b6c237a219cb38164338cf8559867b7435e8c3a8ae7bd"
+      "sha256": "aa5b44a43d316616fd6a44ecdf8ca12c04d010e672b06fdc3bece5fc3c2ed838"
     },
     {
       "path": "docs/VERIFY-KNOWLEDGE-MCP.md",
@@ -1021,7 +1021,7 @@
     },
     {
       "path": "docs/onboarding/onboarding-guide.md",
-      "sha256": "ad63ade0533fe93b596c3d2940b5c78f54ba8eddc566ea142ea3fc464aa4802a"
+      "sha256": "a0fe4979fc14580726f5c41dc47da1576c5d0a0afa11b1ba2767bc5e38c5076b"
     },
     {
       "path": "docs/onboarding/onboarding-slides.md",
