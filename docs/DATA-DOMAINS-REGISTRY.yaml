@@ -75,7 +75,7 @@ data_domains:
     owner: personal
     tempo: warm
     allowed_flows: ["read-own", "read-promoted", "write-own"]
-    homes: ["вне-git память", "promoted-knowledge (Pack)"]
+    homes: ["governance-personal: inbox/captures/ГГГГ-ММ.md (авторитетный дом сырья)", "вне-git память (восстанавливаемая проекция)", "promoted-knowledge (Pack)"]
     enforcement: "planned"
     maturity: planned
 
@@ -90,8 +90,9 @@ data_domains:
     enforcement: "policy-only"
     maturity: implemented
 
-  - domain: "2.5 диалоговые артефакты"
-    type: "2.5"
+  # 2026-11-27 (WP-526 Ф14): коды 2.5/2.6 сняты — диалоги не тип личной оси 2.1-2.4; дом прежний (machine-dialogue).
+  - domain: "диалоги агентов (прежний код 2.5)"
+    type: "machine-dialogue"
     quarantine: false
     sensitivity: confidential
     owner: personal
@@ -102,14 +103,14 @@ data_domains:
     maturity: partial
     notes: "homes исправлен 2026-08-28: было governance-personal (sessions/) до поправки пилота 2026-08-18 (WP-526 Ф5) — см. ADR-004"
 
-  - domain: "2.6 карантин-диалоги"
-    type: "2.5-subset"
+  - domain: "диалоги на карантине (прежний код 2.6)"
+    type: "machine-dialogue-subset"
     quarantine: true
     sensitivity: restricted
     owner: personal
     tempo: none
     allowed_flows: []
-    homes: ["machine-dialogue (тот же репозиторий физически, что у домена 2.5, с отдельным access-контролем)"]
+    homes: ["machine-dialogue (тот же репозиторий физически, что у диалогов агентов, с отдельным access-контролем)"]
     enforcement: "planned"
     residual_risk: high
     maturity: planned

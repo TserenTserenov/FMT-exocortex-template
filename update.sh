@@ -3550,7 +3550,7 @@ print_extra_write_targets() {
     echo "  • $WORKSPACE_DIR/.claude.md.base и $WORKSPACE_DIR/.claude.md.delivered — база слияния CLAUDE.md и запись хешей доставленной копии"
     echo "  • $WORKSPACE_DIR/.memory-deployed.tsv — запись версий памяти, которые установлены и не менялись (по ней update.sh отличает нетронутую копию от изменённой)"
     echo "  • $WORKSPACE_DIR/.iwe-paths и $HOME/.zshenv — пересоздаваемое окружение путей"
-    echo "  • local core.hooksPath в git-репозиториях с .githooks под $WORKSPACE_DIR"
+    echo "  • local core.hooksPath в git-репозиториях с .githooks под $WORKSPACE_DIR, где он не задан (свой путь пользователя не меняется, #1688)"
     echo "  • $governance_dir/scripts/install-hooks.sh — установщик platform hooks"
     echo "  • $governance_dir/.githooks/pre-commit и pre-push — platform hooks"
     echo "  • $governance_dir/scripts/update-derived-snapshot.py — обновлятор derived snapshot"

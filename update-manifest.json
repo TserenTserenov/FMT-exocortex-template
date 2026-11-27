@@ -205,7 +205,7 @@
     },
     {
       "path": ".claude/hooks/session-open-gate.sh",
-      "sha256": "2e3d870f4c0eaecd65fbc6d5fa4039e291d0a371d677f63d105e1c6dd7f54318"
+      "sha256": "4917d42fdbe0bd2d7c620afc5fb12759ef413efee1b1007f0e7ee7b5beada0a7"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -329,7 +329,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-session-open-gate.sh",
-      "sha256": "27b4c021bb70c3692791575ec4e4494961ec8b761108ae7c4bcabe206e9c4706"
+      "sha256": "36d17ff94353238dcd0b2a5f264022b81737c82495aebbd8b5672709632535ba"
     },
     {
       "path": ".claude/hooks/tests/test_issue_1184_stop_gate_block_once.sh",
@@ -605,7 +605,7 @@
     },
     {
       "path": ".claude/skills/find-method/SKILL.md",
-      "sha256": "a14ec5f92a9f3c1a82db0af7a1fabe49d404d8d8261be15f44e5bcf3921e0605"
+      "sha256": "c4a0bd1fe3a23e0efee9cd9da6e97b4f0d2b553008b745c743e324b82542305b"
     },
     {
       "path": ".claude/skills/fpf/SKILL.md",
@@ -869,7 +869,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "e0ea3fc3a54445e80058aa7c34135f9f5663ee62f245ea9ea0a7fbfee8e58efc"
+      "sha256": "d33dc38436a45bcdbbbc5df589aaa5fe1e2a66218cc840c4d24a5161239e5d99"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "175670554024f57166d0d876caefd83308bbb3c05213e0e6703e4758981626cd"
+      "sha256": "d54dca570353867e0854de9563f99038c7a98327e0e101cd87c766fb8f73dc10"
     },
     {
       "path": "CLAUDE.md",
@@ -1049,7 +1049,7 @@
     },
     {
       "path": "docs/DATA-DOMAINS-REGISTRY.yaml",
-      "sha256": "f3682b409066dbfa7eec9e5234d27e1bfedc85dbf0836aa2eb387dbed3cec7ba"
+      "sha256": "f9f66aabdd81f5d6689660732cffcca8d8f27fa6cdda94f1b54f4a55d1fbe1d6"
     },
     {
       "path": "docs/DATA-POLICY.md",
@@ -1129,7 +1129,7 @@
     },
     {
       "path": "docs/adr/ADR-004-data-domain-map.md",
-      "sha256": "ca26153bcc4844c0791c26a958b43e14409cb8cd955e779c74f350ac6f02c6e3"
+      "sha256": "cfeab57782be82694fc2ceb74a7b788df3e8b54531dc2db4d1e33f3d490f65ea"
     },
     {
       "path": "docs/agent-coordination-manifest.md",
@@ -2537,7 +2537,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "5622bbed694a3f442ccd817c0acd75efaa9bf2bd4307cfb04570f75634618efc"
+      "sha256": "3827418d18f0d9e4d625dba776b1d6e282c7f36dac10bdde6bb598bddbaa9d1e"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -2653,7 +2653,7 @@
     },
     {
       "path": "scripts/install-hooks.sh",
-      "sha256": "80f856ba356a49b4d2d0635235b9edb8bd725178a687c0fce23af2e8b44184e8"
+      "sha256": "456ddb52697adb2f81ff9e6eacd5602668832ea646283c50fc107c2bbe5622ce"
     },
     {
       "path": "scripts/isolate-push.sh",
@@ -2665,7 +2665,7 @@
     },
     {
       "path": "scripts/iwe-audit.sh",
-      "sha256": "aa57ee872c4052a49d801f01556b977dba09442798a32345c565c07498a0733e"
+      "sha256": "de4fe05eb4b9753e8766be3ec65d8a51a03fc736dc633d25b5111b4519964f5e"
     },
     {
       "path": "scripts/iwe-backup-check.sh",
@@ -2997,7 +2997,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "7323c8bfd2e8810e02a310d445d4f476001bb674628870064bdc7e009bf23e50"
+      "sha256": "b809240aa764f9c996fe3c647ffb4eec4f4f7aaa8094d2a47806574362eb83c8"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3197,7 +3197,7 @@
     },
     {
       "path": "scripts/tests/test_install_hooks.py",
-      "sha256": "afe084887934053e9208edd7702b9e25e14cf855dc17fc513012aeb0cd83aacd"
+      "sha256": "b5c36f8d133293a6ab30f91bac37aacec290741bd7b8b591090721f68e176586"
     },
     {
       "path": "scripts/tests/test_issue_1032_strategy_session_offline.sh",
@@ -3457,7 +3457,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "c5c390913913e19efc70f757c6ead650cb48d1eced8d04f62bebac2a5f68ea60"
+      "sha256": "dd138f606a1a76f7ce97c6831ec6b28b22cbcd5472044bfbd98b024c1f7fbda2"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
@@ -3485,7 +3485,7 @@
     },
     {
       "path": "seed/strategy/scripts/install-hooks.sh",
-      "sha256": "80f856ba356a49b4d2d0635235b9edb8bd725178a687c0fce23af2e8b44184e8"
+      "sha256": "456ddb52697adb2f81ff9e6eacd5602668832ea646283c50fc107c2bbe5622ce"
     },
     {
       "path": "seed/strategy/scripts/isolate-push.sh",
@@ -3577,7 +3577,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "9636c9998fdc859f8d2fe035dd8b610e061892739520e0ff8cae21411befb24d"
+      "sha256": "7f007da19e3388fd2e38d96108a273161b12726627a11637c5816734b8ba1346"
     },
     {
       "path": "setup/lib/apply-op.sh",
@@ -3609,7 +3609,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "8ba62dd3bded2ae3071a20241b73e093f887bef6ee6db35e2d31bea77ac1bd3c"
+      "sha256": "53632056797f04910c37f9bbcabfe5236bd440bd9ff15893963301304b680399"
     }
   ],
   "excluded_paths": [
@@ -3802,7 +3802,9 @@
     "scripts/tests/test_issue_1577_1578_isolate_root.sh",
     "scripts/tests/test_issue_1606_name_registry.sh",
     "scripts/tests/test_issue_1625_runtime_warning.sh",
+    "scripts/tests/test_issue_1659_strategy.sh",
     "scripts/tests/test_issue_1670_secret_scan_bytes.sh",
+    "scripts/tests/test_issue_1688_hooks_path_kept.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
