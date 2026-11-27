@@ -2,7 +2,7 @@
 # see DP.SC.153
 # НЕ редактировать вручную — перегенерировать через generate-skills-catalog.sh
 #
-generated: 2026-11-27T21:11:02Z
+generated: 2026-11-27T21:41:22Z
 skills_dir: .claude/skills
 
 skills:
@@ -48,6 +48,7 @@ skills:
     - extend
     - verify
     - bottleneck-pick
+    - project-analysis
     - archgate
     - decompose
   - id: artifactor
@@ -62,6 +63,7 @@ skills:
     depends_on: []
     invoked_by:
     - protocol-open
+    - project-analysis
     - artifactor
     - wp-new
   - id: audit-docs
@@ -113,6 +115,7 @@ skills:
     depends_on: []
     invoked_by:
     - bottleneck-pick
+    - project-analysis
     - repo-new
     - platform-bottleneck
   - id: check-secret
@@ -157,6 +160,7 @@ skills:
     - peer-conversation
     - day-close
     - setup-wakatime
+    - project-analysis
     - audit-installation
     - kimi-peer-writer
   - id: day-open
@@ -177,6 +181,7 @@ skills:
     - peer-conversation
     - day-close
     - week-close-pilot
+    - project-analysis
     - kimi-peer-writer
     - day-open
     - onboarding
@@ -193,6 +198,7 @@ skills:
     invoked_by:
     - protocol-open
     - bottleneck-pick
+    - project-analysis
     - decompose
   - id: diagnose
     name: "diagnose"
@@ -207,6 +213,7 @@ skills:
     invoked_by:
     - org-dev
     - diagnose
+    - project-analysis
     - pack-creator
   - id: discovery-session
     name: "discovery-session"
@@ -384,6 +391,7 @@ skills:
     depends_on: []
     invoked_by:
     - mentor-participant-brief
+    - project-analysis
   - id: month-close
     name: "month-close"
     description: "Протокол закрытия месяца (Month Close). Стадия 7 каскада ВДВ v9 (PD.METHOD.008). Запускается в первый Пн месяца, до Strategy Session."
@@ -508,6 +516,18 @@ skills:
     depends_on: []
     invoked_by:
     - platform-bottleneck
+  - id: project-analysis
+    name: "project-analysis"
+    description: "Анализ проекта (Аудитор VR.R.002, VR.SC.007): за один проход проверяет проект по блоку «дела и проекты» Чек-листа защиты этапа S0–S3 программы «Личное развитие», ставит уровень со свидетельством по каждому пункту, называет три главных пробела и по каждому даёт направление «роль + метод» (скилл — если есть). Используй, когда участник, наставник или автор просит проверить или проанализировать конкретный проект."
+    version: 0.6.0
+    layer: L3
+    status: experimental
+    triggers:
+      slash:
+        - /project-analysis
+    depends_on: []
+    invoked_by:
+    - project-analysis
   - id: repo-new
     name: "repo-new"
     description: "Гейт создания любого нового репозитория IWE (экосистемного или личного пространства). Проводит запрос через: классификацию намерения (Pack / SpacePlan / именованный проект / экосистемный DS), проверку имени и класса, разметку данных (типы 2.1-2.4, карантин), объявление писатель/владелец/читатели, решение о публичности, обязательный Decision Gate (по умолчанию — одобрение пилота, для CI — ограниченное делегирование), затем исполнение (создание, регистрация, развёртывание скелета). Используй когда пилот хочет создать новый репозиторий, или спрашивает, куда и как разместить новый вид данных. Не для расширения существующего репозитория (→ Repo-Touch/Residency Gate) и не для Pack-репозиториев (делегируется `/pack-new`)."
@@ -572,6 +592,7 @@ skills:
     invoked_by:
     - verify-hypotheses
     - mentor-participant-brief
+    - project-analysis
     - skill-creator
     - repo-new
   - id: strategy-session
@@ -588,6 +609,7 @@ skills:
     - extend
     - discovery-session
     - strategy-session
+    - project-analysis
   - id: think
     name: "think"
     description: "ADI-cycle structured reasoning (Abduction-Deduction-Induction-Audit-Decide). Use for complex decisions when multiple hypotheses need to be considered."
@@ -597,7 +619,8 @@ skills:
     triggers:
       slash: []
     depends_on: []
-    invoked_by: []
+    invoked_by:
+    - project-analysis
   - id: transcribe
     name: "transcribe"
     description: "Transcribe audio/video files via MLX Whisper (Apple Silicon). Usage: /transcribe path/to/file.mp3"
@@ -625,6 +648,7 @@ skills:
     depends_on: []
     invoked_by:
     - vdv
+    - project-analysis
     - skill-creator
     - repo-new
   - id: verify-hypotheses
@@ -659,6 +683,7 @@ skills:
     - day-close
     - verify
     - mentor-participant-brief
+    - project-analysis
     - kimi-peer-writer
     - pack-new
     - skill-creator

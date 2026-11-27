@@ -517,7 +517,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "6faaf3683a47661be8d0168dd7987a17a6d19c147d5a0795afeff790eccdffbf"
+      "sha256": "ed3cdf1fe402581b3f6d12bea5eca2dc9c24460e70c5a6aeaf4fef95dc9881f9"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -784,6 +784,10 @@
       "sha256": "6deb6e109991309d1d525bdb52e67ddabfbd25b6df2cea03f77a62dcbb4700ab"
     },
     {
+      "path": ".claude/skills/project-analysis/SKILL.md",
+      "sha256": "84f7029b1490b5f3de5400d52dd4ec43a67345c0fbfd35667659da8329bd2886"
+    },
+    {
       "path": ".claude/skills/repo-new/SKILL.md",
       "sha256": "c398a29dba95b9b6fc97a304a16b275fdd70e3778123dc241cdc05870620c04b"
     },
@@ -1025,7 +1029,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e5eb9d5c03e0b153fe9f6d911b1123ec12fa01e7a9e82f138a4ec18a0f89498f"
+      "sha256": "7eb7a13366b1f559b00abb91370b09ee6910eb78e36573676881abbc81686b6f"
     },
     {
       "path": "CLAUDE.md",
