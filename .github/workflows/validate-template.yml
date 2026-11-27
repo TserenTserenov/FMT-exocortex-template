@@ -209,6 +209,8 @@ jobs:
         run: bash setup/test-attestation-build-statement.sh
       - name: Run WP-561 Ф25 week-review delivery postcondition tests
         run: bash setup/test-week-review-delivery-postcondition.sh
+      - name: Run issue 1674 session-prep leftover changes tests
+        run: bash setup/test-session-prep-leftover-changes.sh
       - name: Run WP-530 Ф72 strategist isolated scenario tests
         run: bash setup/test-strategist-isolated-scenarios.sh
       - name: Run WP-529 changelog gate tests
@@ -902,6 +904,11 @@ jobs:
       # update.sh in a sandbox with a curl shim and scheduler stubs.
       - name: Run update.sh modified-hook test
         run: bash setup/test-update-modified-hook.sh
+
+      # Issue #1689: a platform skill edited outside its USER-SPACE block is replaced by the
+      # template version, and the previous copy is kept under .backups/skills-pre-update/.
+      - name: Run update.sh modified-skill test
+        run: bash setup/test-update-modified-skill.sh
 
       # WP-568 F11: an author host whose workspace .claude/ dirs are a read-only
       # mirror must finish the update (new file skipped with a warning) instead of

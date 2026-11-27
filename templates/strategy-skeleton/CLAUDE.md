@@ -84,10 +84,12 @@ done
 
 | Директория | Содержание |
 |------------|------------|
-| `docs/` | Strategy.md, Dissatisfactions.md, WP-REGISTRY.md |
+| `docs/` | Strategy.md, Dissatisfactions.md, WP-REGISTRY.md, Backlog.md, Routing-Map.md (карта маршрутизации) |
 | `current/` | WeekPlan W{N}.md, DayPlan YYYY-MM-DD.md |
 | `archive/` | Старые планы и отчёты |
-| `inbox/` | fleeting-notes.md, черновики, WP-context файлы (`WP-NNN-*.md`) |
+| `inbox/` | fleeting-notes.md, черновики, карточки РП (`WP-<номер>/WP-<номер>.md`) |
+
+> **Ключевые места и что куда класть** — в личной карте маршрутизации `docs/Routing-Map.md`: стратегия, неудовлетворённости, реестр РП (`docs/WP-REGISTRY.md`), карточки РП (`inbox/WP-<номер>/WP-<номер>.md`), планы (`current/`), отложенное (`docs/Backlog.md`), входящие (`inbox/`). Карта — единственное место, где записано, куда у этого человека что класть; нет строки для материала — спроси и допиши её в карту.
 
 ## Связи
 

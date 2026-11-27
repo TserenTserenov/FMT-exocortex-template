@@ -223,7 +223,7 @@ run_update() {
 }
 
 # Lines update.sh prints for an updated file: the preview "  ~ <path>  — N строк"
-# and the apply step "  ~ <path> (USER-SPACE preserved)".
+# and the apply step "  ~ <path> (блок USER-SPACE перенесён)".
 skill_listed_updated() { grep -Eq "^  ~ ${SKILL//./\\.}( |$)" "$1"; }
 user_block_of() { sed -n '/^<!-- USER-SPACE -->/,/^<!-- \/USER-SPACE -->/p' "$1"; }
 
