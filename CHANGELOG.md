@@ -42,7 +42,7 @@ Refs: WP-NNN
 
 ### Added
 
-- [behavior] (#PRNUM) Method skills `vdv` and `integration-gate` now tell the agent to show the steps of the method under separate headings in their order and to stop at a step that waits for the user instead of showing later steps as done (the "show the stages" line, decision "in the skill itself"); `vdv` build step 5 now points to audit steps 1-4 (it said 1-5, audit has four steps)
+- [behavior] (#1694) Method skills `vdv` and `integration-gate` now tell the agent to show the steps of the method under separate headings in their order and to stop at a step that waits for the user instead of showing later steps as done (the "show the stages" line, decision "in the skill itself"); `vdv` build step 5 now points to audit steps 1-4 (it said 1-5, audit has four steps)
   - Цель: 20 · Результат: служебное — в Codex ответы по `vdv` и `integration-gate` показывают шаги метода и останавливаются там, где нужен ответ человека; проверить исполнение метода проще
   - Как проверить: в Codex без Claude дать `/vdv audit` описание с двумя конечными результатами — в ответе заголовки шагов 1 и 2 и вопрос, какой результат считать обещанием, без прогона шести принципов; `/integration-gate` на новый инструмент без подробностей — четыре заголовка шагов, шаги 2–4 «не выполнен: ожидает шага N». Проба 27.11 (Codex 0.169, 4 сценария): со строкой шаги и остановки на месте во всех четырёх, без строки шаги свёрнуты во всех четырёх и в аудите с двумя результатами Codex не остановился
   - Как откатить: git revert слияния этого запроса; навыки возвращаются к прежнему тексту без строки
