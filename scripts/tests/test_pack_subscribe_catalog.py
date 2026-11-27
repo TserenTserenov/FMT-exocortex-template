@@ -93,6 +93,18 @@ def test_internal_only_in_lower_source_still_closes_the_name(tmp_path, capsys):
     assert catalog.main(["show", "PACK-shared", "--workspace", str(tmp_path)]) == 3
 
 
+def test_short_closing_record_closes_a_shipped_pack(tmp_path, capsys):
+    """A two-field record (name + internal-only) is enough to hide a shipped pack."""
+    assert "PACK-rhetoric" in listed(tmp_path, capsys)
+    write_catalog(
+        tmp_path / "extensions" / "pack-catalog.yaml",
+        [{"name": "PACK-rhetoric", "offered": "internal-only"}],
+    )
+    assert "PACK-rhetoric" not in listed(tmp_path, capsys)
+    assert catalog.main(["show", "PACK-rhetoric", "--workspace", str(tmp_path)]) == 3
+    assert "skipped" not in capsys.readouterr().err
+
+
 def test_params_local_path_is_read(tmp_path, capsys):
     write_catalog(tmp_path / "my" / "catalog.yaml", [pack("PACK-from-params")])
     (tmp_path / "params.yaml").write_text("pack_catalog_url: my/catalog.yaml\n", encoding="utf-8")

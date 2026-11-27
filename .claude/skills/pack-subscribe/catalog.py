@@ -183,13 +183,18 @@ def merge(sources: list[Source]) -> tuple[list[dict], set[str]]:
             warn(f"{exc}; source skipped")
             continue
         for index, entry in enumerate(entries):
+            # A closing record is honoured even when it is just a name and the
+            # flag: it adds nothing to the catalog, so it needs no full schema.
+            if (isinstance(entry, dict) and entry.get("offered") == INTERNAL_ONLY
+                    and isinstance(entry.get("name"), str) and entry["name"]):
+                internal.add(entry["name"])
+                if set(entry) <= {"name", "offered"}:
+                    continue
             problems = entry_problems(entry)
             if problems:
                 warn(f"{source.label}, entry #{index + 1} skipped: {'; '.join(problems)}")
                 continue
             name = entry["name"]
-            if entry.get("offered") == INTERNAL_ONLY:
-                internal.add(name)
             if name not in merged:
                 merged[name] = dict(entry, source=source.label)
     return list(merged.values()), internal
