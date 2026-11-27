@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e5d5b8951270f5fab713693658ea2322c1c7b2dd520a70165adf6bbfa792d8d8"
+      "sha256": "463270b531b39405856eedd8175e01bb2f1a39861c3f62685ddc8d5e4b808913"
     },
     {
       "path": "CLAUDE.md",
@@ -1049,7 +1049,7 @@
     },
     {
       "path": "docs/DATA-DOMAINS-REGISTRY.yaml",
-      "sha256": "f3682b409066dbfa7eec9e5234d27e1bfedc85dbf0836aa2eb387dbed3cec7ba"
+      "sha256": "f9f66aabdd81f5d6689660732cffcca8d8f27fa6cdda94f1b54f4a55d1fbe1d6"
     },
     {
       "path": "docs/DATA-POLICY.md",
@@ -1129,7 +1129,7 @@
     },
     {
       "path": "docs/adr/ADR-004-data-domain-map.md",
-      "sha256": "ca26153bcc4844c0791c26a958b43e14409cb8cd955e779c74f350ac6f02c6e3"
+      "sha256": "cfeab57782be82694fc2ceb74a7b788df3e8b54531dc2db4d1e33f3d490f65ea"
     },
     {
       "path": "docs/agent-coordination-manifest.md",
