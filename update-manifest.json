@@ -1009,7 +1009,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "3e41a6962c6b87fa6dc2f55c2ac9cf6bd92c4147eee8f622dc9228e5da0a8a79"
+      "sha256": "07648a5b9e3babb61973ed6ab3910f1eff3e32246aa77423ff5c05b5d5f11645"
     },
     {
       "path": "CLAUDE.md",
@@ -2937,7 +2937,7 @@
     },
     {
       "path": "scripts/peer-fanout.sh",
-      "sha256": "287093199187888c3c7b1740f47f994d8331731259146826c2fa343205044e7c"
+      "sha256": "682a88cd4ecc441d338dd152d48f366e68e3278e9eb7af2d6af460865e736087"
     },
     {
       "path": "scripts/peer-session-finalize.sh",

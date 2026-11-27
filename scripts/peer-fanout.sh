@@ -99,6 +99,35 @@ done < "$TASKS_FILE"
 TASK_COUNT=$(wc -l < "$SEEN_IDS_FILE" | tr -d ' ')
 [ "$TASK_COUNT" -ge 1 ] || fail_preflight "tasks file has no tasks: $TASKS_FILE"
 
+# The adapters look further than PATH (override variable, user-local and VS Code
+# extension installs), so the preflight must accept the same places or it would
+# refuse a run that /peer-conversation with the same agent can do.
+vendor_cli_available() {
+  local vendor="$1" override_var candidate base
+  command -v "$vendor" >/dev/null 2>&1 && return 0
+  override_var="${vendor^^}_BIN"
+  candidate="${!override_var:-}"
+  [ -n "$candidate" ] && [ -x "$candidate" ] && return 0
+  case "$vendor" in
+    claude) [ -x "$HOME/.local/bin/claude" ] && return 0 ;;
+    kimi)
+      for candidate in \
+        "$HOME/Library/Application Support/Code/User/globalStorage/moonshot-ai.kimi-code/bin/kimi/kimi" \
+        "$HOME/.config/Code/User/globalStorage/moonshot-ai.kimi-code/bin/kimi/kimi" \
+        "$HOME/.local/share/code-server/User/globalStorage/moonshot-ai.kimi-code/bin/kimi/kimi" \
+        "$HOME/AppData/Roaming/Code/User/globalStorage/moonshot-ai.kimi-code/bin/kimi/kimi"; do
+        [ -x "$candidate" ] && return 0
+      done ;;
+    codex)
+      for base in "$HOME/.vscode/extensions" "$HOME/.vscode-server/extensions" "$HOME/.cursor/extensions"; do
+        [ -d "$base" ] || continue
+        candidate=$(ls -d "$base"/openai.chatgpt-*/bin/*/codex 2>/dev/null | sort -V | tail -1)
+        [ -n "$candidate" ] && [ -x "$candidate" ] && return 0
+      done ;;
+  esac
+  return 1
+}
+
 # --- preflight: adapters and CLIs are checked BEFORE the first task starts ---
 while IFS= read -r line || [ -n "$line" ]; do
   [ -z "$line" ] && continue
@@ -108,7 +137,7 @@ while IFS= read -r line || [ -n "$line" ]; do
   adapter="$ADAPTERS_DIR/${vendor}-peer-adapter.sh"
   [ -f "$adapter" ] && [ -x "$adapter" ] || fail_preflight "adapter missing or not executable: $adapter"
   if [ "${IWE_FANOUT_SKIP_CLI_CHECK:-}" != "1" ] && [ "$vendor" != "hermes" ]; then
-    command -v "$vendor" >/dev/null 2>&1 || fail_preflight "CLI '$vendor' not found in PATH (needed by $adapter)"
+    vendor_cli_available "$vendor" || fail_preflight "CLI '$vendor' not found in PATH, in \$${vendor^^}_BIN or in the places the adapter also looks (needed by $adapter)"
   fi
 done < "$TASKS_FILE"
 

@@ -117,13 +117,20 @@ rm -f "$PID_DIR"/*
 
 # 6. vendor CLI missing from PATH -> exit 1 before launch, the message names the CLI
 printf 't6\tcodex\tTask\n' > "$WORK/b6.tsv"
-err=$(IWE_FANOUT_SKIP_CLI_CHECK=0 PATH="/usr/bin:/bin" "$BASH" "$FANOUT" --tasks "$WORK/b6.tsv" --out-dir "$WORK/bad6" 2>&1 >/dev/null); rc=$?
+mkdir -p "$WORK/emptyhome"
+err=$(IWE_FANOUT_SKIP_CLI_CHECK=0 HOME="$WORK/emptyhome" CODEX_BIN="" PATH="/usr/bin:/bin" "$BASH" "$FANOUT" --tasks "$WORK/b6.tsv" --out-dir "$WORK/bad6" 2>&1 >/dev/null); rc=$?
 if [ -x /usr/bin/codex ] || [ -x /bin/codex ]; then
   check "missing CLI check skipped (codex installed on this host)" 0
 else
   [ "$rc" -eq 1 ] && echo "$err" | grep -q "CLI 'codex' not found" && [ ! -e "$WORK/bad6/t6.md" ]
   check "missing vendor CLI -> exit 1 before launch" "$?"
 fi
+
+# 6b. vendor CLI outside PATH but named by <VENDOR>_BIN -> the preflight accepts it
+printf '#!/bin/sh\nexit 0\n' > "$WORK/fake-codex"; chmod +x "$WORK/fake-codex"
+err=$(IWE_FANOUT_SKIP_CLI_CHECK=0 HOME="$WORK/emptyhome" CODEX_BIN="$WORK/fake-codex" PATH="/usr/bin:/bin" "$BASH" "$FANOUT" --tasks "$WORK/b6.tsv" --out-dir "$WORK/bad6b" 2>&1 >/dev/null)
+if echo "$err" | grep -q "CLI 'codex' not found"; then rc6b=1; else rc6b=0; fi
+check "CODEX_BIN outside PATH is accepted by the preflight" "$rc6b"
 
 # 7. TERM mid-run: child stubs are dead, a partial summary is written
 printf 't7-a\tcodex\tMOCK:hang\nt7-b\tclaude\tMOCK:hang\n' > "$WORK/t7.tsv"
