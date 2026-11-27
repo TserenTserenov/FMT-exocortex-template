@@ -80,7 +80,7 @@ expect "arbitrary housekeeping semaphore: commit" 2 'git commit -m x'
 close_semaphore
 
 # === Semaphore with one of the 4 allowed housekeeping reasons (day-open/day-close/week-close/month-close) → pass ===
-for reason in day-open day-close week-close month-close; do
+for reason in day-open day-close week-close month-close strategy-session; do
   open_allowed_housekeeping_semaphore "$reason"
   expect "allowed housekeeping ($reason): commit" 0 'git commit -m x'
   close_semaphore
@@ -89,6 +89,9 @@ done
 # === A similar but not exactly allowed reason (substring/prefix) → still blocked ===
 open_allowed_housekeeping_semaphore "day-open-extra"
 expect "near-miss housekeeping reason: commit" 2 'git commit -m x'
+close_semaphore
+open_allowed_housekeeping_semaphore "strategy-session-x"
+expect "near-miss strategy-session reason: commit" 2 'git commit -m x'
 close_semaphore
 
 # === Another session's semaphore (different harness_session_id) → not counted ===

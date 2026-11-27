@@ -2,7 +2,7 @@
 # see DP.SC.153
 # НЕ редактировать вручную — перегенерировать через generate-skills-catalog.sh
 #
-generated: 2026-11-26T14:29:40Z
+generated: 2026-11-27T19:37:18Z
 skills_dir: .claude/skills
 
 skills:
@@ -220,6 +220,7 @@ skills:
     depends_on: []
     invoked_by:
     - discovery-session
+    - strategy-session
   - id: extend
     name: "extend"
     description: "IWE extensibility catalog: what can be customized, which extension points exist, which parameters are available, how to install a third-party extension."
@@ -575,7 +576,7 @@ skills:
     - repo-new
   - id: strategy-session
     name: "strategy-session"
-    description: "Стратегическая сессия — диспетчер. День-0 (маркер IWE-INITIAL-NEEDED или нет Strategy.md/WeekPlan) → initial flow (цели, неудовлетворённости, первый WeekPlan). Первая сессия календарного месяца или прямая просьба пилота о полной сессии → полный monthly flow (стратегическая сверка + линза калибра). Остальные дни → короткий weekly flow (требует черновик от session-prep). Триггеры — «проведём стратегическую сессию», «первая стратегическая сессия», «strategy session», «давай стратегировать»."
+    description: "Стратегическая сессия — диспетчер. День-0 (маркер IWE-INITIAL-NEEDED или нет Strategy.md/WeekPlan) → initial flow (разметка принесённого, цели, неудовлетворённости, первый WeekPlan). Первая сессия календарного месяца или прямая просьба пилота о полной сессии → полный monthly flow (стратегическая сверка + линза калибра). Остальные дни → короткий weekly flow (требует черновик от session-prep). Триггеры — «проведём стратегическую сессию», «первая стратегическая сессия», «strategy session», «давай стратегировать»."
     version: 1.0.0
     layer: L1
     status: active
