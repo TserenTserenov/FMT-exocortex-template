@@ -881,6 +881,7 @@ jobs:
           bash .claude/hooks/tests/test-destructive-guard-reader-overwrite.sh
           bash .claude/hooks/tests/test-destructive-guard-monotone.sh
           bash .claude/hooks/tests/test-destructive-guard-legacy-floor.sh
+          bash .claude/hooks/tests/test-guard-readiness.sh
           bash scripts/tests/test_issue_1010_memory_limit.sh
 
       # Issue #1487: auto-memory writes through the memory/ symlink are approved only for the

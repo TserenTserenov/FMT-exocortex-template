@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/destructive_guard_codex.sh\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

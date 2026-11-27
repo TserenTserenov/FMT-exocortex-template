@@ -81,7 +81,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "0429331e17e42273e20ff9350411b226643decb7954e19fa276cfc7b6d1b7be6"
+      "sha256": "82a63c47da1b3bea2c5a004eb0dcb145d58263c0d92e6cf294598bd43b443e00"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -292,6 +292,10 @@
       "sha256": "2cde8950a400719a688132669aae108638e95ede9c59e37a916cc14bfa2e5f30"
     },
     {
+      "path": ".claude/hooks/tests/test-guard-readiness.sh",
+      "sha256": "c22c5b8a37b182b9bf3130bd1be5859b874ad79b8c8b0e3eca800340d380469c"
+    },
+    {
       "path": ".claude/hooks/tests/test-issue-1183-precompact-checkpoint.sh",
       "sha256": "16d78d18246a113850d112fc3fbffd477385388e2df53d5c8f3013fe93fb3f0b"
     },
@@ -470,6 +474,10 @@
     {
       "path": ".claude/scripts/generate-rules-registry.py",
       "sha256": "f9784c2ac2aa91f566ef3fc8abcbadddc889917d72b5f205c3d000fabd729e60"
+    },
+    {
+      "path": ".claude/scripts/guard-readiness.sh",
+      "sha256": "64c7e0fff0fa448a2e712c8db37a2e9e351493d23aedbe8db487e5ce2dac3780"
     },
     {
       "path": ".claude/scripts/light-onboarding-state.sh",
@@ -948,6 +956,14 @@
       "sha256": "54356facf8d596bad78889791927b0d8977d75a836cffbcc184d7611905af673"
     },
     {
+      "path": ".codex/hooks.json",
+      "sha256": "67a90f39b107b8cf5ddb01305850909e9e25021a74cb09fd2b82e75ba2bddabe"
+    },
+    {
+      "path": ".codex/hooks/destructive_guard_codex.sh",
+      "sha256": "32e3c8c0fd6b3385d1f7d0ac48c1ae98bd22e2a15cc3a66b1a1ac559bd4c49c8"
+    },
+    {
       "path": ".githooks/commit-msg",
       "sha256": "4bc0f833362989055169a5343999d581d870fe2a9cb89ac6f90d227eea645946"
     },
@@ -977,7 +993,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "7a084b138741291dcfdd9ccc5db5ba4daa6e23b62e69447d5be9d327a38aa1bf"
+      "sha256": "5dc308a1d6273876e22106d18c5601ab60623bea5c288cb793cadde5e8ac502d"
     },
     {
       "path": ".gitignore",
@@ -1041,7 +1057,7 @@
     },
     {
       "path": "docs/CHATGPT-CODEX-SETUP.md",
-      "sha256": "634a124429b20640a0c95f6a94a0f92985088d06810b0f426b4c150a79d207b8"
+      "sha256": "44a03696e21b15ca3fad4746b8d0adaa61463cba08e338bf31fd306a503f7bac"
     },
     {
       "path": "docs/CLOUD-SCHEDULER.md",
