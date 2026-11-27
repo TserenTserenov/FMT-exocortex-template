@@ -43,11 +43,20 @@ H_CELL_RE = re.compile(r"^(\d+(?:\.\d+)?)h?$")
 
 ATTENTION_HEADER_RE = re.compile(r"(<summary><b>Требует внимания</b></summary>\s*\n)")
 
+# phys_hours in priorities.yaml is per day; a week-scope «h» column is compared
+# with a week of them (template release 0.43, day-open-week-sync-patch.py).
+DAYS_PER_WEEK = 7
+
 
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--dayplan", required=True, help="Path to DayPlan .md")
     p.add_argument("--priorities", default=None, help="Path to priorities.yaml (optional)")
+    p.add_argument(
+        "--hours-scope", choices=("day", "week"), default="day",
+        help="week: the «h» column holds week-plan hours (day-open-week-sync-patch.py rebuilt "
+             "the table), so they are compared with phys_hours x DAYS_PER_WEEK, not with one day",
+    )
     return p.parse_args()
 
 
@@ -111,9 +120,11 @@ def today_scoped_hours(text, today_wps):
     Returns None if today_wps is empty (nothing to scope to)."""
     if not today_wps:
         return None
-    wp_res = [re.compile(rf"WP-{re.escape(str(wp).replace('WP-', '').strip())}(?!\d)") for wp in today_wps]
+    nums = [str(wp).replace('WP-', '').strip() for wp in today_wps]
+    wp_res = [re.compile(rf"WP-{re.escape(num)}(?!\d)") for num in nums]
     in_table = False
     h_col = None
+    num_col = None
     total = 0.0
     for line in text.splitlines():
         stripped = line.strip()
@@ -128,8 +139,11 @@ def today_scoped_hours(text, today_wps):
             h_col = detect_h_col(cells)
             if h_col is not None:
                 in_table = True
+                # A table rebuilt from the week plan carries the bare WP number in «#».
+                num_col = next((i for i, c in enumerate(cells) if c.strip() == "#"), None)
             continue
-        if h_col is not None and len(cells) > h_col and any(r.search(stripped) for r in wp_res):
+        in_num_col = num_col is not None and len(cells) > num_col and cells[num_col].strip("* ") in nums
+        if h_col is not None and len(cells) > h_col and (in_num_col or any(r.search(stripped) for r in wp_res)):
             m = H_CELL_RE.match(cells[h_col].strip())
             if m:
                 total += float(m.group(1))
@@ -178,7 +192,7 @@ def append_attention_finding(text, finding):
     return (patched, True) if n else (text, False)
 
 
-def patch_budget(text, h_rp, h_phys, today_h=None):
+def patch_budget(text, h_rp, h_phys, today_h=None, week_scope=False):
     # RELABEL (2026-09-01, Phase 148/WP-484, peer-session consensus with Codex):
     # h_rp is the sum of remaining-effort estimates across every in-flight WP
     # in the plan table — a portfolio-load figure, not a day's capacity (a
@@ -188,16 +202,20 @@ def patch_budget(text, h_rp, h_phys, today_h=None):
     # ~Xh РП / ~N.Nx substrings are unchanged on purpose — both are still
     # matched by protocol-artifact-validate.sh's format checks.
     mult = h_rp / h_phys if h_phys else 1.0
+    phys_label = "физ в неделю" if week_scope else "физ"
     replacement = (
         f"**Портфель в работе:** ~{h_rp:.0f}h РП"
-        f" / ~{h_phys:.0f}h физ"
+        f" / ~{h_phys:.0f}h {phys_label}"
         f" / Плановый мультипликатор ~{mult:.1f}x"
     )
     if today_h is not None:
         # Separate day-scoped figure (same-day follow-up, pilot caught the
         # portfolio-wide number wasn't a day claim) — sourced from
         # priorities.yaml's `today` list, not this table's full row set.
-        replacement += f" / РП на сегодня: ~{today_h:.0f}h"
+        if week_scope:  # week-plan hours: the whole estimate of today's WPs, not a day's work
+            replacement += f" / сумма оценок РП на сегодня: ~{today_h:.0f}h (оценки целиком, не план дня)"
+        else:
+            replacement += f" / РП на сегодня: ~{today_h:.0f}h"
     return BUDGET_RE.sub(replacement, text)
 
 
@@ -237,10 +255,12 @@ def main():
         print("budget-patch: plan table has no rows — skipping", file=sys.stderr)
         return
 
-    h_phys = read_phys_hours(args.priorities) or h_rp
+    phys_day = read_phys_hours(args.priorities)
+    week_scope = args.hours_scope == "week" and bool(phys_day)
+    h_phys = phys_day * DAYS_PER_WEEK if week_scope else (phys_day or h_rp)
     today_wps = read_today_wps(args.priorities)
     today_h = today_scoped_hours(text, today_wps)
-    patched = patch_budget(text, h_rp, h_phys, today_h)
+    patched = patch_budget(text, h_rp, h_phys, today_h, week_scope)
 
     if patched == text:
         print(f"budget-patch: budget line not found or already correct (h_rp={h_rp})", file=sys.stderr)
@@ -249,7 +269,9 @@ def main():
     dayplan.write_text(patched, encoding="utf-8")
     mult = h_rp / h_phys if h_phys else 1.0
     today_suffix = f" / сегодня ~{today_h:.0f}h" if today_h is not None else ""
-    print(f"budget-patch: ~{h_rp:.0f}h РП / ~{h_phys:.0f}h физ / ~{mult:.1f}x{today_suffix}", file=sys.stderr)
+    scope_suffix = " в неделю" if week_scope else ""
+    print(f"budget-patch: ~{h_rp:.0f}h РП / ~{h_phys:.0f}h физ{scope_suffix} / ~{mult:.1f}x{today_suffix}",
+          file=sys.stderr)
 
 
 if __name__ == "__main__":
