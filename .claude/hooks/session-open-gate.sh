@@ -38,10 +38,13 @@
 # `--housekeeping <anything>` from standing in for a real WP (that is exactly
 # what the first version of this fix got wrong -- it accepted any reason at
 # all, reverting S-68 wholesale; caught by adversarial review before merge).
-# These four names are the operational protocols that open this binding
+# These names are the operational protocols that open this binding
 # themselves, from their own SKILL.md, not something a session can claim for
-# an arbitrary unrelated commit.
-ALLOWED_HOUSEKEEPING_REASONS='^(day-open|day-close|week-close|month-close|update-delivery)$'
+# an arbitrary unrelated commit. strategy-session (issue #1659): the weekly and
+# monthly strategy session edits the week documents, which are no work product
+# (memory/protocol-open.md, scale "Week"); its skill opens the binding in step 0,
+# with an isolated copy when the canonical checkout is frozen.
+ALLOWED_HOUSEKEEPING_REASONS='^(day-open|day-close|week-close|month-close|update-delivery|strategy-session)$'
 # Scheduled runs of non-Claude agents, whole-value match: no trim, case-sensitive,
 # so `sched-1 extra`, a trailing space or a tab do not pass (WP-7 Phase 274).
 SCHED_HOUSEKEEPING_REASON='sched-[A-Za-z0-9._-]+'
@@ -356,8 +359,9 @@ WP-N — РП, который уже обсуждался в этой сесси
 техдолг, не как заглушка для работы без своего РП.
 
 Исключения без своего номера: закрытый список операционных протоколов
-(day-open, day-close, week-close, month-close, update-delivery) — их SKILL.md
-открывают open --housekeeping REASON сами — и плановые запуски не-Claude
+(day-open, day-close, week-close, month-close, update-delivery,
+strategy-session) — их SKILL.md открывают open --housekeeping REASON сами
+(сессия стратегирования при заморозке — с --isolate) — и плановые запуски не-Claude
 агентов (housekeeping sched-<id>, каждый пропуск пишется в журнал).
 
 Канонический чекаут может быть заморожен (WP-520/WP-484) — session-guard.sh в

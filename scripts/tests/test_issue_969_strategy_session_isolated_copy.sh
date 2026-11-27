@@ -116,7 +116,7 @@ fences = []
 for m in re.finditer(r"^([ \t]*)```bash[ \t]*\n(.*?)^\1```[ \t]*$", text, re.S | re.M):
     fences.append((text.count("\n", 0, m.start()) + 1, textwrap.dedent(m.group(2))))
 MARKERS = [("step0", "GUARD_MODE=required"), ("retry", "<блок шага 0 без изменений>"),
-           ("open", "open --isolate --wp"), ("write", "<команды записи>"),
+           ("open", "open --housekeeping strategy-session --isolate"), ("write", "<команды записи>"),
            ("publish", "ds-publish.sh"), ("search", "grep -rl")]
 step0 = next((body for _, body in fences if MARKERS[0][1] in body), "")
 SUBST = [("{{WORKSPACE_DIR}}", ws), ("{{GOVERNANCE_REPO}}", "DS-strategy"),

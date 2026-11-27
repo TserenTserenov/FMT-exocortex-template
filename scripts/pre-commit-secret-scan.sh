@@ -16,6 +16,11 @@
 set -uo pipefail
 umask 077
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
+# issue #1670: sed and grep work on bytes. Under a UTF-8 locale BSD sed stops at the
+# first byte that is not UTF-8 (a Windows-1251 CSV, a binary blob), and the scan used
+# to read the empty result as "nothing added". Every pattern is ASCII, so the C
+# locale loses nothing.
+export LC_ALL=C
 
 if ! repo_root=$(git rev-parse --show-toplevel 2>/dev/null); then
   printf 'Pre-commit secret scan unavailable: repository root is unknown.\n' >&2
@@ -43,7 +48,10 @@ if [ -z "$SECRET_LIB" ]; then
 fi
 # shellcheck source=../.claude/hooks/secret-bypass-lib.sh
 # shellcheck disable=SC1090,SC1091
-. "$SECRET_LIB"
+if ! . "$SECRET_LIB"; then
+  printf 'Pre-commit secret scan unavailable: canonical pattern library failed to load.\n' >&2
+  exit 2
+fi
 if ! command -v secret_pattern_process >/dev/null 2>&1 \
   || [ ! -x "$SECRET_BYPASS_JQ" ] \
   || [ ! -x "$SECRET_BYPASS_PYTHON" ]; then
@@ -60,7 +68,10 @@ fi
 # a real secret pasted into either file by mistake still isn't the scanner's
 # job to catch (an unrelated content-review concern, same as for any file
 # whose entire purpose is to hold example/pattern text).
-if ! staged_diff=$(git diff --cached --diff-filter=ACMR --no-ext-diff --unified=0 -- . \
+# issue #1670: --text and --no-textconv make git show the added content of files it
+# treats as binary (a NUL byte, or "-diff" in .gitattributes) instead of the single
+# line "Binary files differ", so a key inside such a file is scanned too.
+if ! staged_diff=$(git diff --cached --diff-filter=ACMR --no-ext-diff --no-textconv --text --unified=0 -- . \
     ':(exclude).claude/hooks/secret-bypass-lib.sh' \
     ':(exclude).claude/hooks/secret-bypass-analyzer.py'); then
   printf 'Pre-commit secret scan unavailable: staged diff could not be read.\n' >&2
@@ -72,7 +83,11 @@ fi
 
 # Drop diff metadata and the leading "+" marker. Line indexes returned by the
 # helper are internal only; the hook intentionally omits source lines entirely.
-added_lines=$(printf '%s\n' "$staged_diff" | sed -n '/^+++ /d; s/^+//p')
+# issue #1670: a failed sed must stop the commit, not pass it as an empty diff.
+if ! added_lines=$(printf '%s\n' "$staged_diff" | sed -n '/^+++ /d; s/^+//p'); then
+  printf 'Pre-commit secret scan unavailable: diff filtering failed.\n' >&2
+  exit 2
+fi
 if [ -z "$added_lines" ]; then
   exit 0
 fi

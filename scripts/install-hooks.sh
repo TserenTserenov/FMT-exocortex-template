@@ -103,7 +103,38 @@ for hook in pre-commit pre-push; do
   [ -f "$target" ] && chmod +x "$target"
 done
 
-git -C "$REPO" config core.hooksPath .githooks
+# issue #1688: a core.hooksPath the user already pointed at their own hooks
+# (.husky, a shared hooks folder, set locally or globally) is kept. Replacing it
+# silently switched off the user's linters and secret checks on every update.
+# Only an unset value, or one that already resolves to this repo's .githooks,
+# is (re)written.
+hooks_path_rc=0
+current_hooks_path=$(git -C "$REPO" config --get core.hooksPath) || hooks_path_rc=$?
+if [ "$hooks_path_rc" -gt 1 ]; then
+  echo "❌ Cannot read core.hooksPath of $REPO (git config rc=$hooks_path_rc)" >&2
+  echo "   core.hooksPath не изменён." >&2
+  exit 1
+fi
+
+points_at_platform_hooks() {
+  case "$1" in
+    .githooks|.githooks/|./.githooks|./.githooks/) return 0 ;;
+    /*) [ -d "$1" ] && [ "$(cd "$1" && pwd -P)" = "$(cd "$HOOK_DIR" && pwd -P)" ] ;;
+    *) return 1 ;;
+  esac
+}
+
+if [ -n "$current_hooks_path" ] && [ "$current_hooks_path" != /dev/null ] && ! points_at_platform_hooks "$current_hooks_path"; then
+  hooks_path_scope=$(git -C "$REPO" config --show-scope --get core.hooksPath 2>/dev/null | cut -f1) || hooks_path_scope=""
+  echo "⚠️  core.hooksPath уже задан: «${current_hooks_path}»${hooks_path_scope:+ (${hooks_path_scope})} — оставляю как есть, не заменяю (#1688)."
+  echo "   Платформенные проверки из $HOOK_DIR в этом репозитории НЕ активны:"
+  echo "   pre-commit (в том числе закрытие РП с неразобранными входящими) и pre-push (защита от force-push)."
+  echo "   Включить их вместо своих хуков: git -C \"$REPO\" config --local core.hooksPath .githooks"
+  echo "   Либо вызывайте .githooks/pre-commit и .githooks/pre-push из своих хуков."
+  exit 0
+fi
+
+git -C "$REPO" config --local core.hooksPath .githooks
 
 MISSING=""
 for hook in pre-commit pre-push; do
