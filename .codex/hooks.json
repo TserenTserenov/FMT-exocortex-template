@@ -23,6 +23,21 @@
             "type": "command",
             "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" dry-run-gate.sh --matcher \"Write|Edit|MultiEdit|NotebookEdit|Bash|mcp__.*\"",
             "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" extensions-gate.sh --matcher \"Edit|Write\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" pack-creator-spf-guard.sh --matcher \"Write|Edit|MultiEdit|NotebookEdit\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" secret-file-read-block.sh --matcher \"Read|Edit|MultiEdit|Grep\"",
+            "timeout": 60
           }
         ]
       },

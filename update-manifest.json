@@ -237,7 +237,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-codex-guard-adapter.py",
-      "sha256": "4bf2c6ad46ea3ea44e829235e009e12534b721b3a9c00bdc023bfde8f7af3df6"
+      "sha256": "53a38c7dd8bd990dfb9b2045e679e8d58204c7f64cabd408e73e2f172e19d271"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
@@ -961,11 +961,11 @@
     },
     {
       "path": ".codex/hooks.json",
-      "sha256": "e1ed42fb49290920edf97ed96a3954926f9f4da62e4602370603af57246e81a7"
+      "sha256": "8fb1d6fee3864a63e5145efcab02c86f3528a7f0c75811dec283abffe74c7580"
     },
     {
       "path": ".codex/hooks/guard_adapter.py",
-      "sha256": "4f10115481ffb5cbf37189b2a6f43bc12d0319dd88429b33ad8aee41ab00fbfd"
+      "sha256": "493ac737eb8f0b9384c1afdc64ac812f6ac5027dfcfafb0c16c53cb79884897a"
     },
     {
       "path": ".githooks/commit-msg",
@@ -1025,7 +1025,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "134b5f1cc4e39c66576be943061a1db4b707aa3e43adfab80f88145431b0d1ce"
+      "sha256": "3eeec1731d5c48cbe8b94d9db383cfbedbf0c899014a4119e91e9812584c7d06"
     },
     {
       "path": "CLAUDE.md",
