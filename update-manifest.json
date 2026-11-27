@@ -236,6 +236,10 @@
       "sha256": "361afee4f84c5cb5a11615631e8187693813054c6f9175d9c436f686320628d3"
     },
     {
+      "path": ".claude/hooks/tests/test-codex-guard-adapter.py",
+      "sha256": "4bf2c6ad46ea3ea44e829235e009e12534b721b3a9c00bdc023bfde8f7af3df6"
+    },
+    {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
       "sha256": "3a654e30e5b62d17eb0f405e69c60139eb7f966a636b4dce4552a579f8576a47"
     },
@@ -957,11 +961,11 @@
     },
     {
       "path": ".codex/hooks.json",
-      "sha256": "67a90f39b107b8cf5ddb01305850909e9e25021a74cb09fd2b82e75ba2bddabe"
+      "sha256": "e1ed42fb49290920edf97ed96a3954926f9f4da62e4602370603af57246e81a7"
     },
     {
-      "path": ".codex/hooks/destructive_guard_codex.sh",
-      "sha256": "32e3c8c0fd6b3385d1f7d0ac48c1ae98bd22e2a15cc3a66b1a1ac559bd4c49c8"
+      "path": ".codex/hooks/guard_adapter.py",
+      "sha256": "4f10115481ffb5cbf37189b2a6f43bc12d0319dd88429b33ad8aee41ab00fbfd"
     },
     {
       "path": ".githooks/commit-msg",
@@ -993,7 +997,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "5dc308a1d6273876e22106d18c5601ab60623bea5c288cb793cadde5e8ac502d"
+      "sha256": "849158db8c6483d9dc9845b80d14b3c81592f538d2442192ff1dbd74b8be1735"
     },
     {
       "path": ".gitignore",
@@ -1021,7 +1025,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f2d3a088a42ec1e9fe46b8a80b4f013f8927d425cdc77df9948ea44b80686cce"
+      "sha256": "134b5f1cc4e39c66576be943061a1db4b707aa3e43adfab80f88145431b0d1ce"
     },
     {
       "path": "CLAUDE.md",
@@ -1057,7 +1061,7 @@
     },
     {
       "path": "docs/CHATGPT-CODEX-SETUP.md",
-      "sha256": "44a03696e21b15ca3fad4746b8d0adaa61463cba08e338bf31fd306a503f7bac"
+      "sha256": "58d5f177ed06c5d07fe0852bb935afa30ff6732d2abd0350abcc1cf950904ec6"
     },
     {
       "path": "docs/CLOUD-SCHEDULER.md",
