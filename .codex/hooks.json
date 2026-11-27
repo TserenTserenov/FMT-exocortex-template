@@ -1,0 +1,103 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" destructive-guard.sh",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" secret-leak-block.sh",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" session-open-gate.sh --agent codex",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" dry-run-gate.sh --matcher \"Write|Edit|MultiEdit|NotebookEdit|Bash|mcp__.*\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" extensions-gate.sh --matcher \"Edit|Write\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" pack-creator-spf-guard.sh --matcher \"Write|Edit|MultiEdit|NotebookEdit\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" secret-file-read-block.sh --matcher \"Read|Edit|MultiEdit|Grep\"",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" extensions-gate.sh --matcher \"Edit|Write\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" pack-creator-spf-guard.sh --matcher \"Write|Edit|MultiEdit|NotebookEdit\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" secret-file-read-block.sh --matcher \"Read|Edit|MultiEdit|Grep\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" dry-run-gate.sh --matcher \"Write|Edit|MultiEdit|NotebookEdit|Bash|mcp__.*\"",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" destructive-mcp-guard.sh",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" secret-mcp-dump-guard.sh",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" dry-run-gate.sh --matcher \"Write|Edit|MultiEdit|NotebookEdit|Bash|mcp__.*\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/guard_adapter.py\" sql-pii-guard.sh --matcher \"Write|Edit|MultiEdit\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
