@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "463270b531b39405856eedd8175e01bb2f1a39861c3f62685ddc8d5e4b808913"
+      "sha256": "d54dca570353867e0854de9563f99038c7a98327e0e101cd87c766fb8f73dc10"
     },
     {
       "path": "CLAUDE.md",
@@ -2953,7 +2953,7 @@
     },
     {
       "path": "scripts/pre-commit-secret-scan.sh",
-      "sha256": "b91187a8be7ca0dc653fc0dc904397bea5c82153b885a664c9fad8953d7baa09"
+      "sha256": "c0699319f92490c40f3d75bba66a5e4f1803cdadb0bf582bc941da90460fd711"
     },
     {
       "path": "scripts/promote-common.sh",
@@ -3803,6 +3803,7 @@
     "scripts/tests/test_issue_1606_name_registry.sh",
     "scripts/tests/test_issue_1625_runtime_warning.sh",
     "scripts/tests/test_issue_1659_strategy.sh",
+    "scripts/tests/test_issue_1670_secret_scan_bytes.sh",
     "scripts/tests/test_issue_1688_hooks_path_kept.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
