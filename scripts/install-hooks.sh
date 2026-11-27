@@ -124,7 +124,7 @@ points_at_platform_hooks() {
   esac
 }
 
-if [ -n "$current_hooks_path" ] && ! points_at_platform_hooks "$current_hooks_path"; then
+if [ -n "$current_hooks_path" ] && [ "$current_hooks_path" != /dev/null ] && ! points_at_platform_hooks "$current_hooks_path"; then
   hooks_path_scope=$(git -C "$REPO" config --show-scope --get core.hooksPath 2>/dev/null | cut -f1) || hooks_path_scope=""
   echo "⚠️  core.hooksPath уже задан: «${current_hooks_path}»${hooks_path_scope:+ (${hooks_path_scope})} — оставляю как есть, не заменяю (#1688)."
   echo "   Платформенные проверки из $HOOK_DIR в этом репозитории НЕ активны:"

@@ -90,4 +90,12 @@ out=$(run_installer "$WS")
 check ".githooks unchanged" ".githooks" "$(local_hooks_path "$WS/DS-strategy")"
 lacks "no warning for .githooks" "уже задан" "$out"
 
+# 5. /dev/null is the "hooks off" idiom, not the user's own hook set: it is rewired.
+WS="$TMP/ws-devnull"
+make_repo "$WS" DS-strategy
+git -C "$WS/DS-strategy" config --local core.hooksPath /dev/null
+out=$(run_installer "$WS")
+check "/dev/null -> .githooks" ".githooks" "$(local_hooks_path "$WS/DS-strategy")"
+lacks "no warning for /dev/null" "уже задан" "$out"
+
 exit "$fail"

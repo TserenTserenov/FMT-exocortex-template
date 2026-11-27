@@ -2537,7 +2537,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "1d8459cd8a824c716ce4559ae117d2907e5341ed3b0dbb7060071d323a2b3f4a"
+      "sha256": "3827418d18f0d9e4d625dba776b1d6e282c7f36dac10bdde6bb598bddbaa9d1e"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -2653,7 +2653,7 @@
     },
     {
       "path": "scripts/install-hooks.sh",
-      "sha256": "bd9cbb7dbce1d54fda98df22e1a4393c7a09ebaa04cf9b852783c641c9f14113"
+      "sha256": "456ddb52697adb2f81ff9e6eacd5602668832ea646283c50fc107c2bbe5622ce"
     },
     {
       "path": "scripts/isolate-push.sh",
@@ -3457,7 +3457,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "62ab0a4dbe9f971b3a9f8509013d2955de3b512172d9de1d94ae121a120a2112"
+      "sha256": "dd138f606a1a76f7ce97c6831ec6b28b22cbcd5472044bfbd98b024c1f7fbda2"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
@@ -3485,7 +3485,7 @@
     },
     {
       "path": "seed/strategy/scripts/install-hooks.sh",
-      "sha256": "bd9cbb7dbce1d54fda98df22e1a4393c7a09ebaa04cf9b852783c641c9f14113"
+      "sha256": "456ddb52697adb2f81ff9e6eacd5602668832ea646283c50fc107c2bbe5622ce"
     },
     {
       "path": "seed/strategy/scripts/isolate-push.sh",
@@ -3577,7 +3577,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "f0a86fbc34a679dde09a1b6f0d403a13c7d1e1961cdb36672ad71b2e89c47932"
+      "sha256": "7f007da19e3388fd2e38d96108a273161b12726627a11637c5816734b8ba1346"
     },
     {
       "path": "setup/lib/apply-op.sh",

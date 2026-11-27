@@ -255,7 +255,7 @@ for repo_dir in "$WORKSPACE_DIR"/* "$WORKSPACE_DIR"/*/*; do
     current_hooks_path=$(git -C "$repo_dir" config --get core.hooksPath 2>/dev/null) || current_hooks_path=""
     case "$current_hooks_path" in
         .githooks|.githooks/|./.githooks|./.githooks/) ;;
-        "")
+        ""|/dev/null)
             git -C "$repo_dir" config --local core.hooksPath .githooks
             $QUIET || echo "  ✓ $repo_dir → core.hooksPath=.githooks"
             ;;
