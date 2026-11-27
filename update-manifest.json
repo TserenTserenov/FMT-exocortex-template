@@ -517,7 +517,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "42f5d1a82dd75b2d40be091fb85bdcf99a7217b3fa508d816535db11524da64b"
+      "sha256": "0de763c7f263c52196b131b44bd57f0307d77a7bc4ea4e7c2cae4635b597e188"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -589,7 +589,7 @@
     },
     {
       "path": ".claude/skills/day-open/SKILL.md",
-      "sha256": "a31eeab058a0e0d0beba5b231f4bc10011de830c1e54c4175f81d85d9426539f"
+      "sha256": "9f642759fb212f752639a5b63a58b812507227c156527f88eecc07299e56bcf3"
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
@@ -1001,7 +1001,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "849158db8c6483d9dc9845b80d14b3c81592f538d2442192ff1dbd74b8be1735"
+      "sha256": "a18c53fb9fcb056f34a4fa4e9ef56113678efdf9729e7d8a89e2e3f5c8674a4a"
     },
     {
       "path": ".gitignore",
@@ -1029,7 +1029,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "033e660e29d1edfedec6b7c144cb17f4b2a91544398e536254be2da303ecf1a8"
+      "sha256": "5c30f9066e8115e7c17f1b309df21a5bcf9dd441b10662e1c279f0af29995844"
     },
     {
       "path": "CLAUDE.md",
@@ -1393,7 +1393,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "c4106d2d6eb6119e6844f18cf53a96a2c4f80a618ab3f2abded8a93b3bda3f1d"
+      "sha256": "96b78fd9a4cc5121f9f70717060d3b1047dc2fb498743d4d7ac59b42cc0dcd29"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2537,7 +2537,7 @@
     },
     {
       "path": "scripts/day-open-budget-patch.py",
-      "sha256": "00741e86c33692337bd4fd8cb870345719044c8f19918f8db016c95c7bab0e49"
+      "sha256": "d36f1d049dc1bfebede5f929778e5087add23f538d32adca69f9818494fc5e9b"
     },
     {
       "path": "scripts/day-open-checks-runner.sh",
@@ -2565,7 +2565,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "3827418d18f0d9e4d625dba776b1d6e282c7f36dac10bdde6bb598bddbaa9d1e"
+      "sha256": "a79b573b621e210fdcae7f542ed447fd8f892b181580254aef680981d59fdc6f"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -2573,7 +2573,7 @@
     },
     {
       "path": "scripts/day-open-priorities-patch.py",
-      "sha256": "55057e05f5b4a7cfc81daaeb2c0e8e39e04cebf5cdbda1ca7fdaf01cea908cbb"
+      "sha256": "2a004a129aa0c5c1703619b1db536f478390cdea3902fb921714848d9d18843b"
     },
     {
       "path": "scripts/day-open-scaffold.sh",
@@ -2594,6 +2594,10 @@
     {
       "path": "scripts/day-open-version-check-patch.py",
       "sha256": "4324e682ec690e2ef565f7c99ba580e5d80556bccb73d36ca39b8ee096a2decf"
+    },
+    {
+      "path": "scripts/day-open-week-sync-patch.py",
+      "sha256": "adf267ff9ae8ac75411210bc0533ef281bebc06e46da0e0bf94ab40c4c0d09ca"
     },
     {
       "path": "scripts/dry-run-begin.sh",
@@ -2812,8 +2816,16 @@
       "sha256": "db7edc4b804bd9ca0520bcadad68d5d2486db8795f282f82c53e5025ee20aabf"
     },
     {
+      "path": "scripts/lib/compact_dashboard.py",
+      "sha256": "18e3b37d1e95008e34f1acda9c2b46bff3861dab46757952f03436045dfdf313"
+    },
+    {
       "path": "scripts/lib/day-open-hooks.sh",
       "sha256": "d036781319493cfe1d58f369a87d0d52756cc6c7b0cdef8b5783594fd3d09ab6"
+    },
+    {
+      "path": "scripts/lib/day_open_attention.py",
+      "sha256": "540ebe68fd887e256504e7ebe32ae20bc10dac630552b4f31b2bd05784c25a4c"
     },
     {
       "path": "scripts/lib/dayplan_sections.py",
@@ -2868,6 +2880,14 @@
       "sha256": "782d0316b8ef223c41d74e8c6c8293c41be3f4ed7dda2561985b72894f341f67"
     },
     {
+      "path": "scripts/lib/plan_hours.py",
+      "sha256": "5b002e25acf100dd58c7b23b05e066185018f3b0b1b2b1948383b6dfab1275b0"
+    },
+    {
+      "path": "scripts/lib/plan_table.py",
+      "sha256": "e16834e5fc595e379cc4fdf5c535ab9b3851bc37fd26ca820bc3c20f9c32e54d"
+    },
+    {
       "path": "scripts/lib/process-identity.sh",
       "sha256": "a1eb29a8ead2aa71911826723c84b9367363245050a5dd5f53d3f839df127c9c"
     },
@@ -2886,6 +2906,10 @@
     {
       "path": "scripts/lib/telegram.sh",
       "sha256": "1523d49deb3dd027e3838f6d3bd012cf2ca14a3adfc8c8212522d91022e34ff3"
+    },
+    {
+      "path": "scripts/lib/week_pool.py",
+      "sha256": "571184ab574fb62143eda1df403fb3191744da438ea81e154d481c5742692d68"
     },
     {
       "path": "scripts/lib/wp-num.sh",
@@ -3457,7 +3481,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-budget-patch.py",
-      "sha256": "1d5bed9e154a076b0a9f9e311fd0b05bfc9b0aa6364693ff40cb69c7186ae9e2"
+      "sha256": "49ed4bfb19076910196fbde92308a42af6427abeeed9c8c0e5a63ef4332436e1"
     },
     {
       "path": "seed/strategy/scripts/day-open-checks-runner.sh",
@@ -3485,11 +3509,11 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "dd138f606a1a76f7ce97c6831ec6b28b22cbcd5472044bfbd98b024c1f7fbda2"
+      "sha256": "2a99e3953b6ed708d2ee1cc4a94b3b2c280d8c8025c694f5b5b132823df36ef6"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
-      "sha256": "5c826a28ba66346e104b6c50d139aa4bd84bf685b77a17e742977a28c9054f22"
+      "sha256": "3d25f0a505bb19f4a85e5d97071874c10c0f903349401f74239f5b1381af7ba8"
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
@@ -3502,6 +3526,10 @@
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",
       "sha256": "bc380db1c7cc5c9c44840bfd1815320dec1f850a4f47264e0510a87cb024f6ef"
+    },
+    {
+      "path": "seed/strategy/scripts/day-open-week-sync-patch.py",
+      "sha256": "4fcfc8223a69df3f1b8064f55460052da43a7fd94a09644641d03b2851b3a37c"
     },
     {
       "path": "seed/strategy/scripts/ds-publish.sh",
@@ -3532,8 +3560,16 @@
       "sha256": "8e5f0f9c6082a942fb699922c674dcd853b86e02254b66faa5ed6844a96e23f8"
     },
     {
+      "path": "seed/strategy/scripts/lib/compact_dashboard.py",
+      "sha256": "3c25bcce8bc4ce9a15344dee80ad445a77bc0f652bf9a3e6fadb37b6276a1c11"
+    },
+    {
       "path": "seed/strategy/scripts/lib/day-open-hooks.sh",
       "sha256": "4c1881f69c04b34810164dee70316502cf9dc76ef519fe3f35df3987af59957e"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/day_open_attention.py",
+      "sha256": "4de049a39a0a10e8592e521c513d32c772ed8ff363ebf7cc730ceb8a93526b8f"
     },
     {
       "path": "seed/strategy/scripts/lib/dayplan_sections.py",
@@ -3564,12 +3600,24 @@
       "sha256": "204f0cd09a835209dfaad780a9d761f831000d799d2aae5cb631af60a7b51397"
     },
     {
+      "path": "seed/strategy/scripts/lib/plan_hours.py",
+      "sha256": "8bdfdc7dda1c4378e44ff1b98abbafc77d65e625065962a4a3aa9cf36a7e1101"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/plan_table.py",
+      "sha256": "840532e73257e74001f932dd4cabc663e6c3ddb79bfb2a12b842a5851054d22e"
+    },
+    {
       "path": "seed/strategy/scripts/lib/publish-gate.sh",
       "sha256": "a9c2191dda6f55c0cd33d2ff99114caf7609b09244ffb7be4210dc783a82426c"
     },
     {
       "path": "seed/strategy/scripts/lib/telegram.sh",
       "sha256": "7f0bd85eb1950426d59e8580f86745813fe9fd4a93de4adf0f0a4dee080c5aed"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/week_pool.py",
+      "sha256": "bce877130fb5343f33265feeacc2d6a7d575af798fa9ac7a6f711714f8848779"
     },
     {
       "path": "seed/strategy/scripts/lib/wp_inbox.py",
@@ -3739,6 +3787,7 @@
     "scripts/tests/test_day_close_prepare.py",
     "scripts/tests/test_day_open_checks_runner_false_positive.sh",
     "scripts/tests/test_day_open_preflight_calendar_path.sh",
+    "scripts/tests/test_day_open_week_sync_patch.py",
     "scripts/tests/test_delivery_content.py",
     "scripts/tests/test_delivery_formal.py",
     "scripts/tests/test_dispatcher_dsh_executor.py",
@@ -3959,6 +4008,7 @@
     "scripts/tests/test_validate_filters.sh",
     "scripts/tests/test_validate_hypothesis_priority.sh",
     "scripts/tests/test_validate_skill_hook_claims_path.sh",
+    "scripts/tests/test_week_pool.py",
     "scripts/tests/test_wp568_strategist_auth_and_retry_message.sh",
     "scripts/tests/test_wp_inbox_bundle_signal.sh",
     "scripts/tests/wp-inbox-close-gate-smoke.sh",

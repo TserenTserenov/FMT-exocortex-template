@@ -2,7 +2,7 @@
 # see DP.SC.153
 # НЕ редактировать вручную — перегенерировать через generate-skills-catalog.sh
 #
-generated: 2026-11-27T21:42:42Z
+generated: 2026-11-27T22:13:05Z
 skills_dir: .claude/skills
 
 skills:
@@ -166,7 +166,7 @@ skills:
   - id: day-open
     name: "day-open"
     description: "Day Open protocol. Collects yesterday's commits, issues, notes, calendar, bot QA, Scout, world events — builds DayPlan and compact dashboard."
-    version: 1.1.0
+    version: 1.2.0
     layer: L1
     status: active
     triggers:

@@ -203,12 +203,18 @@ PLATFORM_HOOKS_EXPLICIT_INCLUDE=(
     "seed/strategy/scripts/day-open-priorities-patch.py"
     "seed/strategy/scripts/day-open-sync-banner-patch.py"  # stale-input banner step 4.58 (#1245)
     "seed/strategy/scripts/day-open-version-check-patch.py"
+    "seed/strategy/scripts/day-open-week-sync-patch.py"  # day plan from the week plan, step 4.45 (#1641)
     "seed/strategy/scripts/ledger-append.sh"
     "seed/strategy/scripts/llm-proxy-launcher.sh"
     "seed/strategy/scripts/lib/common.sh"
     "seed/strategy/scripts/lib/day-open-hooks.sh"
     # Both installed DayPlan readers import this parser from their seed copy.
     "seed/strategy/scripts/lib/dayplan_sections.py"
+    "seed/strategy/scripts/lib/compact_dashboard.py"
+    "seed/strategy/scripts/lib/day_open_attention.py"
+    "seed/strategy/scripts/lib/plan_hours.py"
+    "seed/strategy/scripts/lib/plan_table.py"
+    "seed/strategy/scripts/lib/week_pool.py"
     "seed/strategy/scripts/lib/find-python3.sh"
     "seed/strategy/scripts/lib/ledger-path.sh"
     "seed/strategy/scripts/lib/ledger-publish-kick.sh"
