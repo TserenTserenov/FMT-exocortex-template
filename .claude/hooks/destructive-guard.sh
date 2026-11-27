@@ -73,7 +73,23 @@ DG_NONCE=${3:-}
 [ -n "$DG_PROOF" ] && printf 'pid %s\n' "$$" >"$DG_PROOF" 2>/dev/null
 set -euo pipefail
 
+# Readiness receipt (WP-592 F6). When the blocked command names the fixture of a readiness probe
+# made by .claude/scripts/guard-readiness.sh, the block writes a receipt into that probe folder:
+# the check can then tell this guard's own block from a refusal by the agent, its sandbox or the
+# model. Only an existing probe folder whose probe.id holds the same id is written to, and a
+# failed write never changes the block. It proves the hook is wired, not that the agent is honest:
+# an allowed command can write the same file.
+dg_readiness_receipt() {
+  local re='([^[:space:]"'"'"']*\.iwe-runtime/guard-readiness/([0-9a-f]{24}))/fixture' dir id
+  [[ "${CMD:-}" =~ $re ]] || return 0
+  dir=${BASH_REMATCH[1]} id=${BASH_REMATCH[2]}
+  case "$dir" in /*) ;; *) dir="${CWD:-.}/$dir" ;; esac
+  [ "$(cat "$dir/probe.id" 2>/dev/null || true)" = "$id" ] || return 0
+  printf 'blocked %s\n' "$id" >"$dir/guard-blocked" 2>/dev/null || true
+}
+
 block() {
+  dg_readiness_receipt || true
   echo "BLOCKED: $1" >&2
   exit 2
 }
