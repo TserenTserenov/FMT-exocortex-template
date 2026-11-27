@@ -281,7 +281,11 @@ else
     # silently disabled the pre-push force-push guard (WP-436) on a live host —
     # the "guard exists but isn't wired up" gap stayed invisible until an incident.
     HOOKS_PATH=$(git -C "$DS_DIR" config --get core.hooksPath 2>/dev/null || echo "")
-    if [ "$HOOKS_PATH" != ".githooks" ]; then
+    if [ -n "$HOOKS_PATH" ] && [ "$HOOKS_PATH" != ".githooks" ]; then
+        # issue #1688: a value the user set is kept by install-hooks.sh, so
+        # suggesting it would not help; name the choice and the explicit switch.
+        echo "⚠️ \`core.hooksPath\` = \`$HOOKS_PATH\` (свой путь пользователя, обновление его не меняет) — платформенные проверки из \`.githooks/\` (pre-push force-push guard WP-436, закрытие РП с неразобранными входящими) не активны. Включить их вместо своих хуков: \`git -C \"$DS_DIR\" config --local core.hooksPath .githooks\`."
+    elif [ "$HOOKS_PATH" != ".githooks" ]; then
         if [ -x "$DS_DIR/scripts/install-hooks.sh" ]; then
             echo "⚠️ \`core.hooksPath\` = \`${HOOKS_PATH:-<не задан>}\`, ожидается \`.githooks\` — pre-push force-push guard (WP-436) может быть отключён. Почини: \`bash \"$DS_DIR/scripts/install-hooks.sh\"\`."
         else

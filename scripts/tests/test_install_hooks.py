@@ -408,6 +408,113 @@ def test_effective_governance_rejects_reserved_or_template_target(
     assert sentinel.read_text(encoding="utf-8") == "template sentinel\n"
 
 
+def _hooks_path(repo: Path, *scope: str) -> str:
+    result = subprocess.run(
+        ["git", "config", *scope, "--get", "core.hooksPath"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        env={"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "HOME": str(repo.parent)},
+    )
+    return result.stdout.strip()
+
+
+def _repo_with_own_husky_hook(tmp_path: Path) -> Path:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    husky = repo / ".husky"
+    husky.mkdir()
+    (husky / "pre-commit").write_text("#!/bin/bash\necho user lint\n", encoding="utf-8")
+    (husky / "pre-commit").chmod(0o755)
+    subprocess.run(["git", "config", "--local", "core.hooksPath", ".husky"], cwd=repo, check=True)
+    return repo
+
+
+def test_user_hooks_path_is_kept_with_warning(tmp_path):
+    """issue #1688: an update replaced the user's own core.hooksPath (.husky)
+    with .githooks silently, so the user's own hooks stopped running."""
+    repo = _repo_with_own_husky_hook(tmp_path)
+
+    result = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _hooks_path(repo, "--local") == ".husky"
+    assert "core.hooksPath уже задан: «.husky» (local)" in result.stdout
+    assert "НЕ активны" in result.stdout
+    assert "git -C" in result.stdout and "config --local core.hooksPath .githooks" in result.stdout
+    assert "Hooks wired" not in result.stdout
+    # Missing platform hooks are still delivered, ready for a manual switch.
+    assert (repo / ".githooks" / "pre-push").is_file()
+
+
+def test_global_user_hooks_path_is_not_shadowed_by_a_local_value(tmp_path):
+    """A shared hooks folder set globally must not be overridden by a local
+    .githooks value either: that switches the user's hooks off just as well."""
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    shared = tmp_path / "shared-hooks"
+    shared.mkdir()
+    subprocess.run(
+        ["git", "config", "--file", str(tmp_path / ".gitconfig"), "core.hooksPath", str(shared)],
+        check=True,
+    )
+
+    result = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _hooks_path(repo, "--local") == ""
+    assert f"«{shared}» (global)" in result.stdout
+
+
+def test_unset_hooks_path_is_wired_to_githooks(tmp_path):
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+
+    result = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _hooks_path(repo, "--local") == ".githooks"
+    assert "Hooks wired" in result.stdout
+    assert "уже задан" not in result.stdout
+
+
+@pytest.mark.parametrize("value", [".githooks", "./.githooks/", "ABSOLUTE"])
+def test_platform_hooks_path_spellings_are_not_treated_as_user_value(tmp_path, value):
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / ".githooks").mkdir()
+    if value == "ABSOLUTE":
+        value = str(repo / ".githooks")
+    subprocess.run(["git", "config", "--local", "core.hooksPath", value], cwd=repo, check=True)
+
+    result = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _hooks_path(repo, "--local") == ".githooks"
+    assert "уже задан" not in result.stdout
+    assert "Hooks wired" in result.stdout
+
+
+def test_update_backfill_keeps_user_hooks_path_and_succeeds(tmp_path):
+    """The update step must not fail the update for a kept user value, and must
+    not change it (the original #1688 reproduction went through update.sh)."""
+    workspace = tmp_path / "IWE-custom"
+    governance = workspace / "custom-governance"
+    _init_repo(governance)
+    subprocess.run(["git", "config", "--local", "core.hooksPath", ".husky"], cwd=governance, check=True)
+
+    result = subprocess.run(
+        ["bash", "-c", _update_backfill_script(workspace)],
+        capture_output=True,
+        text=True,
+        env={"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "HOME": str(tmp_path)},
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _hooks_path(governance, "--local") == ".husky"
+    assert "оставляю как есть" in result.stdout
+
+
 def test_root_and_seed_installers_have_one_implementation():
     root_lines = (ROOT / "scripts" / "install-hooks.sh").read_text(encoding="utf-8").splitlines()
     seed_lines = INSTALL_HOOKS.read_text(encoding="utf-8").splitlines()

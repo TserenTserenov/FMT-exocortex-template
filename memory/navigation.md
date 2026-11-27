@@ -81,6 +81,8 @@ description: "Операционный файл памяти IWE"
 | Стратегия | `{{GOVERNANCE_REPO}}/docs/Strategy.md` |
 | Реестр всех РП (WP-1…WP-85+) | `{{GOVERNANCE_REPO}}/docs/WP-REGISTRY.md` |
 | WeekPlan | `{{GOVERNANCE_REPO}}/current/` |
+| Личная карта маршрутизации (ключевые места, что куда класть, свои источники, области) | `{{GOVERNANCE_REPO}}/docs/Routing-Map.md` |
+| Отложенное с условием возврата | `{{GOVERNANCE_REPO}}/docs/Backlog.md` |
 
 ## GitHub-организации (НЕ путать!)
 

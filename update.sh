@@ -304,6 +304,33 @@ render_skill_with_user_section() {
     reinject_user_section "$3" "$2"
 }
 
+# render_workspace_skill SRC DST OUT — the workspace copy of a skill the update writes:
+# SRC with the install_constants values from DST's frontmatter substituted for their
+# {{KEY}} placeholders and DST's USER-SPACE block reinjected. Step 5 writes it, and the
+# edit detector (workspace_copy_matches) compares a workspace copy with it, so both use
+# one definition (issue #1689). Sets SKILL_RENDER_USER_SPACE=1 when DST had the block.
+render_workspace_skill() {
+    local src="$1" dst="$2" out="$3" user_section="" ic_block="" key val
+    SKILL_RENDER_USER_SPACE=0
+    if [ -f "$dst" ]; then
+        user_section=$(sed -n '/^<!-- USER-SPACE -->/,/^<!-- \/USER-SPACE -->/p' "$dst" 2>/dev/null || true)
+        ic_block=$(awk '/^install_constants:/{found=1} found && /^[a-z][^:]+:/ && !/^install_constants:/{exit} found{print}' "$dst" 2>/dev/null || true)
+    fi
+    cp "$src" "$out" || return 1
+    if [ -n "$ic_block" ]; then
+        while IFS=': ' read -r key val; do
+            key="${key#"${key%%[! ]*}"}"
+            val="${val#"${val%%[! ]*}"}"
+            [[ "$key" =~ ^[A-Z_]+$ ]] && [ -n "$val" ] || continue
+            sed_inplace "s|{{${key}}}|${val}|g" "$out"
+        done <<< "$ic_block"
+    fi
+    if [ -n "$user_section" ]; then
+        reinject_user_section "$out" "$user_section"
+        SKILL_RENDER_USER_SPACE=1
+    fi
+}
+
 # === Cross-platform Python resolution (issue #402) ===
 # On Windows Git Bash, `command -v python3` finds the Microsoft Store App
 # Execution Alias stub (prints "Python was not found..." and exits non-zero)
@@ -1742,6 +1769,10 @@ RULES_SAFE_TO_UPDATE="|"
 HOOKS_BACKUP_RUN=""
 HOOK_BACKUP_FILE=""
 HOOKS_REPLACED=()
+SKILLS_BACKUP_RUN=""
+SKILLS_REPLACED=()
+PLATFORM_BACKUP_FILE=""
+SKILL_RENDER_USER_SPACE=0
 MEMORY_BACKUP_RUN=""
 # The record of installed memory versions, proof (a) of the memory policy (issues #965/#967).
 # The workspace is not a git repository: the record stays local to this installation.
@@ -3348,14 +3379,35 @@ refresh_fpf_base_clone() {
     return 0
 }
 
-# Rules and hooks (WP-529 Phase 246): a workspace copy equal to the previous template is
-# safe to replace silently; any other copy carries the user's own edit.
+# workspace_copy_matches FPATH SRC DST — true when DST is exactly what the update would
+# write from SRC: the same bytes for rules and hooks, and for a skill spec SRC rendered
+# with DST's own install_constants and USER-SPACE block (issue #1689).
+workspace_copy_matches() {
+    local fpath="$1" src="$2" dst="$3" rendered rc
+    case "$fpath" in
+        .claude/skills/*/SKILL.md)
+            rendered=$(mktemp "${TMPDIR:-/tmp}/iwe-skill-render.XXXXXX") || return 1
+            rc=1
+            if render_workspace_skill "$src" "$dst" "$rendered" \
+                && [ "$(hash_file "$rendered")" = "$(hash_file "$dst")" ]; then
+                rc=0
+            fi
+            rm -f "$rendered"
+            return "$rc"
+            ;;
+    esac
+    [ "$(hash_file "$src")" = "$(hash_file "$dst")" ]
+}
+
+# Rules, hooks (WP-529 Phase 246) and skill specs (issue #1689): a workspace copy equal to
+# what the previous template wrote is safe to replace silently; any other copy carries the
+# user's own edit. Called before the template clone moves, so SRC is the previous version.
 record_rule_workspace_state() {
     local fpath="$1" src dst
-    case "$fpath" in .claude/rules/*|.claude/hooks/*) ;; *) return 0 ;; esac
+    case "$fpath" in .claude/rules/*|.claude/hooks/*|.claude/skills/*/SKILL.md) ;; *) return 0 ;; esac
     src="$SCRIPT_DIR/$fpath"
     dst="$WORKSPACE_DIR/$fpath"
-    if [ ! -f "$dst" ] || { [ -f "$src" ] && [ "$(hash_file "$src")" = "$(hash_file "$dst")" ]; }; then
+    if [ ! -f "$dst" ] || { [ -f "$src" ] && workspace_copy_matches "$fpath" "$src" "$dst"; }; then
         RULES_SAFE_TO_UPDATE="${RULES_SAFE_TO_UPDATE}${fpath}|"
     fi
 }
@@ -3364,23 +3416,49 @@ rule_was_safe_to_update() {
     case "$RULES_SAFE_TO_UPDATE" in *"|$1|"*) return 0 ;; *) return 1 ;; esac
 }
 
-backup_rule_before_overwrite() {
-    local fpath="$1" dst="$2" backup
-    case "$fpath" in .claude/rules/*) ;; *) return 0 ;; esac
+# backup_platform_file_before_overwrite FPATH DST — keep the workspace copy of a rule or a
+# skill file under .backups/<kind>-pre-update/<run>/ before the update replaces it; one run
+# directory per kind and update run. PLATFORM_BACKUP_FILE names the copy. Non-zero when
+# the copy could not be saved: the caller must then leave DST alone.
+backup_platform_file_before_overwrite() {
+    local fpath="$1" dst="$2" run_var kind prefix
+    PLATFORM_BACKUP_FILE=""
+    case "$fpath" in
+        .claude/rules/*) run_var=RULES_BACKUP_RUN kind=rules prefix=.claude/rules/ ;;
+        .claude/skills/*) run_var=SKILLS_BACKUP_RUN kind=skills prefix=.claude/skills/ ;;
+        *) return 0 ;;
+    esac
     [ -f "$dst" ] || return 0
-    if [ -z "$RULES_BACKUP_RUN" ]; then
-        RULES_BACKUP_RUN="$WORKSPACE_DIR/.backups/rules-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+    if [ -z "${!run_var:-}" ]; then
+        printf -v "$run_var" '%s' "$WORKSPACE_DIR/.backups/$kind-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
     fi
-    backup="$RULES_BACKUP_RUN/${fpath#.claude/rules/}"
-    mkdir -p "$(dirname "$backup")"
-    cp "$dst" "$backup"
-    echo "  ↳ backup: $dst → $backup"
+    PLATFORM_BACKUP_FILE="${!run_var}/${fpath#"$prefix"}"
+    [ ! -L "$WORKSPACE_DIR/.backups" ] && mkdir -p "$(dirname "$PLATFORM_BACKUP_FILE")" \
+        && cp "$dst" "$PLATFORM_BACKUP_FILE" || return 1
+    echo "  ↳ backup: $dst → $PLATFORM_BACKUP_FILE"
+}
+
+# backup_edited_skill FPATH SRC DST — issue #1689: the update keeps only the USER-SPACE block
+# of a skill spec. A copy that matched the previous template, or already equals what SRC
+# renders to, is replaced silently; any other one is saved first and named in the log.
+# Non-zero when the copy could not be saved: the caller must then leave DST alone.
+backup_edited_skill() {
+    local fpath="$1" src="$2" dst="$3"
+    [ -f "$dst" ] || return 0
+    rule_was_safe_to_update "$fpath" && return 0
+    workspace_copy_matches "$fpath" "$src" "$dst" && return 0
+    if ! backup_platform_file_before_overwrite "$fpath" "$dst"; then
+        echo "  ⚠ $fpath — не заменён: рабочая копия отличается от шаблона не только блоком USER-SPACE, а сохранить её копию не удалось. Сверьте: diff \"$src\" \"$dst\""
+        return 1
+    fi
+    echo "  ⚠ $fpath — рабочая копия отличалась от шаблона не только блоком USER-SPACE и заменена версией шаблона; прежняя версия: $PLATFORM_BACKUP_FILE"
+    SKILLS_REPLACED+=("$fpath")
 }
 
 # issue #847: memory/* stale-repair (see repair_pass() below) used to overwrite
 # a workspace-local memory file with the template's version whenever hashes
 # differed, with no backup — unlike .claude/rules/* above, which already has
-# this via backup_rule_before_overwrite(). apply_memory_policy() now replaces only
+# this via backup_platform_file_before_overwrite(). apply_memory_policy() now replaces only
 # a copy it proved untouched, and saves it here first under its own backup dir.
 # MEMORY_BACKUP_FILE names the saved copy; it is set before the attempt, so a
 # warning can name it too. Returns non-zero when the copy could not be saved
@@ -3420,6 +3498,14 @@ report_replaced_hooks_summary() {
     echo "    Свои изменения переносите в extensions/ — туда обновление не пишет."
 }
 
+report_replaced_skills_summary() {
+    [ "${#SKILLS_REPLACED[@]}" -gt 0 ] || return 0
+    echo ""
+    echo "  ⚠ Скиллы, отличавшиеся от шаблона не только блоком USER-SPACE, заменены версией шаблона (${#SKILLS_REPLACED[@]}); прежние версии — в $SKILLS_BACKUP_RUN"
+    printf '    %s\n' "${SKILLS_REPLACED[@]}"
+    echo "    Обновление сохраняет только блок <!-- USER-SPACE --> скилла; свои правки держите в нём или в extensions/."
+}
+
 copy_platform_file_preserving_user_space() {
     local src="$1" dst="$2" fpath="$3" user_section=""
     if [ -f "$dst" ]; then
@@ -3427,7 +3513,7 @@ copy_platform_file_preserving_user_space() {
             .claude/rules/*)
                 user_section=$(sed -n '/^<!-- USER-SPACE -->/,/^<!-- \/USER-SPACE -->/p' "$dst" 2>/dev/null || true)
                 if [ "$(hash_file "$src")" != "$(hash_file "$dst")" ] && ! rule_was_safe_to_update "$fpath"; then
-                    backup_rule_before_overwrite "$fpath" "$dst"
+                    backup_platform_file_before_overwrite "$fpath" "$dst"
                     echo "  ⚠ $fpath — рабочая копия отличается от прежнего шаблона; пользовательская правка сохранена."
                     echo "    Сверьте: diff \"$src\" \"$dst\""
                     return 1
@@ -3447,9 +3533,10 @@ copy_platform_file_preserving_user_space() {
                 # #1010 F3: the regular update path keeps the USER-SPACE block of a skill spec
                 # (Step 5, SKILL.md branch); the repair/stale-repair path did not and dropped it.
                 user_section=$(sed -n '/^<!-- USER-SPACE -->/,/^<!-- \/USER-SPACE -->/p' "$dst" 2>/dev/null || true)
+                backup_edited_skill "$fpath" "$src" "$dst" || return 1
                 ;;
         esac
-        backup_rule_before_overwrite "$fpath" "$dst"
+        case "$fpath" in .claude/rules/*) backup_platform_file_before_overwrite "$fpath" "$dst" ;; esac
     fi
     cp "$src" "$dst"
     [ -z "$user_section" ] || reinject_user_section "$dst" "$user_section"
@@ -3550,7 +3637,7 @@ print_extra_write_targets() {
     echo "  • $WORKSPACE_DIR/.claude.md.base и $WORKSPACE_DIR/.claude.md.delivered — база слияния CLAUDE.md и запись хешей доставленной копии"
     echo "  • $WORKSPACE_DIR/.memory-deployed.tsv — запись версий памяти, которые установлены и не менялись (по ней update.sh отличает нетронутую копию от изменённой)"
     echo "  • $WORKSPACE_DIR/.iwe-paths и $HOME/.zshenv — пересоздаваемое окружение путей"
-    echo "  • local core.hooksPath в git-репозиториях с .githooks под $WORKSPACE_DIR"
+    echo "  • local core.hooksPath в git-репозиториях с .githooks под $WORKSPACE_DIR, где он не задан (свой путь пользователя не меняется, #1688)"
     echo "  • $governance_dir/scripts/install-hooks.sh — установщик platform hooks"
     echo "  • $governance_dir/.githooks/pre-commit и pre-push — platform hooks"
     echo "  • $governance_dir/scripts/update-derived-snapshot.py — обновлятор derived snapshot"
@@ -5877,6 +5964,7 @@ if [ "$TOTAL_CHANGES" -eq 0 ]; then
     apply_settings_merge_if_requested
     report_author_skip_summary
     report_replaced_hooks_summary
+    report_replaced_skills_summary
     report_executable_index_mismatches manifest
     # WP-7 F267 stage 1: an install with nothing to update still gets its capability record.
     if ! $CHECK_ONLY && [ -f "$SCRIPT_DIR/scripts/iwe-capabilities.sh" ]; then
@@ -6448,7 +6536,7 @@ for f in "${UPDATED_FILES[@]}"; do
             SKILL_STAGED_FILE="$TMPDIR_UPDATE/skill-staged-$UPDATE_PLAN_COUNT.md"
             render_skill_with_user_section "$TMPDIR_UPDATE/files/$f" "$USER_SECTION" "$SKILL_STAGED_FILE"
             update_plan_add_file "$f" "$SKILL_STAGED_FILE"
-            UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f (USER-SPACE preserved)"
+            UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f (блок USER-SPACE перенесён)"
         else
             update_plan_add_file "$f" "$TMPDIR_UPDATE/files/$f"
             UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f"
@@ -6958,33 +7046,14 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
             fi
             skip_author_readonly_target "$f" "$dst" && continue
             mkdir -p "$(dirname "$dst")"
-            # 1. Extract USER_SECTION from workspace before overwriting
-            if [ -f "$dst" ]; then
-                USER_SECTION=$(sed -n '/^<!-- USER-SPACE -->/,/^<!-- \/USER-SPACE -->/p' "$dst" 2>/dev/null || true)
-            else
-                USER_SECTION=""
-            fi
-            # 2. Extract install_constants values from workspace frontmatter
-            if [ -f "$dst" ]; then
-                IC_BLOCK=$(awk '/^install_constants:/{found=1} found && /^[a-z][^:]+:/ && !/^install_constants:/{exit} found{print}' "$dst" 2>/dev/null || true)
-            else
-                IC_BLOCK=""
-            fi
-            # 3. Copy src (with {{KEY}} placeholders) → dst
-            cp "$src" "$dst"
-            # 4. Substitute install_constants: {{KEY}} → VALUE
-            if [ -n "$IC_BLOCK" ]; then
-                while IFS=': ' read -r key val; do
-                    key="${key#"${key%%[! ]*}"}"
-                    val="${val#"${val%%[! ]*}"}"
-                    [[ "$key" =~ ^[A-Z_]+$ ]] && [ -n "$val" ] || continue
-                    sed_inplace "s|{{${key}}}|${val}|g" "$dst"
-                done <<< "$IC_BLOCK"
-            fi
-            # 5. Reinject USER_SECTION
-            if [ -n "$USER_SECTION" ]; then
-                reinject_user_section "$dst" "$USER_SECTION"
-                echo "  ✓ $f → workspace (USER-SPACE preserved)"
+            # issue #1689: edits outside the USER-SPACE block are saved before the overwrite.
+            backup_edited_skill "$f" "$src" "$dst" || continue
+            # The template copy with the workspace's install_constants and USER-SPACE block.
+            SKILL_RENDERED_FILE="$TMPDIR_UPDATE/skill-workspace-render.md"
+            render_workspace_skill "$src" "$dst" "$SKILL_RENDERED_FILE"
+            cp "$SKILL_RENDERED_FILE" "$dst"
+            if [ "$SKILL_RENDER_USER_SPACE" = 1 ]; then
+                echo "  ✓ $f → workspace (блок USER-SPACE перенесён)"
             else
                 echo "  ✓ $f → workspace"
             fi
@@ -7924,6 +7993,7 @@ if [ "${AUTHOR_SKIPPED:-0}" -gt 0 ]; then
 fi
 report_author_skip_summary
 report_replaced_hooks_summary
+report_replaced_skills_summary
 echo "=========================================="
 echo ""
 echo "Перезапустите Claude Code для применения обновлений в memory/."
