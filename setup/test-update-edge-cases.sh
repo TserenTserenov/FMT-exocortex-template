@@ -1858,7 +1858,10 @@ RULES_BACKUP_RUN=""
 RULES_SAFE_TO_UPDATE="|.claude/rules/example.md|"
 eval "$(awk '/^hash_file\(\)/{copy=1} copy{print} copy && /^}/{exit}' "$TEMPLATE_DIR/update.sh")"
 eval "$(awk '/^rule_was_safe_to_update\(\)/{copy=1} copy{print} copy && /^}/{exit}' "$TEMPLATE_DIR/update.sh")"
-eval "$(awk '/^backup_rule_before_overwrite\(\)/{copy=1} copy{print} copy && /^}/{exit}' "$TEMPLATE_DIR/update.sh")"
+eval "$(awk '/^backup_platform_file_before_overwrite\(\)/{copy=1} copy{print} copy && /^}/{exit}' "$TEMPLATE_DIR/update.sh")"
+eval "$(awk '/^render_workspace_skill\(\)/{copy=1} copy{print} copy && /^}/{exit}' "$TEMPLATE_DIR/update.sh")"
+eval "$(awk '/^workspace_copy_matches\(\)/{copy=1} copy{print} copy && /^}/{exit}' "$TEMPLATE_DIR/update.sh")"
+eval "$(awk '/^backup_edited_skill\(\)/{copy=1} copy{print} copy && /^}/{exit}' "$TEMPLATE_DIR/update.sh")"
 eval "$(awk '/^reinject_user_section\(\)/{copy=1} copy{print} copy && /^}/{exit}' "$TEMPLATE_DIR/update.sh")"
 eval "$(awk '/^copy_platform_file_preserving_user_space\(\)/{copy=1} copy{print} copy && /^}/{exit}' "$TEMPLATE_DIR/update.sh")"
 cat > "$T24_ROOT/rule-upstream.md" <<'EOF'
@@ -5666,7 +5669,7 @@ T50_FN_BLOCK=$(awk '
 ' "$TEMPLATE_DIR/update.sh")
 T50_HASH_BLOCK=$(awk '/^hash_file\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh")
 T50_SAFE_BLOCK=$(awk '/^rule_was_safe_to_update\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh")
-T50_BACKUP_BLOCK=$(awk '/^backup_rule_before_overwrite\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh")
+T50_BACKUP_BLOCK=$(for fn in backup_platform_file_before_overwrite render_workspace_skill workspace_copy_matches backup_edited_skill; do awk -v sig="$fn() {" '$0 == sig {found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh"; done)
 T50_REINJECT_BLOCK=$(awk '/^reinject_user_section\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh")
 
 if [ -z "$T50_FN_BLOCK" ] || [ -z "$T50_HASH_BLOCK" ] || [ -z "$T50_SAFE_BLOCK" ] || [ -z "$T50_BACKUP_BLOCK" ] || [ -z "$T50_REINJECT_BLOCK" ]; then

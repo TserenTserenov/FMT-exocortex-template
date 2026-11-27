@@ -17,11 +17,11 @@ pass() { echo "  PASS: $*"; }
 fail() { echo "  FAIL: $*" >&2; fails=$((fails + 1)); }
 
 echo "== F3 USER-SPACE kept by the stale/repair copy of a skill"
-for fn in hash_file backup_rule_before_overwrite rule_was_safe_to_update reinject_user_section copy_platform_file_preserving_user_space; do
+for fn in hash_file backup_platform_file_before_overwrite render_workspace_skill workspace_copy_matches backup_edited_skill rule_was_safe_to_update reinject_user_section copy_platform_file_preserving_user_space; do
   eval "$(awk -v sig="$fn() {" '$0 == sig {c=1} c {print} c && /^}$/ {exit}' "$ROOT/update.sh")"
 done
 declare -F copy_platform_file_preserving_user_space >/dev/null || { echo "FATAL: cannot extract copy_platform_file_preserving_user_space" >&2; exit 2; }
-WORKSPACE_DIR="$TMP/ws"; RULES_BACKUP_RUN=""
+WORKSPACE_DIR="$TMP/ws"; RULES_BACKUP_RUN=""; RULES_SAFE_TO_UPDATE="|"; SKILLS_BACKUP_RUN=""; SKILLS_REPLACED=()
 mkdir -p "$TMP/src" "$TMP/ws/.claude/skills/demo"
 printf '# Demo skill v2\n' > "$TMP/src/SKILL.md"
 printf '# Demo skill v1\n\n<!-- USER-SPACE -->\nMY-LOCAL-NOTE\n<!-- /USER-SPACE -->\n' > "$TMP/ws/.claude/skills/demo/SKILL.md"

@@ -44,7 +44,9 @@ fn:replace_ds_publish_with_backup	A	plan	replaces ds-publish.sh with a copy in .
 fn:run_post_apply_backfills_or_die	B	not-covered	install-iwe-paths.sh writes .iwe-paths and edits shell rc files in the home directory; rc edits are class C
 fn:backfill_extractor_feeders	C	not-covered	setup-extractor-feeders.sh --schedule-only installs scheduler jobs; printed in the update summary
 fn:refresh_fpf_base_clone	B	atomic+inverse	git merge --ff-only in the FPF clone; excluded from snapshot and plan, inverse is git reset --hard to the previous revision
-fn:backup_rule_before_overwrite	A	plan	copy of a rule file into .backups before overwrite
+fn:backup_platform_file_before_overwrite	A	plan	copy of a rule, skill or other platform file into .backups/<kind>-pre-update/<run> before overwrite (#1689)
+fn:render_workspace_skill	H	caller	writes the rendered workspace copy of a skill to the output path its caller passes (comparison in temp, install path in Step 5)
+fn:workspace_copy_matches	T	none	renders the skill into a temp file to compare with the installed copy, then removes it
 fn:backup_memory_file_before_overwrite	A	plan	copy of a memory file into .backups before overwrite
 fn:backup_hook_before_overwrite	A	plan	copy of a hook into .backups before overwrite
 fn:copy_platform_file_preserving_user_space	A	plan	copies a platform file and re-appends the user block
