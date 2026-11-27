@@ -605,7 +605,7 @@
     },
     {
       "path": ".claude/skills/find-method/SKILL.md",
-      "sha256": "a14ec5f92a9f3c1a82db0af7a1fabe49d404d8d8261be15f44e5bcf3921e0605"
+      "sha256": "c4a0bd1fe3a23e0efee9cd9da6e97b4f0d2b553008b745c743e324b82542305b"
     },
     {
       "path": ".claude/skills/fpf/SKILL.md",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "654c8565ffd493cfe2ac1c17477b28506648cdc60a9f7343307327d38ce2e1d8"
+      "sha256": "20fc0f319779eceda8f26b028b9af6da08fd6716e682ae87a18d678779f4b4e6"
     },
     {
       "path": "CLAUDE.md",
