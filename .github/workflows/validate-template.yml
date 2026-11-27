@@ -903,6 +903,11 @@ jobs:
       - name: Run update.sh modified-hook test
         run: bash setup/test-update-modified-hook.sh
 
+      # Issue #1689: a platform skill edited outside its USER-SPACE block is replaced by the
+      # template version, and the previous copy is kept under .backups/skills-pre-update/.
+      - name: Run update.sh modified-skill test
+        run: bash setup/test-update-modified-skill.sh
+
       # WP-568 F11: an author host whose workspace .claude/ dirs are a read-only
       # mirror must finish the update (new file skipped with a warning) instead of
       # aborting on `cp: Permission denied` and leaving .update-incomplete behind.
