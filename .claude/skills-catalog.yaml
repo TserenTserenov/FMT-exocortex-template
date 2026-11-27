@@ -2,7 +2,7 @@
 # see DP.SC.153
 # НЕ редактировать вручную — перегенерировать через generate-skills-catalog.sh
 #
-generated: 2026-11-27T19:40:21Z
+generated: 2026-11-27T20:32:31Z
 skills_dir: .claude/skills
 
 skills:
