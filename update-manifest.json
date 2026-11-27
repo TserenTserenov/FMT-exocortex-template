@@ -205,7 +205,7 @@
     },
     {
       "path": ".claude/hooks/session-open-gate.sh",
-      "sha256": "2e3d870f4c0eaecd65fbc6d5fa4039e291d0a371d677f63d105e1c6dd7f54318"
+      "sha256": "4917d42fdbe0bd2d7c620afc5fb12759ef413efee1b1007f0e7ee7b5beada0a7"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -329,7 +329,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-session-open-gate.sh",
-      "sha256": "27b4c021bb70c3692791575ec4e4494961ec8b761108ae7c4bcabe206e9c4706"
+      "sha256": "36d17ff94353238dcd0b2a5f264022b81737c82495aebbd8b5672709632535ba"
     },
     {
       "path": ".claude/hooks/tests/test_issue_1184_stop_gate_block_once.sh",
@@ -869,7 +869,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "e0ea3fc3a54445e80058aa7c34135f9f5663ee62f245ea9ea0a7fbfee8e58efc"
+      "sha256": "d33dc38436a45bcdbbbc5df589aaa5fe1e2a66218cc840c4d24a5161239e5d99"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "57e35c9f4577c591f4cf6764ad7637a0f38ba1f001827fddf9ceb7edd99bc939"
+      "sha256": "20fc0f319779eceda8f26b028b9af6da08fd6716e682ae87a18d678779f4b4e6"
     },
     {
       "path": "CLAUDE.md",
@@ -2997,7 +2997,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "7323c8bfd2e8810e02a310d445d4f476001bb674628870064bdc7e009bf23e50"
+      "sha256": "b809240aa764f9c996fe3c647ffb4eec4f4f7aaa8094d2a47806574362eb83c8"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3802,6 +3802,7 @@
     "scripts/tests/test_issue_1577_1578_isolate_root.sh",
     "scripts/tests/test_issue_1606_name_registry.sh",
     "scripts/tests/test_issue_1625_runtime_warning.sh",
+    "scripts/tests/test_issue_1659_strategy.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",

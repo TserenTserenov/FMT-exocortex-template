@@ -19,7 +19,7 @@ grep -q 'ISOLATE_DEFAULT_BRANCH="\$(git -C "\$ISOLATE_BASE_DIR" symbolic-ref ref
   || fail "session-guard.sh no longer resolves the default branch before --isolate fetch/worktree add"
 grep -q 'fetch origin "\$ISOLATE_DEFAULT_BRANCH"' "$SG" \
   || fail "--isolate fetch still hardcodes origin main"
-grep -q '"\$ISOLATED_WORKTREE_PATH" "origin/\$ISOLATE_DEFAULT_BRANCH"' "$SG" \
+grep -q '"origin/\$ISOLATE_DEFAULT_BRANCH" "\$ISOLATE_STORE_DIR_REAL"' "$SG" \
   || fail "--isolate worktree add still hardcodes origin/main"
 
 # Resolution itself, against a real repo whose default branch is "master".
