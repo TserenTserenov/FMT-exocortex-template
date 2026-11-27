@@ -8,6 +8,7 @@
 # Commands:
 #   open --wp WP-N [--task "..."] [--files "a,b"] [--slug "..."] [--agent claude-code|kimi|hermes|grok] [--personality <unassigned|UUID>] [--isolate]
 #   open --housekeeping <reason> [--agent ...]        # background housekeeping session without ORZ
+#   open --housekeeping strategy-session --isolate [--base-sha <sha>]  # isolated governance copy without a WP (#1659)
 #   open-log-path                                      # print the session-open log path (for readers such as dt-collect.sh)
 #   close [--wp WP-N] [--slug "..."] [--agent ...]
 #   close ... --force-no-reflection "<reason>"       # close without answering the reflection —
@@ -1698,6 +1699,116 @@ if [ "$CMD" = "__quarantine-dead" ]; then
   exit 0
 fi
 
+# --- isolate helpers shared by WP-bound and housekeeping opens ---
+# _isolate_fetch_reason <git-fetch-stderr> <branch>: a classified cause only.
+# Git may echo credentials embedded in a remote URL, so the raw error is never printed.
+_isolate_fetch_reason() {
+  case "$1" in
+    *"Could not resolve host"*|*"Name or service not known"*) echo "имя сервера не разрешается" ;;
+    *"Failed to connect"*|*"Connection refused"*|*"Network is unreachable"*|*"Could not connect"*) echo "нет соединения с origin" ;;
+    *"Authentication failed"*|*"Permission denied (publickey)"*|*"could not read Username"*) echo "ошибка авторизации origin" ;;
+    *"couldn't find remote ref"*) echo "на origin нет ветки $2" ;;
+    *) echo "причина не классифицирована; проверь git fetch origin $2 локально" ;;
+  esac
+}
+
+# _isolate_add_worktree <base> <path> <branch> <start-ref> <store-real> [offline]
+# Creates the worktree on a new branch and removes it again if it resolved outside
+# the isolated-worktrees store. `offline` = start from a verified local commit
+# without any remote query (no lazy fetch of partial-clone objects).
+_isolate_add_worktree() {
+  local base="$1" path="$2" branch="$3" start="$4" store_real="$5" mode="${6:-}" real
+  if [ "$mode" = offline ]; then
+    GIT_NO_LAZY_FETCH=1 git -C "$base" worktree add -b "$branch" "$path" "$start" \
+      || fail "--isolate: git worktree add от --base-sha не удался" 1
+  else
+    git -C "$base" worktree add -b "$branch" "$path" "$start" \
+      || fail "--isolate: git worktree add не удался" 1
+  fi
+  real=$(realpath "$path" 2>/dev/null || echo "$path")
+  case "$real" in
+    "$store_real"/*) : ;;
+    *)
+      git -C "$base" worktree remove --force "$path" 2>/dev/null || rm -rf "$path"
+      fail "--isolate: worktree вне store — удалён" 1
+      ;;
+  esac
+}
+
+# _publish_isolated_worktree <semaphore>: on close, deliver the commits of the
+# session's isolated worktree (isolate-push) and remove it; a failed push keeps it.
+_publish_isolated_worktree() {
+  local sem="$1" wt push_bin target
+  wt=$(grep "^isolated_worktree: " "$sem" 2>/dev/null | head -1 | cut -d" " -f2- || true)
+  [ -n "$wt" ] && [ -d "$wt" ] || return 0
+  if ! push_bin=$(resolve_isolate_push_script); then
+    echo "⚠️  isolate-push.sh не найден ($GOV_REPO/scripts, $IWE_ROOT/scripts или $(dirname "$SESSION_GUARD_SELF")) — worktree оставлен: $wt" >&2
+    return 0
+  fi
+  echo "session-guard: close: isolate-push через $push_bin" >&2
+  # The same target open isolated from: origin's default branch, `main`
+  # only when origin/HEAD is unknown. A hard-coded `main` never delivered
+  # a repo whose default branch is named otherwise.
+  target="$(git -C "$wt" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#^refs/remotes/origin/##' || true)"
+  target="${target:-main}"
+  if ! IWE_GOVERNANCE_REPO="$GOV_REPO" bash "$push_bin" "$wt" "$target"; then
+    echo "⚠️  isolate-push не завершился успешно — worktree оставлен: $wt" >&2
+    return 0
+  fi
+  git -C "$(git -C "$wt" rev-parse --git-common-dir 2>/dev/null | sed "s|/.git$||;s|/$||" || true)" worktree remove --force "$wt" 2>/dev/null \
+    || git worktree remove --force "$wt" 2>/dev/null \
+    || echo "⚠️  не удалось удалить isolate worktree $wt" >&2
+}
+
+# Housekeeping reasons whose protocol writes the governance documents and may
+# therefore work in an isolated copy without a WP (issue #1659: the weekly and
+# monthly strategy session edits the week documents, which are no work product).
+ISOLATABLE_HOUSEKEEPING_REASONS='^strategy-session$'
+
+# _open_housekeeping_isolate: create the isolated copy of the governance repository
+# for `open --housekeeping <reason> --isolate`; sets ISOLATED_WORKTREE_PATH/_BRANCH.
+# Run from the governance repository only: the reason exists for its documents.
+_open_housekeeping_isolate() {
+  local base default_branch store store_real name fetch_error fetch_rc local_sha offline_command
+  type with_isolate_lock >/dev/null 2>&1 || fail "--isolate: session-guard-isolate-lib.sh не подключён" 1
+  base="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  [ -n "$base" ] || fail "--isolate: текущий каталог не git-репозиторий" 1
+  same_git_repo "$base" "$IWE_ROOT/$GOV_REPO" \
+    || fail "open --housekeeping ${HOUSEKEEPING} --isolate: запусти из репозитория управления ($IWE_ROOT/$GOV_REPO), а не из $base" 1
+  default_branch="$(git -C "$base" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#^refs/remotes/origin/##' || true)"
+  default_branch="${default_branch:-main}"
+  store="$IWE_ROOT/.iwe-runtime/isolated-worktrees"
+  mkdir -p "$store"
+  store_real="$(realpath "$store")"
+  # A timestamp and entropy keep every run on its own branch: the semaphore name is
+  # fixed per reason, but a published copy's branch must not be reused.
+  name="${AGENT}-${HK_SESSION_ID}-$(date +%s)-$(isolate_entropy_suffix)"
+  ISOLATED_WORKTREE_PATH="$store/$name"
+  ISOLATED_WORKTREE_BRANCH="session-isolate/$name"
+  printf 'session-guard: --isolate: изолирую %q (remote: origin)\n' "$base" >&2
+  if [ -n "${BASE_SHA:-}" ]; then
+    GIT_NO_LAZY_FETCH=1 git -C "$base" cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
+      || fail "--isolate: --base-sha '$BASE_SHA' не является коммитом в ($base)" 1
+    with_isolate_lock "$name" _isolate_add_worktree "$base" "$ISOLATED_WORKTREE_PATH" \
+      "$ISOLATED_WORKTREE_BRANCH" "$BASE_SHA" "$store_real" offline
+  else
+    if ! fetch_error=$(LC_ALL=C GIT_TERMINAL_PROMPT=0 git -C "$base" fetch origin "$default_branch" 2>&1); then
+      fetch_rc=$?
+      echo "session-guard: --isolate: origin/$default_branch недоступен: $(_isolate_fetch_reason "$fetch_error" "$default_branch") (git fetch, код $fetch_rc)." >&2
+      local_sha=$(git -C "$base" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)
+      if [ -n "$local_sha" ]; then
+        printf -v offline_command '%q ' bash "$SESSION_GUARD_SELF" open --housekeeping "$HOUSEKEEPING" --isolate --agent "$AGENT" --base-sha "$local_sha"
+        printf 'session-guard: Офлайн после проверки ревизии: (cd -- %q && %s)\n' "$base" "$offline_command" >&2
+      fi
+      fail "--isolate: отдельная копия не создана; канон не изменён" 1
+    fi
+    with_isolate_lock "$name" _isolate_add_worktree "$base" "$ISOLATED_WORKTREE_PATH" \
+      "$ISOLATED_WORKTREE_BRANCH" "origin/$default_branch" "$store_real"
+  fi
+  ISOLATED_WORKTREE_PATH=$(realpath "$ISOLATED_WORKTREE_PATH" 2>/dev/null) \
+    || fail "--isolate: не удалось канонизировать путь worktree" 1
+}
+
 # --- OPEN ---
 if [ "$CMD" = "open" ]; then
   [ "${#POSITIONAL[@]}" -eq 0 ] || fail "open не принимает позиционные аргументы" 1
@@ -1727,9 +1838,28 @@ if [ "$CMD" = "open" ]; then
     HK_FILE="$SESSION_DIR/${AGENT}-housekeeping-${HOUSEKEEPING}.open"
     HK_SESSION_ID="housekeeping-${HOUSEKEEPING}"
     _safe_session_token "$HK_SESSION_ID" || fail "open --housekeeping: идентификатор слишком длинный" 1
+    if [ "${ISOLATE_FLAG:-0}" = "1" ] && ! printf '%s' "$HOUSEKEEPING" | grep -qE "$ISOLATABLE_HOUSEKEEPING_REASONS"; then
+      fail "open --housekeeping ${HOUSEKEEPING} --isolate: отдельная копия без РП есть только у сессии стратегирования (strategy-session); остальным служебным сессиям она не нужна" 1
+    fi
     _ensure_session_transition_lock "$HK_FILE" "$HK_SESSION_ID"
     HK_MAX_AGE=1800  # 30 minutes default TTL for housekeeping semaphores
     NOW_EPOCH=$(date +%s)
+    # issue #1659: a housekeeping session with an isolated copy may hold unpublished
+    # commits, so it is never renamed to .stale by age. The same conversation re-enters
+    # its copy; any other open is refused until `close` publishes the copy.
+    HK_EXISTING_WT=""
+    [ -f "$HK_FILE" ] && HK_EXISTING_WT=$(grep "^isolated_worktree: " "$HK_FILE" | head -1 | cut -d' ' -f2- || true)
+    if [ -n "$HK_EXISTING_WT" ] && [ -d "$HK_EXISTING_WT" ]; then
+      if [ "${ISOLATE_FLAG:-0}" = "1" ] && [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] \
+         && grep -qxF "harness_session_id: $CLAUDE_CODE_SESSION_ID" "$HK_FILE"; then
+        HK_EXISTING_BRANCH=$(grep "^isolated_branch: " "$HK_FILE" | head -1 | cut -d' ' -f2- || true)
+        echo "Housekeeping OPEN (re-entry): $HK_FILE (reason: $HOUSEKEEPING)"
+        printf '{"worktree_path": "%s", "branch": "%s", "session_id": "%s"}\n' \
+          "$HK_EXISTING_WT" "$HK_EXISTING_BRANCH" "$HK_SESSION_ID"
+        exit 0
+      fi
+      fail "open --housekeeping: сессия '${HOUSEKEEPING}' уже открыта с отдельной копией $HK_EXISTING_WT (другой беседой или без --isolate). Закрой её — close --housekeeping ${HOUSEKEEPING} --agent $AGENT опубликует копию — и открой заново" 1
+    fi
     if [ -f "$HK_FILE" ]; then
       HK_CREATED=$(grep "^created_at: " "$HK_FILE" | cut -d' ' -f2- || echo "")
       if [ -n "$HK_CREATED" ]; then
@@ -1751,6 +1881,9 @@ if [ "$CMD" = "open" ]; then
     fi
     _archive_previous_terminal "${HK_FILE}.closed" "$HK_FILE" \
       || fail "open --housekeeping: прошлый .closed не удалось перенести в архив" 1
+    if [ "${ISOLATE_FLAG:-0}" = "1" ]; then
+      _open_housekeeping_isolate
+    fi
     HK_TMP=$(mktemp "$SESSION_DIR/.session-open.XXXXXX")
     chmod 600 "$HK_TMP"
     {
@@ -1795,11 +1928,21 @@ if [ "$CMD" = "open" ]; then
       echo "pid: $_hk2_open_pid"
       _hk2_open_pid_start_id=$(_owner_pid_start_id "$_hk2_open_pid")
       [ -n "$_hk2_open_pid_start_id" ] && echo "pid_start_id: $_hk2_open_pid_start_id"
+      if [ -n "${ISOLATED_WORKTREE_PATH:-}" ]; then
+        echo "governance_worktree: $ISOLATED_WORKTREE_PATH"
+        echo "isolated_worktree: $ISOLATED_WORKTREE_PATH"
+        echo "isolated_branch: $ISOLATED_WORKTREE_BRANCH"
+      fi
       echo "---"
     } > "$HK_TMP"
     _publish_open_no_clobber "$HK_TMP" "$HK_FILE" \
       || { rm -f "$HK_TMP"; fail "open --housekeeping: семафор появился параллельно; существующий файл не изменён" 1; }
     echo "Housekeeping OPEN: $HK_FILE (reason: $HOUSEKEEPING)"
+    if [ -n "${ISOLATED_WORKTREE_PATH:-}" ]; then
+      printf '{"worktree_path": "%s", "branch": "%s", "session_id": "%s"}\n' \
+        "$ISOLATED_WORKTREE_PATH" "$ISOLATED_WORKTREE_BRANCH" "$HK_SESSION_ID"
+      echo "⚠️  cd \"$ISOLATED_WORKTREE_PATH\" перед следующим действием -- рабочий каталог не переключается автоматически." >&2
+    fi
     exit 0
   fi
 
@@ -2072,15 +2215,7 @@ if [ "$CMD" = "open" ]; then
           :
         else
           fetch_rc=$?
-          # Git may echo credentials embedded in a remote URL. Report only a
-          # classified cause; the pilot can inspect the raw error locally.
-          case "$fetch_error" in
-            *"Could not resolve host"*|*"Name or service not known"*) fetch_reason="имя сервера не разрешается" ;;
-            *"Failed to connect"*|*"Connection refused"*|*"Network is unreachable"*|*"Could not connect"*) fetch_reason="нет соединения с origin" ;;
-            *"Authentication failed"*|*"Permission denied (publickey)"*|*"could not read Username"*) fetch_reason="ошибка авторизации origin" ;;
-            *"couldn't find remote ref"*) fetch_reason="на origin нет ветки $ISOLATE_DEFAULT_BRANCH" ;;
-            *) fetch_reason="причина не классифицирована; проверь git fetch origin $ISOLATE_DEFAULT_BRANCH локально" ;;
-          esac
+          fetch_reason=$(_isolate_fetch_reason "$fetch_error" "$ISOLATE_DEFAULT_BRANCH")
           echo "session-guard: --isolate: origin/$ISOLATE_DEFAULT_BRANCH недоступен: $fetch_reason (git fetch, код $fetch_rc)." >&2
           local_sha=$(git -C "$ISOLATE_BASE_DIR" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)
           if [ -n "$local_sha" ]; then
@@ -2092,21 +2227,12 @@ if [ "$CMD" = "open" ]; then
           fi
           return 1
         fi
-        git -C "$ISOLATE_BASE_DIR" worktree add -b "$ISOLATED_WORKTREE_BRANCH" "$ISOLATED_WORKTREE_PATH" "origin/$ISOLATE_DEFAULT_BRANCH" \
-          || fail "--isolate: git worktree add не удался" 1
+        _isolate_add_worktree "$ISOLATE_BASE_DIR" "$ISOLATED_WORKTREE_PATH" "$ISOLATED_WORKTREE_BRANCH" \
+          "origin/$ISOLATE_DEFAULT_BRANCH" "$ISOLATE_STORE_DIR_REAL"
       else
-        # An explicit local commit is the offline path: no remote query here.
-        GIT_NO_LAZY_FETCH=1 git -C "$ISOLATE_BASE_DIR" worktree add -b "$ISOLATED_WORKTREE_BRANCH" "$ISOLATED_WORKTREE_PATH" "$BASE_SHA" \
-          || fail "--isolate: git worktree add от --base-sha не удался" 1
+        _isolate_add_worktree "$ISOLATE_BASE_DIR" "$ISOLATED_WORKTREE_PATH" "$ISOLATED_WORKTREE_BRANCH" \
+          "$BASE_SHA" "$ISOLATE_STORE_DIR_REAL" offline
       fi
-      real=$(realpath "$ISOLATED_WORKTREE_PATH" 2>/dev/null || echo "$ISOLATED_WORKTREE_PATH")
-      case "$real" in
-        "$ISOLATE_STORE_DIR_REAL"/*) : ;;
-        *)
-          git -C "$ISOLATE_BASE_DIR" worktree remove --force "$ISOLATED_WORKTREE_PATH" 2>/dev/null || rm -rf "$ISOLATED_WORKTREE_PATH"
-          fail "--isolate: worktree вне store — удалён" 1
-          ;;
-      esac
     }
     with_isolate_lock "$SESSION_ID" _fmt_isolate_create
     ISOLATED_WORKTREE_PATH=$(realpath "$ISOLATED_WORKTREE_PATH" 2>/dev/null) \
@@ -2504,6 +2630,9 @@ if [ "$CMD" = "close" ]; then
       || fail "close --housekeeping: не удалось подготовить durable receipt" 1
     [ -n "$HK_CLOSE_ATTEMPT" ] \
       || fail "close --housekeeping: durable receipt не вернул attempt id" 1
+    # issue #1659: a strategy session opened with --isolate delivers its copy here,
+    # the same step a WP close runs.
+    _publish_isolated_worktree "$HK_FILE"
     _terminal_close_no_clobber "$HK_FILE" "$AGENT" "$HK_SESSION_ID" "$HK_CLOSE_ATTEMPT" \
       || fail "close --housekeeping: terminal destination занят другим inode; open сохранён" 1
     rm -f "${HK_FILE}.lease"
@@ -2690,24 +2819,7 @@ print(json.dumps({"wp": sys.argv[1], "slug": sys.argv[2], "agent": sys.argv[3], 
     || fail "close: durable receipt не вернул attempt id; open сохранён" 1
 
   # WP-485 Phase 14: happy-path isolate publish (full isolate-push/v2 journal deferred)
-  ISOLATE_WT=$(grep "^isolated_worktree: " "$SEM_FILE" 2>/dev/null | head -1 | cut -d" " -f2- || true)
-  if [ -n "$ISOLATE_WT" ] && [ -d "$ISOLATE_WT" ]; then
-    if PUSH_BIN=$(resolve_isolate_push_script); then
-      echo "session-guard: close: isolate-push через $PUSH_BIN" >&2
-      # The same target open isolated from: origin's default branch, `main`
-      # only when origin/HEAD is unknown. A hard-coded `main` never delivered
-      # a repo whose default branch is named otherwise.
-      ISOLATE_TARGET_BRANCH="$(git -C "$ISOLATE_WT" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#^refs/remotes/origin/##' || true)"
-      ISOLATE_TARGET_BRANCH="${ISOLATE_TARGET_BRANCH:-main}"
-      if ! IWE_GOVERNANCE_REPO="$GOV_REPO" bash "$PUSH_BIN" "$ISOLATE_WT" "$ISOLATE_TARGET_BRANCH"; then
-        echo "⚠️  isolate-push не завершился успешно — worktree оставлен: $ISOLATE_WT" >&2
-      else
-        git -C "$(git -C "$ISOLATE_WT" rev-parse --git-common-dir 2>/dev/null | sed "s|/.git$||;s|/$||" || true)" worktree remove --force "$ISOLATE_WT" 2>/dev/null           || git worktree remove --force "$ISOLATE_WT" 2>/dev/null           || echo "⚠️  не удалось удалить isolate worktree $ISOLATE_WT" >&2
-      fi
-    else
-      echo "⚠️  isolate-push.sh не найден ($GOV_REPO/scripts, $IWE_ROOT/scripts или $(dirname "$SESSION_GUARD_SELF")) — worktree оставлен: $ISOLATE_WT" >&2
-    fi
-  fi
+  _publish_isolated_worktree "$SEM_FILE"
 
   _terminal_close_no_clobber "$SEM_FILE" "$AGENT" "$SESSION_ID" "$CLOSE_ATTEMPT" \
     || fail "close: terminal destination занят другим inode; open не удалён" 1
