@@ -30,12 +30,81 @@
 
 set -euo pipefail
 
+# --check-secret-scan: a read-only probe for update.sh, prints nothing, exit 3 when the commit
+# check that will run in this repository never calls the secret scan (issue #1670, point 4).
+CHECK_SECRET_SCAN=false
+if [ "${1:-}" = "--check-secret-scan" ]; then
+  CHECK_SECRET_SCAN=true
+  shift
+fi
+
 REPO="${1:-${PWD}}"
 HOOK_DIR="$REPO/.githooks"
 
 if [ -L "$REPO" ] || [ -L "$REPO/.git" ] || [ ! -d "$REPO/.git" ]; then
   echo "❌ Not a git repo: $REPO"
   exit 1
+fi
+
+points_at_platform_hooks() {
+  case "$1" in
+    .githooks|.githooks/|./.githooks|./.githooks/) return 0 ;;
+    /*) [ -d "$1" ] && [ -d "$HOOK_DIR" ] && [ "$(cd "$1" && pwd -P)" = "$(cd "$HOOK_DIR" && pwd -P)" ] ;;
+    *) return 1 ;;
+  esac
+}
+
+# issue #1670, point 4: the pre-commit that really runs in this repository may be the user's own (a
+# copy that differs from the platform one, or one in their own hooks folder). When it never calls the
+# secret scan, commits are not checked for secrets, and the only trace used to be the line
+# "pre-commit отличается от канонического шаблона", easy to miss. Say it plainly, with the line to
+# add. The user's hook is never changed (WP-484). A call of .githooks/pre-commit counts as a call of
+# the scan: that hook runs it.
+SECRET_SCAN_CALL_RE='pre-commit-secret-scan|\.githooks/pre-commit'
+
+# secret_scan_gap <core.hooksPath value or empty>: prints the pre-commit that will run and returns 0
+# when it has no call of the scan; returns 1 when the scan is called, or when the platform folder
+# simply has no pre-commit yet (the installer copies it).
+secret_scan_gap() {
+  local hooks_path="$1" pre_commit own_folder=false
+  if [ -n "$hooks_path" ] && [ "$hooks_path" != /dev/null ] && ! points_at_platform_hooks "$hooks_path"; then
+    own_folder=true
+    case "$hooks_path" in
+      /*) pre_commit="${hooks_path%/}/pre-commit" ;;
+      *) pre_commit="$REPO/${hooks_path%/}/pre-commit" ;;
+    esac
+  else
+    pre_commit="$HOOK_DIR/pre-commit"
+  fi
+  if [ -f "$pre_commit" ]; then
+    ! grep -Eq "$SECRET_SCAN_CALL_RE" "$pre_commit" || return 1
+  else
+    $own_folder || return 1
+  fi
+  printf '%s\n' "$pre_commit"
+}
+
+warn_secret_scan_gap() { # <pre-commit path>
+  local scanner="${CANONICAL_HOOKS_DIR%/seed/strategy/.githooks}/scripts/pre-commit-secret-scan.sh"
+  echo "⚠️  СЕКРЕТЫ НЕ ПРОВЕРЯЮТСЯ при сохранении в $REPO: свой pre-commit не вызывает pre-commit-secret-scan.sh (#1670)."
+  if [ -f "$1" ]; then
+    echo "   Файл: $1"
+  else
+    echo "   В папке $(dirname "$1") нет pre-commit."
+  fi
+  echo "   Добавьте в начало своего pre-commit строку (образец — блок «secret corpus scan» в seed/strategy/.githooks/pre-commit):"
+  echo "     bash \"$scanner\" || exit 1"
+  echo "   Свой pre-commit установщик не меняет."
+}
+
+if $CHECK_SECRET_SCAN; then
+  hooks_path_rc=0
+  current_hooks_path=$(git -C "$REPO" config --get core.hooksPath) || hooks_path_rc=$?
+  [ "$hooks_path_rc" -le 1 ] || exit 1
+  if secret_scan_gap "$current_hooks_path" >/dev/null; then
+    exit 3
+  fi
+  exit 0
 fi
 
 CANONICAL_HOOKS_DIR=""
@@ -116,14 +185,6 @@ if [ "$hooks_path_rc" -gt 1 ]; then
   exit 1
 fi
 
-points_at_platform_hooks() {
-  case "$1" in
-    .githooks|.githooks/|./.githooks|./.githooks/) return 0 ;;
-    /*) [ -d "$1" ] && [ "$(cd "$1" && pwd -P)" = "$(cd "$HOOK_DIR" && pwd -P)" ] ;;
-    *) return 1 ;;
-  esac
-}
-
 if [ -n "$current_hooks_path" ] && [ "$current_hooks_path" != /dev/null ] && ! points_at_platform_hooks "$current_hooks_path"; then
   hooks_path_scope=$(git -C "$REPO" config --show-scope --get core.hooksPath 2>/dev/null | cut -f1) || hooks_path_scope=""
   echo "⚠️  core.hooksPath уже задан: «${current_hooks_path}»${hooks_path_scope:+ (${hooks_path_scope})} — оставляю как есть, не заменяю (#1688)."
@@ -131,6 +192,9 @@ if [ -n "$current_hooks_path" ] && [ "$current_hooks_path" != /dev/null ] && ! p
   echo "   pre-commit (в том числе закрытие РП с неразобранными входящими) и pre-push (защита от force-push)."
   echo "   Включить их вместо своих хуков: git -C \"$REPO\" config --local core.hooksPath .githooks"
   echo "   Либо вызывайте .githooks/pre-commit и .githooks/pre-push из своих хуков."
+  if gap_file=$(secret_scan_gap "$current_hooks_path"); then
+    warn_secret_scan_gap "$gap_file"
+  fi
   exit 0
 fi
 
@@ -149,3 +213,7 @@ fi
 
 echo "✅ Hooks wired: $HOOK_DIR"
 echo "   core.hooksPath = $(git -C "$REPO" config core.hooksPath)"
+
+if gap_file=$(secret_scan_gap "$(git -C "$REPO" config core.hooksPath)"); then
+  warn_secret_scan_gap "$gap_file"
+fi

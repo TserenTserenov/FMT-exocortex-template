@@ -1086,6 +1086,8 @@ else
     else
         echo "    Установи: brew install python3 && pip3 install pyyaml"
     fi
+    echo "    Если python3 3.10+ уже стоит, не хватает только библиотеки: python3 -m pip install --user pyyaml"
+    echo "    Без неё коммит плана дня с настроенным day-rhythm-config.yaml будет отклонён («python3 не резолвится»)."
 fi
 
 # The catalog belongs inside the governance repo. Do not call this helper until

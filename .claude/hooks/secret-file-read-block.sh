@@ -117,6 +117,11 @@ self_test() {
   run_case dotrailway_dir_denied deny Read file_path "/home/user/.railway/token"
   run_case wrangler_toml_denied deny Read file_path "wrangler.toml"
   run_case netrc_denied deny Read file_path ".netrc"
+  run_case ecdsa_key_denied deny Read file_path "id_ecdsa"
+  run_case git_credentials_denied deny Read file_path "/home/user/.git-credentials"
+  run_case aws_credentials_denied deny Read file_path "/home/user/.aws/credentials"
+  # Only the credentials file of that folder is secret, its other files stay readable.
+  run_case aws_config_allowed allow Read file_path "/home/user/.aws/config"
   # Lowercasing (base_n/target_n) must not regress — a mixed-case path is the
   # same file as its lowercase form on a case-insensitive filesystem.
   run_case case_insensitive_denied deny Read file_path "ID_RSA"
@@ -229,13 +234,15 @@ esac
 # Kimi reads `path`, Claude reads `file_path`: when a file tool carries BOTH string
 # fields and they differ, judge each path on its own (re-run this hook once per field);
 # the first deny wins, so an ordinary file_path cannot hide a secret path.
-if [ "$tool_name" != "Grep" ] && [ -z "${IWE_SECRET_READ_SPLIT:-}" ] && printf '%s' "$input" | "$SECRET_BYPASS_JQ" -e \
+# The re-run is marked by an argument, not by an environment variable: a variable set in the
+# environment of the agent would switch this check off (rc.3 observation).
+if [ "$tool_name" != "Grep" ] && [ "${1:-}" != "--single-field" ] && printf '%s' "$input" | "$SECRET_BYPASS_JQ" -e \
   '(.tool_input.file_path | type) == "string" and (.tool_input.path | type) == "string" and .tool_input.file_path != .tool_input.path' >/dev/null 2>&1; then
   for split_field in file_path path; do
     # The jq program references a jq variable.
     # shellcheck disable=SC2016
     split_input=$(printf '%s' "$input" | "$SECRET_BYPASS_JQ" -c --arg f "$split_field" '.tool_input |= {($f): .[$f]}') || security_failure
-    split_out=$(printf '%s' "$split_input" | IWE_SECRET_READ_SPLIT=1 bash "$0") || security_failure
+    split_out=$(printf '%s' "$split_input" | bash "$0" --single-field) || security_failure
     if [ -n "$split_out" ]; then
       printf '%s\n' "$split_out"
       exit 0
@@ -284,6 +291,9 @@ if [ -z "$matched" ]; then
     */secrets/*.yaml|*/secrets/*.yml|*/secrets/*.json|secrets/*.yaml|secrets/*.yml|secrets/*.json)
       matched="secrets/ dir (sops)"
       ;;
+    */.aws/credentials|.aws/credentials)
+      matched=".aws/credentials"
+      ;;
   esac
 fi
 if [ -z "$matched" ]; then
@@ -291,9 +301,10 @@ if [ -z "$matched" ]; then
     .env|.env.*|*.env) matched="*.env" ;;
     *.pem|*.key|*.p12|*.pfx) matched="private-key" ;;
     *.token) matched="*.token" ;;
-    id_rsa|id_rsa.*|id_ed25519|id_ed25519.*) matched="ssh-key" ;;
+    id_rsa|id_rsa.*|id_ed25519|id_ed25519.*|id_ecdsa|id_ecdsa.*) matched="ssh-key" ;;
     *-secret.yaml|*-secret.yml|*-secret.json|*-secret.txt|*-secret.ini|*-secret.conf|secrets.yaml|secrets.yml|secrets.json|credentials.yaml|credentials.yml|credentials.json) matched="secret/creds file" ;;
     .netrc|.proxy-env|.proxy-secret) matched=".netrc/proxy" ;;
+    .git-credentials) matched="git-credentials" ;;
     wrangler.toml) matched="wrangler.toml" ;;
   esac
 fi

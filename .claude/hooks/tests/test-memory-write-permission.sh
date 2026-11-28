@@ -100,6 +100,10 @@ rmdir "$MEM/.git/hooks" 2>/dev/null; rmdir "$MEM/.git" 2>/dev/null
 mkdir -p "$MEM/plain/hooks"
 ln -s "$MEM/plain" "$MEM/.git"
 expect_silent "link named .git to an ordinary folder" "$(call auto Write "$WS/memory/.git/hooks/pre-commit")"
+# N10 (rc.4 audit): with that link, memory/.git/../x normalises to memory/x and the name .git
+# vanishes from the written path, but the OS resolves the link first, so the real file is memory/x
+expect_silent "dot-dot after a link named .git (exploit path of the rc.4 audit)" "$(call auto Write "$WS/memory/.git/../x.md")"
+expect_silent "dot-dot inside memory is refused too" "$(call auto Write "$WS/memory/sub/../note.md")"
 rm -f "$MEM/.git"; mkdir -p "$MEM/.git/hooks"
 expect_silent "dot-claude inside memory" "$(call auto Write "$WS/memory/.claude/settings.json")"
 expect_silent "dot-github inside memory" "$(call auto Write "$WS/memory/.github/workflows/x.yml")"

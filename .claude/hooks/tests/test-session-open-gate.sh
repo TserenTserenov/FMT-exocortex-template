@@ -61,17 +61,24 @@ expect "no semaphore: bare commit"    2 'git commit -m x'
 expect "no semaphore: -C commit"      2 'git -C DS-strategy commit -m x'
 expect "no semaphore: push"           2 'git push'
 expect "no semaphore: push after ;"   2 'git add x; git push'
+# The command word is case-insensitive: on macOS and Windows `GIT commit` runs the same git.
+expect "no semaphore: GIT commit"     2 'GIT commit -m x'
+expect "no semaphore: Git commit"     2 'Git commit -m x'
+expect "no semaphore: Git -C push"    2 'Git -C repo push'
 
 # === No semaphore, but the command is not commit/push → pass (the gate is not about this) ===
 expect "no semaphore: status"         0 'git -C repo status --short'
 expect "no semaphore: commit-tree"    0 'git commit-tree -m x'
 expect "no semaphore: non-git"        0 'ls -la'
 expect "no semaphore: echo mentions"  0 'echo "git commit"'
+expect "no semaphore: GIT status"     0 'GIT status --short'
+expect "no semaphore: echo mentions GIT" 0 'echo "GIT commit"'
 
 # === This session's semaphore is open (--wp) → pass ===
 open_semaphore
 expect "wp semaphore open: commit"    0 'git commit -m x'
 expect "wp semaphore open: -C push"   0 'git -C repo push'
+expect "wp semaphore open: GIT commit" 0 'GIT commit -m x'
 
 # === This session's semaphore is open, but without wp: and with an arbitrary housekeeping reason → still blocked (S-68) ===
 close_semaphore

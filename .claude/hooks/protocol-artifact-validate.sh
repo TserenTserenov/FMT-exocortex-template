@@ -203,7 +203,7 @@ if [ -f "$DAY_RHYTHM_CONFIG" ]; then
   if [ -z "$_RESOLVED_PYTHON3" ]; then
     # issue #765: the python3 resolver is no less reliable than the YAML itself — the same
     # fail-closed boundary that applies below to a broken/unreadable config.
-    ERRORS+=("day-rhythm-config.yaml есть, но python3 не резолвится (find-python3.sh не найден или не вернул интерпретатор) — mandatory-проверка невозможна, fail-closed")
+    ERRORS+=("day-rhythm-config.yaml есть, но python3 не резолвится (find-python3.sh не найден или не вернул интерпретатор): чаще всего нет python3 3.10+ с библиотекой PyYAML — поставьте её: python3 -m pip install --user pyyaml; без этого mandatory-проверка невозможна, fail-closed")
   else
     # Codes: 0 = mandatory configured; 1 = valid config without mandatory;
     # 2+ = broken/unreadable YAML — fail-closed (same contract as sibling

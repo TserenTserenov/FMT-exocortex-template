@@ -270,6 +270,9 @@ fi
 grep -qF 'python3 не резолвится' "$TMP/c12.err" \
     && ok "fail-closed без резолвера называет причину" \
     || bad "fail-closed без резолвера называет причину"
+grep -qF 'python3 -m pip install --user pyyaml' "$TMP/c12.err" \
+    && ok "fail-closed без резолвера называет PyYAML и команду установки" \
+    || bad "fail-closed без резолвера называет PyYAML и команду установки"
 mv "$WS/FMT-exocortex-template/scripts/lib/find-python3.sh.away" "$WS/FMT-exocortex-template/scripts/lib/find-python3.sh"
 git -C "$GOV" reset -q
 rm -f "$GOV/current/DayPlan 2026-09-03.md" "$WS/memory/day-rhythm-config.yaml"
