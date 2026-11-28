@@ -952,7 +952,7 @@ if [ "$TOOL_NAME" = "Bash" ]; then
         printf '%s' "$CMD_CODE" | sed -E "s@$2@ @g" | tr -d "\"'\\\\" | grep -q "$1"
     }
     IWE_SCRIPTS_TAMPERED=$DYNAMIC_ASSIGN
-    var_named_elsewhere IWE_SCRIPTS '\$(IWE_SCRIPTS|\{IWE_SCRIPTS\})/(day-close-prepare|dry-run-complete|memory-bleed|check-dirty-repos)\.sh' \
+    var_named_elsewhere IWE_SCRIPTS '\$(IWE_SCRIPTS|\{IWE_SCRIPTS\})/(day-close-prepare|dry-run-complete|memory-bleed|check-dirty-repos|check-repo-residue)\.sh' \
         && IWE_SCRIPTS_TAMPERED=1
     IWE_TEMPLATE_TAMPERED=$DYNAMIC_ASSIGN
     var_named_elsewhere IWE_TEMPLATE "\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_RE}\\}/\\.claude/scripts/(memory-drift-scan|check-index-health)\\.py" \

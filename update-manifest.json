@@ -89,11 +89,11 @@
     },
     {
       "path": ".claude/hooks/dry-run-cmd-parse.pl",
-      "sha256": "2830ad863d0d2b8010823debf9ad443081080896af23e6e65014b907ce2287e9"
+      "sha256": "9809692e6540c6e9d03fae1d2e326efecc988c1600f846f4c05de8a996c5519d"
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "104cc36c01578a04fc384ce1b4b9a18cdf70a928edcfc6887838d2ebc38243a6"
+      "sha256": "9e647f7eaff9e53341dc23366d540f52559988ad1611d4532f41473c7af6d360"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -517,7 +517,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "8f0ec2745891c1addc335b1f8113aa60dfa6aae56625e63834ddc105d0cb06e1"
+      "sha256": "613c1431eed529aec820bd61e59550771fc1849438c30ae185b388376362a7a1"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -937,7 +937,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "51d1663dfa64a5e8fc1bc4277d86524d9ccad1c68ee5113b1460a1d925a07bea"
+      "sha256": "b0362587102f0889623be79f255adf34d3b219bf7ad4c39100b88a672d75cd56"
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
@@ -1033,7 +1033,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "64480ce5ece0c456713ba829af69a93d8a5b0050d2cab2e0dd57b22a5698132b"
+      "sha256": "adf690a77c3859ebbaba26d97ca277fbf5f456f7b8235b6ee259f19dd6284ed8"
     },
     {
       "path": "CLAUDE.md",
@@ -2452,6 +2452,10 @@
       "sha256": "1b5bd16ed3c7e39dd161023d5e062b9e9a088eac137587717ea06e58d644a132"
     },
     {
+      "path": "scripts/check-repo-residue.sh",
+      "sha256": "1e5d45c7a25fa568bf08a697f3612d9c6dbf771cb4cb485a5f03fcd9ff37190a"
+    },
+    {
       "path": "scripts/check-script-collisions.sh",
       "sha256": "7cdf22d4b83e752188a437200fbc873b5456faac20f2a7605fa7153696210b36"
     },
@@ -3177,7 +3181,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "1dc3c2a3197c5095e0f0eaaeede653005c9009688415a349b96210b64c463ad8"
+      "sha256": "9005cf60eef847ee2320b6d147ab86ea728a412b5067968e95c34163af39fa68"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3751,6 +3755,7 @@
     "scripts/tests/session-guard-isolate-t1-t20-smoke.sh",
     "scripts/tests/session-guard-second-open-warning-smoke.sh",
     "scripts/tests/test-captures-write-lock-840.sh",
+    "scripts/tests/test-check-repo-residue.sh",
     "scripts/tests/test-delivered-exec-bit-matches-update.sh",
     "scripts/tests/test-issue-1411-secret-scan-fp.sh",
     "scripts/tests/test-issue-1411-update-rollback-unrelated-history.sh",

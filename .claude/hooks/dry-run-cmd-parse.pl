@@ -211,7 +211,7 @@ if ($mode eq 'strip') {
 }
 
 my %keyword = map { $_ => 1 } qw(if then elif else while until do ! coproc nohup setsid builtin);
-my @helpers = qw(day-close-prepare.sh dry-run-complete.sh check-dirty-repos.sh);
+my @helpers = qw(day-close-prepare.sh dry-run-complete.sh check-dirty-repos.sh check-repo-residue.sh);
 my %wl;
 if (defined $ENV{WL_ROOT} && length $ENV{WL_ROOT}) {
     $wl{"$ENV{WL_ROOT}/$_"} = 1 for @helpers;

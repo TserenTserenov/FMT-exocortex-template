@@ -2,7 +2,7 @@
 # see DP.SC.153
 # НЕ редактировать вручную — перегенерировать через generate-skills-catalog.sh
 #
-generated: 2026-11-27T22:13:41Z
+generated: 2026-11-28T05:56:35Z
 skills_dir: .claude/skills
 
 skills:
@@ -731,7 +731,7 @@ skills:
   - id: week-close
     name: "week-close"
     description: "Протокол закрытия недели (Week Close). Ретро 7 дней + carry-over в новую неделю + платформенные шаги (бэкап, dirty repos)."
-    version: 1.2.0
+    version: 1.3.0
     layer: L1
     status: active
     triggers:
