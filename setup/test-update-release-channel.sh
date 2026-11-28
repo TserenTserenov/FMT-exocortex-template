@@ -26,6 +26,7 @@ extract_function() {
 }
 {
     extract_function github_api_get
+    extract_function github_rate_limit_hint
     extract_function resolve_delivery_ref
     extract_function detect_release_rollback
     # #963: the helpers detect_release_rollback() calls for histories with no common ancestor
