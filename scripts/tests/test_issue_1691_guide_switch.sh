@@ -12,6 +12,12 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/guide-1691.XXXXXX")"
 trap 'rm -rf -- "$TMP"' EXIT
+# The snapshot script imports only the standard library, so the stdlib-only resolver
+# is enough; resolving once keeps the test on the same contract as the scripts (#1114).
+PYTHON3=$("$ROOT/scripts/lib/find-python3.sh" --stdlib-only) || {
+  echo "FAIL: python3 not found (find-python3.sh)" >&2
+  exit 1
+}
 mkdir -p "$TMP/bin" "$TMP/home"
 CALLS="$TMP/claude-calls.log"
 export CLAUDE_CALLS_LOG="$CALLS"
@@ -45,7 +51,7 @@ new_template_ws() {  # <params.yaml text or empty for none> -> prints the worksp
 run_template() {  # <workspace> [args] -> stdout+stderr; exit code in $RC
   local ws="$1"; shift
   OUT=$(PATH="$TMP/bin:$PATH" HOME="$TMP/home" IWE_ROOT="$ws" IWE_GOVERNANCE_REPO=DS-strategy \
-        python3 "$ROOT/scripts/update-derived-snapshot.py" "$@" 2>&1)
+        "$PYTHON3" "$ROOT/scripts/update-derived-snapshot.py" "$@" 2>&1)
   RC=$?
 }
 template_snapshot() { printf '%s\n' "$1/DS-strategy/.cache/derived_snapshot.json"; }
@@ -62,7 +68,7 @@ new_installed_ws() {  # <params.yaml text or empty> -> prints the workspace
 run_installed() {  # <workspace> [args]
   local ws="$1"; shift
   OUT=$(PATH="$TMP/bin:$PATH" HOME="$TMP/home" env -u IWE_ROOT \
-        python3 "$ws/DS-strategy/scripts/update-derived-snapshot.py" "$@" 2>&1)
+        "$PYTHON3" "$ws/DS-strategy/scripts/update-derived-snapshot.py" "$@" 2>&1)
   RC=$?
 }
 
