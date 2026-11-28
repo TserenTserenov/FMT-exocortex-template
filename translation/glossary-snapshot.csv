@@ -184,6 +184,7 @@ DP.ROLE.127,Визионер,Visionary,pack,DP,ok,name-en-publishable/1
 DP.ROLE.128,Камердинер,Valet,pack,DP,ok,name-en-publishable/1
 DP.ROLE.129,Переводчик для ИИ-агентов,AI Agent Translator,pack,DP,ok,name-en-publishable/1
 DP.ROLE.130,Часовщик,Clockmaker,pack,DP,ok,name-en-publishable/1
+DP.ROLE.131,Архитектор личной структуры IWE,Personal IWE Structure Architect,pack,DP,ok,name-en-publishable/1
 DP.RUNBOOK.001,Runbook: Aist Bot Errors,Runbook: Aist Bot Errors,pack,DP,ok,name-en-publishable/1
 DP.SC.001,Планирование дня,Day Planning,pack,DP,ok,name-en-publishable/1
 DP.SC.002,Планирование и ревью недели,Week Planning and Review,pack,DP,ok,name-en-publishable/1
@@ -298,6 +299,7 @@ DP.SC.235,Работа возобновляется после смены отв
 DP.SC.236,Результаты параллельных сессий собираются в одну версию,Results of parallel sessions are assembled into one consistent version,pack,DP,ok,name-en-publishable/1
 DP.SC.237,Видно состояние дела,The state of the work item is visible,pack,DP,ok,name-en-publishable/1
 DP.SC.238,После приёмки сохраняется способ со свидетельствами,The method and its evidence are kept after acceptance,pack,DP,ok,name-en-publishable/1
+DP.SC.239,"Публичный материал, суть которого пересказывает холодный читатель",A public material whose point a cold reader retells,pack,DP,ok,name-en-publishable/1
 DP.SC.NNN,"{""Название обещания""}",{Service Promise Name},pack,DP,ok,name-en-publishable/1
 DP.SOTA.001,DDD Strategic (Khononov),DDD Strategic (Khononov),pack,DP,ok,name-en-publishable/1
 DP.SOTA.002,Context Engineering,Context Engineering,pack,DP,ok,name-en-publishable/1
@@ -370,6 +372,7 @@ DP.WP.013,Publication Schedule,Publication Schedule,pack,DP,ok,name-en-publishab
 DP.WP.014,Validation Report,Validation Report,pack,DP,ok,name-en-publishable/1
 DP.WP.015,WP-Registry,WP-Registry,pack,DP,ok,name-en-publishable/1
 DP.WP.016,Stage Dependency Map (Карта этапов с зависимостями),Stage Dependency Map,pack,DP,ok,name-en-publishable/1
+DP.WP.017,Карта разметки,Markup Map,pack,DP,ok,name-en-publishable/1
 ECO.ARCH.001,Архитектура экосистемы развития интеллекта,Intelligence Development Ecosystem Architecture,pack,ECO,ok,name-en-publishable/1
 ECO.ARCH.002,Правило связывания цифровых двойников,Digital Twin Binding Rule,pack,ECO,ok,name-en-publishable/1
 ECO.ARCH.003,Правило привязки работ к описаниям систем,Work-to-System Description Rule,pack,ECO,ok,name-en-publishable/1
@@ -599,6 +602,21 @@ PD.METHOD.063,Сквозной пример для связи различени
 PD.METHOD.064,Проверяемая связь метода с конкретным поддерживающим механизмом,Evidence-backed mapping from a method to its support mechanism,pack,PD,ok,name-en-publishable/1
 PD.METHOD.065,"Разрешение на любой результат до практики, усиление и защита","Permission for any result before practice, reinforcement and defense",pack,PD,ok,name-en-publishable/1
 PD.METHOD.069,Изменение стиля,Style Change (replacing one method by a trigger),pack,PD,ok,name-en-publishable/1
+PD.METHOD.070,Формирование рабочего продукта,Work Product Formulation (naming the intended result of a task with a completion criterion),pack,PD,ok,name-en-publishable/1
+PD.METHOD.071,Составление списка рабочих продуктов,Work Product List Keeping (one list of intended results with explicit statuses),pack,PD,ok,name-en-publishable/1
+PD.METHOD.072,Формирование и учёт рабочего продукта на каждую задачу,Work Product per Task (forming and listing the intended result of every task),pack,PD,ok,name-en-publishable/1
+PD.METHOD.073,Защита ежедневных слотов саморазвития,Daily Development Slot Protection,pack,PD,ok,name-en-publishable/1
+PD.METHOD.074,Самодиагностика по карте,Self-Diagnostics by Map,pack,PD,ok,name-en-publishable/1
+PD.METHOD.075,Публичная демонстрация прогресса,Public Progress Demonstration,pack,PD,ok,name-en-publishable/1
+PD.METHOD.076,Ежедневная самопохвала за рабочие продукты,Daily Self-Praise for Work Products,pack,PD,ok,name-en-publishable/1
+PD.METHOD.077,Закрытие проекта,Project Closing (with a mandatory closing document),pack,PD,ok,name-en-publishable/1
+PD.METHOD.078,Формирование своего понимания до проверки с ИИ,Own Understanding Before AI Check (25+25),pack,PD,ok,name-en-publishable/1
+PD.METHOD.079,Построение цифрового экзокортекса,Digital Exocortex Building,pack,PD,ok,name-en-publishable/1
+PD.METHOD.080,Удержание режима сна,Sleep Regime Keeping (with a weekly sleep-quality review),pack,PD,ok,name-en-publishable/1
+PD.METHOD.081,Соблюдение режима питания и питья,Meal and Water Regime Keeping,pack,PD,ok,name-en-publishable/1
+PD.METHOD.082,Контроль внимания,Attention Control,pack,PD,ok,name-en-publishable/1
+PD.METHOD.083,Замена «лёгких» удовольствий «сложными»,Replacing Easy Pleasures with Hard Ones,pack,PD,ok,name-en-publishable/1
+PD.METHOD.084,Очистка цифровой среды,Digital Environment Cleanup,pack,PD,ok,name-en-publishable/1
 PD.ROLE.002,Интеллектуал,Intellectual,pack,PD,ok,name-en-publishable/1
 PD.ROLE.003,Профессионал,Professional,pack,PD,ok,name-en-publishable/1
 PD.ROLE.006,Тело как первая система,Body as First System (Carrier of Personal Development Program),pack,PD,ok,name-en-publishable/1
@@ -627,6 +645,9 @@ PD.WP.018,Meaning Canvas,Meaning Canvas,pack,PD,ok,name-en-publishable/1
 PD.WP.019.stage-2,Практикующий,Practitioner,pack,PD,ok,name-en-publishable/1
 PD.WP.019.stage-3,Систематический,Systematic,pack,PD,ok,name-en-publishable/1
 PD.WP.019.stage-4,Дисциплинированный,Disciplined,pack,PD,ok,name-en-publishable/1
+PD.WP.021,Список рабочих продуктов,Work Product List,pack,PD,ok,name-en-publishable/1
+PD.WP.022,Документ о закрытии проекта,Project Closing Document,pack,PD,ok,name-en-publishable/1
+PD.WP.023,Список утечек внимания,Attention Leaks List,pack,PD,ok,name-en-publishable/1
 U.BoundedContext,BoundedContext,BoundedContext,fpf,,ok,name-en-publishable/1
 U.Capability,Capability,Capability,fpf,,ok,name-en-publishable/1
 U.Characteristic,Characteristic,Characteristic,fpf,,ok,name-en-publishable/1
