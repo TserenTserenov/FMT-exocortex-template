@@ -87,6 +87,10 @@ fi
 echo "$OUT" | grep -qF 'python3 не резолвится' \
   && ok "причина блокировки названа явно" \
   || bad "причина блокировки названа явно (получено: $OUT)"
+# the real cause (no PyYAML) and the exact command to fix it are in the same message
+echo "$OUT" | grep -qF 'python3 -m pip install --user pyyaml' \
+  && ok "блокировка называет библиотеку PyYAML и команду установки" \
+  || bad "блокировка называет библиотеку PyYAML и команду установки (получено: $OUT)"
 
 # --- 2. The same config, the resolver is present nearby (self-relative ../lib/) ---
 WITH_RESOLVER_DIR="$TMP/with-resolver/.claude/hooks"

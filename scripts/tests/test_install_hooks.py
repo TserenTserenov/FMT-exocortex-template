@@ -61,15 +61,17 @@ def _update_backfill_script(
         f"SCRIPT_DIR={shlex.quote(str(ROOT))}",
         f"WORKSPACE_DIR={shlex.quote(str(workspace))}",
         "ENV_GOVERNANCE_REPO=",
+        "SECRET_SCAN_GAPS=()",
         _extract_shell_function("effective_governance_repo"),
         _extract_shell_function("atomic_copy_executable"),
         _extract_shell_function("backfill_platform_hooks"),
+        _extract_shell_function("report_secret_scan_gap_summary"),
     ]
     if effective_governance is not None:
         parts.append(f"EFFECTIVE_GOVERNANCE_REPO={shlex.quote(effective_governance)}")
     else:
         parts.extend(["unset EFFECTIVE_GOVERNANCE_REPO", "unset IWE_GOVERNANCE_REPO"])
-    parts.append("backfill_platform_hooks")
+    parts.extend(["backfill_platform_hooks", "report_secret_scan_gap_summary"])
     return "\n".join(parts)
 
 
@@ -519,3 +521,195 @@ def test_root_and_seed_installers_have_one_implementation():
     root_lines = (ROOT / "scripts" / "install-hooks.sh").read_text(encoding="utf-8").splitlines()
     seed_lines = INSTALL_HOOKS.read_text(encoding="utf-8").splitlines()
     assert seed_lines == root_lines
+
+
+# --- issue #1670, point 4: a pre-commit of the user's own that never calls the secret scan -----
+
+SECRET_SCAN_WARNING = "СЕКРЕТЫ НЕ ПРОВЕРЯЮТСЯ"
+OLD_HOOK_WITHOUT_SCAN = "#!/bin/bash\necho old platform-development hook\n"
+HOOK_WITH_SCAN = '#!/bin/bash\nbash "$HOME/IWE/FMT-exocortex-template/scripts/pre-commit-secret-scan.sh" || exit 1\n'
+
+
+def _check_secret_scan(repo: Path) -> subprocess.CompletedProcess:
+    env = {"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "HOME": str(repo.parent)}
+    return subprocess.run(
+        ["bash", str(INSTALL_HOOKS), "--check-secret-scan", str(repo)],
+        capture_output=True,
+        text=True,
+        env={**env, "IWE_TEMPLATE": str(ROOT)},
+    )
+
+
+def _repo_with_githooks_pre_commit(tmp_path: Path, content: str) -> Path:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / ".githooks").mkdir()
+    (repo / ".githooks" / "pre-commit").write_text(content, encoding="utf-8")
+    (repo / ".githooks" / "pre-commit").chmod(0o755)
+    return repo
+
+
+def test_local_pre_commit_without_secret_scan_is_warned_loudly_and_kept(tmp_path):
+    """The reporter's old copy of the platform-development hook sat in a plans repository since
+    July: the only trace was one line 'pre-commit отличается от канонического шаблона'."""
+    repo = _repo_with_githooks_pre_commit(tmp_path, OLD_HOOK_WITHOUT_SCAN)
+
+    result = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert SECRET_SCAN_WARNING in result.stdout
+    assert "pre-commit-secret-scan.sh" in result.stdout
+    # the line to add names the real scanner of this template
+    assert f'bash "{ROOT}/scripts/pre-commit-secret-scan.sh" || exit 1' in result.stdout
+    assert (repo / ".githooks" / "pre-commit").read_text(encoding="utf-8") == OLD_HOOK_WITHOUT_SCAN
+
+    probe = _check_secret_scan(repo)
+    assert probe.returncode == 3
+    assert probe.stdout == "" and probe.stderr == ""
+
+
+def test_local_pre_commit_that_calls_the_secret_scan_gets_no_warning(tmp_path):
+    repo = _repo_with_githooks_pre_commit(tmp_path, HOOK_WITH_SCAN)
+
+    result = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert SECRET_SCAN_WARNING not in result.stdout
+    assert _check_secret_scan(repo).returncode == 0
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "#!/bin/sh\n# TODO pre-commit-secret-scan.sh\necho lint\n",
+        "#!/bin/sh\necho pre-commit-secret-scan.sh\n",
+        "#!/bin/sh\necho 'example\nbash pre-commit-secret-scan.sh\n'\n",
+        "#!/bin/sh\ncat <<EOF\nbash pre-commit-secret-scan.sh\nEOF\n",
+        "#!/bin/sh\nunused () {\n  bash pre-commit-secret-scan.sh\n}\necho lint\n",
+        "#!/bin/sh\nSCANNER=pre-commit-secret-scan.sh\necho lint\n",
+        "#!/bin/sh\nexit 0\nbash pre-commit-secret-scan.sh\n",
+        "#!/bin/sh\nset -n;\nbash pre-commit-secret-scan.sh\n",
+        "#!/bin/sh\ntrue ||\nbash pre-commit-secret-scan.sh\nexit 0\n",
+        "#!/bin/sh\nfalse &&\nbash pre-commit-secret-scan.sh\nexit 0\n",
+        "#!/bin/sh\nbash pre-commit-secret-scan.sh &\nexit 0\n",
+        "#!/bin/sh\nbash pre-commit-secret-scan.sh || true\n",
+        "#!/bin/bash -n\nbash pre-commit-secret-scan.sh || exit 1\n",
+        "#!/bin/bash\nprintf -v PATH /tmp/fakebin\nbash pre-commit-secret-scan.sh || exit 1\n",
+        '#!/bin/sh\nbash pre-commit-secret-scan.sh "||" exit 1\nexit 0\n',
+        "#!/bin/sh\nbash pre-commit-secret-scan.sh \\|\\| exit 1\nexit 0\n",
+        '#!/bin/sh\nbash pre-commit-secret-scan.sh "||" exit 1 # || exit 1\nexit 0\n',
+    ],
+)
+def test_mentions_of_scanner_are_not_a_call(tmp_path, content):
+    repo = _repo_with_githooks_pre_commit(tmp_path, content)
+    result = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert SECRET_SCAN_WARNING in result.stdout
+    assert _check_secret_scan(repo).returncode == 3
+    assert (repo / ".githooks" / "pre-commit").read_text() == content
+
+
+def test_canonical_hooks_get_no_secret_scan_warning(tmp_path):
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+
+    result = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert SECRET_SCAN_WARNING not in result.stdout
+    assert _check_secret_scan(repo).returncode == 0
+
+
+def test_user_hooks_folder_pre_commit_without_secret_scan_is_warned_and_kept(tmp_path):
+    repo = _repo_with_own_husky_hook(tmp_path)
+
+    result = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _hooks_path(repo, "--local") == ".husky"
+    assert SECRET_SCAN_WARNING in result.stdout
+    assert str(repo / ".husky" / "pre-commit") in result.stdout
+    assert (repo / ".husky" / "pre-commit").read_text(encoding="utf-8") == "#!/bin/bash\necho user lint\n"
+    assert _check_secret_scan(repo).returncode == 3
+
+
+def test_user_hooks_folder_pre_commit_that_delegates_to_platform_hook_gets_no_warning(tmp_path):
+    repo = _repo_with_own_husky_hook(tmp_path)
+    (repo / ".husky" / "pre-commit").write_text(
+        '#!/bin/bash\necho user lint\nbash "$(git rev-parse --show-toplevel)/.githooks/pre-commit" || exit 1\n',
+        encoding="utf-8",
+    )
+
+    result = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert SECRET_SCAN_WARNING not in result.stdout
+    assert _check_secret_scan(repo).returncode == 0
+
+
+def test_delegation_to_an_old_platform_hook_does_not_prove_a_scan(tmp_path):
+    repo = _repo_with_own_husky_hook(tmp_path)
+    (repo / ".husky" / "pre-commit").write_text(
+        '#!/bin/sh\nbash "$(git rev-parse --show-toplevel)/.githooks/pre-commit" || exit 1\n'
+    )
+    (repo / ".githooks").mkdir()
+    (repo / ".githooks" / "pre-commit").write_text(OLD_HOOK_WITHOUT_SCAN)
+    result = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert SECRET_SCAN_WARNING in result.stdout
+    assert _check_secret_scan(repo).returncode == 3
+    assert (repo / ".githooks" / "pre-commit").read_text() == OLD_HOOK_WITHOUT_SCAN
+
+
+def test_user_hooks_folder_without_pre_commit_is_warned(tmp_path):
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    (repo / ".husky").mkdir()
+    (repo / ".husky" / "pre-push").write_text("#!/bin/bash\n", encoding="utf-8")
+    subprocess.run(["git", "config", "--local", "core.hooksPath", ".husky"], cwd=repo, check=True)
+
+    result = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert SECRET_SCAN_WARNING in result.stdout
+    assert "нет pre-commit" in result.stdout
+    assert _check_secret_scan(repo).returncode == 3
+
+
+def test_update_backfill_names_the_secret_scan_gap_in_its_summary(tmp_path):
+    """update.sh runs the installer, then says in its own summary which governance repository
+    has a pre-commit that never calls the secret scan; the user's hook stays as it was."""
+    workspace = tmp_path / "IWE-custom"
+    governance = workspace / "custom-governance"
+    _init_repo(governance)
+    (governance / ".githooks").mkdir()
+    (governance / ".githooks" / "pre-commit").write_text(OLD_HOOK_WITHOUT_SCAN, encoding="utf-8")
+
+    result = subprocess.run(
+        ["bash", "-c", _update_backfill_script(workspace)],
+        capture_output=True,
+        text=True,
+        env={"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "HOME": str(tmp_path)},
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert SECRET_SCAN_WARNING in result.stdout  # the installer's own warning, with the line to add
+    assert "Сохранения в custom-governance НЕ проверяются на секреты" in result.stdout
+    assert (governance / ".githooks" / "pre-commit").read_text(encoding="utf-8") == OLD_HOOK_WITHOUT_SCAN
+
+
+def test_update_backfill_keeps_quiet_when_the_secret_scan_is_called(tmp_path):
+    workspace = tmp_path / "IWE-custom"
+    governance = workspace / "custom-governance"
+    _init_repo(governance)
+
+    result = subprocess.run(
+        ["bash", "-c", _update_backfill_script(workspace)],
+        capture_output=True,
+        text=True,
+        env={"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "HOME": str(tmp_path)},
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert SECRET_SCAN_WARNING not in result.stdout
+    assert "НЕ проверяются на секреты" not in result.stdout

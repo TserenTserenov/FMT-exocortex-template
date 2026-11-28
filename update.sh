@@ -1703,6 +1703,28 @@ sys.exit(0 if quiet else 1)
 PY
 }
 
+# One phrase for the drift warning, chosen by the merge report: what the workspace settings.json
+# carries (or lacks) that makes update.sh leave it alone. The warning used to say "own hooks"
+# every time, also for an install with only an own value, an old platform value or nothing own
+# (finding 4 of the rc.2 check of 0.42.2).
+settings_drift_summary() {
+    "$PY_BIN" - "$1" <<'PY' 2>/dev/null
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    r = json.load(handle)
+parts = []
+if r.get("hooks_only_in_workspace", 0) > 0:
+    parts.append("в ней есть ваши хуки, которых нет в шаблоне")
+if r.get("conflicts"):
+    parts.append("в ней ваши значения настроек, отличные от шаблона")
+if r.get("retired_defaults_replaced"):
+    parts.append("в ней значение, которое платформа ставила раньше и позже отозвала")
+if not parts:
+    parts.append("своих хуков и значений в ней нет, она отстаёт от шаблона")
+print("; ".join(parts))
+PY
+}
+
 # The settings merge warning must compare the template with the workspace, not
 # depend on this run having downloaded a changed template file.  Forks normally
 # fast-forward their template mirror before update.sh, which otherwise leaves
@@ -1725,14 +1747,15 @@ report_settings_merge_drift() {
     # as the cmp -s match above. A merger failure does NOT count as quiet
     # (that would hide real drift behind a parse error); it falls through
     # to the existing warn path below.
-    local probe_file quiet=false
+    local probe_file quiet=false summary="сравнить её с шаблоном не удалось"
     if probe_file=$(build_settings_merge_report "$src" "$dst" \
         "$TMPDIR_UPDATE/settings-merge-probe.json"); then
         settings_merge_report_is_quiet "$probe_file" && quiet=true
+        summary=$(settings_drift_summary "$probe_file") || summary="что в ней своё, определить не удалось"
     fi
     $quiet && return 0
 
-    echo "  ⚠ .claude/settings.json — платформа обновила hooks/permissions, workspace-копия НЕ тронута (несёт пользовательские хуки)."
+    echo "  ⚠ .claude/settings.json — платформа обновила hooks/permissions, workspace-копия НЕ тронута ($summary)."
     if $CHECK_ONLY; then
         echo "    Режим --check: предпросмотр не записан. Запустите update.sh без --check, чтобы получить безопасный план слияния."
         return 0
@@ -1769,6 +1792,8 @@ RULES_SAFE_TO_UPDATE="|"
 HOOKS_BACKUP_RUN=""
 HOOK_BACKUP_FILE=""
 HOOKS_REPLACED=()
+# Governance repositories whose own pre-commit never calls the secret scan (issue #1670, point 4).
+SECRET_SCAN_GAPS=()
 SKILLS_BACKUP_RUN=""
 SKILLS_REPLACED=()
 PLATFORM_BACKUP_FILE=""
@@ -2811,6 +2836,15 @@ backfill_platform_hooks() {
         bash "$target_installer" "$governance_dir"; then
         return 1
     fi
+    # issue #1670, point 4: the installer keeps a pre-commit of the user's own; when it never calls
+    # the secret scan, the final summary says so (the installer already printed the line to add).
+    local secret_scan_rc=0
+    IWE_TEMPLATE="$SCRIPT_DIR" IWE_ROOT="$WORKSPACE_DIR" \
+        bash "$target_installer" --check-secret-scan "$governance_dir" || secret_scan_rc=$?
+    if [ "$secret_scan_rc" -eq 3 ]; then
+        SECRET_SCAN_GAPS+=("$governance_repo")
+    fi
+    return 0
 }
 
 backfill_executor_catalog() {
@@ -3498,6 +3532,13 @@ report_replaced_hooks_summary() {
     echo "    Свои изменения переносите в extensions/ — туда обновление не пишет."
 }
 
+report_secret_scan_gap_summary() {
+    [ "${#SECRET_SCAN_GAPS[@]}" -gt 0 ] || return 0
+    echo ""
+    echo "  ⚠ Сохранения в ${SECRET_SCAN_GAPS[*]} НЕ проверяются на секреты: свой pre-commit не вызывает pre-commit-secret-scan.sh."
+    echo "    Свой pre-commit обновление не меняет; строка для вставки в его начало напечатана выше, в разделе «Platform hooks»."
+}
+
 report_replaced_skills_summary() {
     [ "${#SKILLS_REPLACED[@]}" -gt 0 ] || return 0
     echo ""
@@ -3933,6 +3974,29 @@ github_api_get() {
     return "$result"
 }
 
+# An anonymous GitHub API call that ends in an HTTP error may be the rate limit (60 requests per
+# hour for one address); curl then says only "error: 403". The /rate_limit endpoint is not
+# counted itself, so ask it, and if the limit is used up name the reason and the way out.
+# Silent when a token or an authenticated gh is in use, when the probe fails or the limit is not used up.
+github_rate_limit_hint() {
+    local flat remaining reset_epoch reset_time=""
+    [ -z "${GH_TOKEN:-}${GITHUB_TOKEN:-}" ] || return 0
+    if command -v gh >/dev/null 2>&1 && \
+       GH_DEBUG='' DEBUG='' GH_PROMPT_DISABLED=1 gh auth status --hostname github.com >/dev/null 2>&1; then
+        return 0
+    fi
+    # shellcheck disable=SC2086
+    flat=$(curl ${CURL_BASE_OPTS:-} ${_CURL_SSL_OPT:-} -sSfL "https://api.github.com/rate_limit" 2>/dev/null | tr -d ' \n\r') || return 0
+    remaining=$(printf '%s' "$flat" | sed -n 's/.*"rate":{[^}]*"remaining":\([0-9][0-9]*\).*/\1/p')
+    [ "$remaining" = "0" ] || return 0
+    reset_epoch=$(printf '%s' "$flat" | sed -n 's/.*"rate":{[^}]*"reset":\([0-9][0-9]*\).*/\1/p')
+    if [ -n "$reset_epoch" ]; then
+        reset_time=$(date -d "@$reset_epoch" '+%H:%M' 2>/dev/null || date -r "$reset_epoch" '+%H:%M' 2>/dev/null || true)
+    fi
+    echo "  Причина: исчерпан лимит анонимных запросов к GitHub (60 в час с одного адреса)${reset_time:+; сбросится около $reset_time по времени этого компьютера}." >&2
+    echo "  Что делать: подождать и повторить либо задать токен GitHub (достаточно обычного, без особых прав): GH_TOKEN=<токен> bash update.sh — с токеном лимит 5000 в час." >&2
+}
+
 resolve_delivery_ref() {
     local resolved_ref release_tag release_json commit_json api_status
     local rc_tag refs_json latest_tag
@@ -3961,6 +4025,7 @@ resolve_delivery_ref() {
             fi
             if [ "$api_status" -ne 0 ]; then
                 echo "ОШИБКА: не удалось получить список rc-тегов (API недоступен, страница $page)." >&2
+                github_rate_limit_hint
                 echo "  Канал rc fail-closed: без списка кандидатов обновление не выполняется." >&2
                 exit "$EXIT_NETWORK"
             fi
@@ -4030,6 +4095,7 @@ print(sha)'); then
             # Unlike the release channel (a tag is a valid pin), rc is fail-closed
             # here too: an unpinned SHA = an unverifiable snapshot (cold review).
             echo "ОШИБКА: не удалось закрепить кандидат $rc_tag по SHA коммита." >&2
+            github_rate_limit_hint
             echo "  Канал rc fail-closed: обновление по подвижному имени тега не выполняется." >&2
             exit "$EXIT_NETWORK"
         fi
@@ -4114,6 +4180,7 @@ print(sha)'); then
         # of unverified main — exactly what the release channel protects against. The explicit
         # main channel remains the only road to a moving branch.
         echo "ОШИБКА: не удалось определить последний релиз (нет релизов или API недоступен)." >&2
+        github_rate_limit_hint
         echo "  Release-канал работает только от опубликованного релиза (fail-closed, #501)." >&2
         echo "  Повторите позже, либо осознанно выберите подвижную ветку:" >&2
         echo "    IWE_UPDATE_CHANNEL=main bash update.sh" >&2
@@ -5965,6 +6032,7 @@ if [ "$TOTAL_CHANGES" -eq 0 ]; then
     report_author_skip_summary
     report_replaced_hooks_summary
     report_replaced_skills_summary
+    report_secret_scan_gap_summary
     report_executable_index_mismatches manifest
     # WP-7 F267 stage 1: an install with nothing to update still gets its capability record.
     if ! $CHECK_ONLY && [ -f "$SCRIPT_DIR/scripts/iwe-capabilities.sh" ]; then
@@ -7994,6 +8062,7 @@ fi
 report_author_skip_summary
 report_replaced_hooks_summary
 report_replaced_skills_summary
+report_secret_scan_gap_summary
 echo "=========================================="
 echo ""
 echo "Перезапустите Claude Code для применения обновлений в memory/."

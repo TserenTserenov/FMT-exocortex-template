@@ -121,7 +121,7 @@ validate_dayplan() { # <staged-path> <tmpfile>
     fi
     if [ -f "$config" ]; then
         if [ -z "$py" ]; then
-            err "DayPlan $rel: day-rhythm-config.yaml есть, но python3 не резолвится (find-python3.sh не найден или не вернул интерпретатор) — mandatory-проверка невозможна, fail-closed"
+            err "DayPlan $rel: day-rhythm-config.yaml есть, но python3 не резолвится (find-python3.sh не найден или не вернул интерпретатор): чаще всего нет python3 3.10+ с библиотекой PyYAML — поставьте её: python3 -m pip install --user pyyaml; без этого mandatory-проверка невозможна, fail-closed"
         else
             # Codes: 0 = mandatory configured; 1 = valid config (map)
             # without mandatory; 2 = any error (no PyYAML, broken YAML, root
