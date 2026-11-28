@@ -813,7 +813,7 @@
     },
     {
       "path": ".claude/skills/repo-new/SKILL.md",
-      "sha256": "c398a29dba95b9b6fc97a304a16b275fdd70e3778123dc241cdc05870620c04b"
+      "sha256": "19c8cf84102b994ae5d50f0451535fe59b565184e5d13f2446943827431a6a23"
     },
     {
       "path": ".claude/skills/repo-new/assets/repository-skeleton/CLAUDE.md",
@@ -1053,7 +1053,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "ebf62773242987d68fc4d66ad8bdf679c4d4368b9a4faec813fea8cf5be964e0"
+      "sha256": "82b44f13ce932294cd1fd580ac177d61d0d98ba39ee9437e9f39fca9af782c6e"
     },
     {
       "path": "CLAUDE.md",
