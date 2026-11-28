@@ -37,14 +37,17 @@ expect_has "0б is not marked done before step 11" 'Шаг 0б здесь ещё
 CHECK_BLOCK=$(awk '/^\*\*Проверка шага 0б/ {f=1; next} f && /^```bash$/ {b=1; next} b && /^```$/ {exit} b {print}' "$SKILL")
 if [ -n "$CHECK_BLOCK" ]; then ok "check block found in the skill"; else bad "check block not found"; fi
 
-new_repo() {  # prints the path of a clone with a bare origin and one initial commit
-  local d
+new_repo() {  # [branch] -> prints the path of a clone with a bare origin and one initial commit
+  local d br="${1:-}"
   d=$(mktemp -d "$TMP/case.XXXXXX")
   git init -q --bare "$d/origin.git"
-  git init -q -b main "$d/gov"
+  git init -q -b "${br:-main}" "$d/gov"
   git -C "$d/gov" remote add origin "$d/origin.git"
   echo seed > "$d/gov/README.md"
-  git -C "$d/gov" add README.md && git -C "$d/gov" commit -q -m seed && git -C "$d/gov" push -q origin main
+  git -C "$d/gov" add README.md && git -C "$d/gov" commit -q -m seed && git -C "$d/gov" push -q origin "${br:-main}"
+  # An explicit branch stands for a real clone, where origin/HEAD names the remote default
+  # branch; without an argument origin/HEAD stays unset (cases B-E: the "main" fallback).
+  [ -z "$br" ] || git -C "$d/gov" remote set-head origin "$br"
   printf '%s\n' "$d/gov"
 }
 
@@ -84,6 +87,27 @@ append_retro "$R"
 git -C "$R" add machine/ledger/week/2099/week-2099-W01.yaml && git -C "$R" commit -q -m "ledger: earlier" && git -C "$R" push -q origin main
 append_retro "$R"
 expect_has "re-appended ledger: warning" "ЖУРНАЛ НЕДЕЛИ НЕ СОХРАНЁН" "$(run_check "$R")"
+
+echo "--- #1705 F: governance repo whose default branch is master (no origin/main) ---"
+LEDGER_REL="machine/ledger/week/2099/week-2099-W01.yaml"
+R=$(new_repo master)
+if git -C "$R" rev-parse -q --verify refs/remotes/origin/main >/dev/null; then bad "fixture: origin/main must not exist"; else ok "fixture: origin has only master"; fi
+append_retro "$R"
+git -C "$R" add "$LEDGER_REL" && git -C "$R" commit -q -m "week-close: W01" && git -C "$R" push -q origin master
+out=$(run_check "$R")
+expect_has "pushed ledger on master: step 0б counts as done" "журнал недели сохранён" "$out"
+expect_has "success line names the commit on origin/master" "($(git -C "$R" log -1 --format=%h origin/master -- "$LEDGER_REL"))" "$out"
+case "$out" in *"НЕ СОХРАНЁН"*) bad "pushed ledger on master must not warn: $out" ;; *) ok "no false warning on master" ;; esac
+
+echo "--- #1705 G: master repo, ledger committed but not pushed -> still a warning ---"
+R=$(new_repo master)
+append_retro "$R"
+git -C "$R" add "$LEDGER_REL" && git -C "$R" commit -q -m "week-close: W01"
+expect_has "unpushed ledger on master: warning" "ЖУРНАЛ НЕДЕЛИ НЕ СОХРАНЁН" "$(run_check "$R")"
+
+echo "--- #1705 H: skill text names the remote default branch, no hard-wired origin/main in the check ---"
+expect_has "check block reads origin/HEAD" 'symbolic-ref refs/remotes/origin/HEAD' "$CHECK_BLOCK"
+case "$CHECK_BLOCK" in *'origin/main'*) bad "check block still names origin/main outside a comment" ;; *) ok "check block has no hard-wired origin/main" ;; esac
 
 echo
 echo "issue #1550: $PASSES passed, $FAILS failed"

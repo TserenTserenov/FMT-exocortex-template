@@ -190,7 +190,7 @@ artifact_url: https://github.com/MimEcoSys/DS-principles-curriculum/blob/main/sp
 
 ## 9. ArchGate — ЭМОГССБ (conjunctive screening)
 
-> DP.ARCH.001 §7. Один ❌ → пересмотр архитектуры. CLAUDE.md §5: блокирующее.
+> DP.ARCH.001 §15 «Архитектурные принципы (2-й уровень)». Один ❌ → пересмотр архитектуры. CLAUDE.md §5: блокирующее.
 
 | Характеристика | Оценка | Обоснование |
 |----------------|--------|-------------|

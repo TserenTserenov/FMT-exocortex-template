@@ -63,10 +63,20 @@ runs_on: [claude, kimi, codex]
 
 ## Шаг 3. Получить версию IWE
 
-Запусти:
+Автору шаблона нужен коммит основного репозитория шаблона (апстрима), а не последний коммит копии пользователя: коммит форка с историей апстрима не совпадает и версию не определяет (обращение #1692). Запусти:
 ```bash
-git -C "${IWE_WORKSPACE:-$HOME/IWE}/FMT-exocortex-template" log -1 --format="%h %ad" --date=short 2>/dev/null || echo "неизвестно"
+FMT="${IWE_WORKSPACE:-$HOME/IWE}/FMT-exocortex-template"
+if git -C "$FMT" rev-parse -q --verify upstream/main >/dev/null 2>&1; then
+  git -C "$FMT" log -1 --format="%h %ad" --date=short upstream/main
+elif git -C "$FMT" remote get-url origin 2>/dev/null | grep -qi 'TserenTserenov/FMT-exocortex-template'; then
+  git -C "$FMT" log -1 --format="%h %ad" --date=short
+elif git -C "$FMT" rev-parse -q --verify HEAD >/dev/null 2>&1; then
+  echo "$(git -C "$FMT" log -1 --format="%h %ad" --date=short) (коммит локальной копии: upstream/main нет — remote upstream не настроен или не получен; коммит может не совпадать с историей апстрима)"
+else
+  echo "неизвестно"
+fi
 ```
+Порядок: `upstream/main`, если у копии есть такая ссылка; иначе коммит копии, если её `origin` и есть апстрим (`TserenTserenov/FMT-exocortex-template`); иначе коммит копии с пометкой в скобках; нет и его — «неизвестно». Результат (вместе с пометкой, если она есть) пиши в `IWE_VERSION` как есть.
 
 ## Шаг 4. Проверить gh CLI
 

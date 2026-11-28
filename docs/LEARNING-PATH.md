@@ -1251,7 +1251,7 @@ IWE использует LLM (Claude) — это создаёт специфич
 
 **Где изучить:**
 - [CLAUDE.md](../CLAUDE.md) § 5 — ЭМОГССБ (включая характеристику Безопасность)
-- [DP.ARCH.001 § 4.7](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/02-domain-entities/DP.ARCH.001-platform-architecture.md) — архитектурная характеристика Безопасность
+- [DP.ARCH.001 § 12.7](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/02-domain-entities/DP.ARCH.001-platform-architecture.md) — архитектурная характеристика Безопасность
 
 ## 9. Платформа: бот и тиры
 
