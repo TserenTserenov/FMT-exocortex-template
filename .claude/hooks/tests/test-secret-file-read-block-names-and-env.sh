@@ -64,6 +64,33 @@ check aws_credentials_template_allowed allow '{"tool_name":"Read","tool_input":{
 check git_config_allowed allow '{"tool_name":"Read","tool_input":{"file_path":"/home/u/.gitconfig"}}'
 check readme_allowed allow '{"tool_name":"Read","tool_input":{"file_path":"README.md"}}'
 
+# Equivalent spellings must still name the same protected file. Only harmless fixtures are used.
+mkdir -p "$TMP_DIR/user/.aws/sub"
+printf 'fixture\n' > "$TMP_DIR/user/.aws/credentials"
+for path in "$TMP_DIR/user/.aws/./credentials" "$TMP_DIR/user/.aws/sub/../credentials"; do
+  check aws_equivalent_path_denied deny "$(jq -n --arg p "$path" '{tool_name:"ReadFile",tool_input:{path:$p}}')"
+done
+for path in 'C:\workspace\.aws\credentials' 'C:\workspace\.git-credentials' \
+  'C:\workspace\.ssh\id_ecdsa' 'C:/workspace/.aws/sub/../credentials' \
+  'C:\workspace\.aws.\credentials.'; do
+  check windows_secret_path_denied deny "$(jq -n --arg p "$path" '{tool_name:"ReadFile",tool_input:{path:$p}}')"
+done
+check windows_aws_config_allowed allow '{"tool_name":"ReadFile","tool_input":{"path":"C:\\Users\\test\\.aws\\config"}}'
+check protected_directory_before_parent_denied deny '{"tool_name":"ReadFile","tool_input":{"path":"/tmp/.secrets/../ordinary.txt"}}'
+for name in '.env.foo\..\safe.txt' 'id_rsa.foo\..\safe.txt'; do
+  printf 'fixture\n' > "$TMP_DIR/$name"
+  check posix_literal_backslash_stays_protected deny "$(jq -n --arg p "$TMP_DIR/$name" '{tool_name:"ReadFile",tool_input:{path:$p}}')"
+done
+mkdir -p "$TMP_DIR/store/.secrets/sub" "$TMP_DIR/workspace"
+printf 'fixture\n' > "$TMP_DIR/store/.secrets/db.yaml"
+ln -s "$TMP_DIR/store/.secrets/sub" "$TMP_DIR/workspace/secrets"
+if [ "$TMP_DIR/workspace/secrets/../db.yaml" -ef "$TMP_DIR/store/.secrets/db.yaml" ]; then
+  check original_sops_path_stays_protected deny "$(jq -n --arg p "$TMP_DIR/workspace/secrets/../db.yaml" '{tool_name:"ReadFile",tool_input:{path:$p}}')"
+else
+  FAIL=$((FAIL + 1))
+  echo 'FAIL secret path fixture does not name the same file' >&2
+fi
+
 # 2. The old variable must not switch the second path field off.
 SPLIT_ENV=IWE_SECRET_READ_SPLIT=1
 check split_variable_secret_path_behind_plain_file_path_denied deny \

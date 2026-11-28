@@ -270,11 +270,30 @@ case "$target" in
     ;;
 esac
 
-base=$(basename "$target")
-base_n=$(printf '%s' "$base" | sed -E 's/[[:space:].]+$//' | tr '[:upper:]' '[:lower:]')
-target_n=$(printf '%s' "$target" | tr '[:upper:]' '[:lower:]')
+target_original_n=$(printf '%s' "$target" | tr '[:upper:]' '[:lower:]') || security_failure
+target_written_n=$(printf '%s' "$target" | tr '\\' '/' | tr '[:upper:]' '[:lower:]') || security_failure
+target_n=$("$SECRET_BYPASS_PYTHON" - "$target" <<'PY_PATH'
+import posixpath
+import re
+import sys
 
-case "$base_n" in
+value = sys.argv[1]
+windows = "\\" in value or re.match(r"^[A-Za-z]:", value)
+value = value.replace("\\", "/")
+if windows:
+    # Win32 ignores trailing dots/spaces in names; keep . and .. as path operators.
+    value = "/".join(
+        part.rstrip(" ") if part.rstrip(" ") in (".", "..") else part.rstrip(" .")
+        for part in value.split("/")
+    )
+print(posixpath.normpath(value).lower())
+PY_PATH
+) || security_failure
+base=$(basename "$target_n")
+base_n=$(printf '%s' "$base" | sed -E 's/[[:space:].]+$//' | tr '[:upper:]' '[:lower:]')
+base_original_n=$(basename "$target_original_n" | sed -E 's/[[:space:].]+$//') || security_failure
+
+case "$base_original_n" in
   *.example|*.sample|*.template|*.dist|*.example.*|*.sample.*)
     log_decision "allow-template" "template-exception" "$target" || true
     exit 0
@@ -282,22 +301,24 @@ case "$base_n" in
 esac
 
 matched=""
-case "/$target_n/" in
-  */.secrets/*) matched=".secrets/ dir" ;;
-  */.railway/*) matched=".railway/ dir" ;;
-esac
-if [ -z "$matched" ]; then
-  case "$target_n" in
-    */secrets/*.yaml|*/secrets/*.yml|*/secrets/*.json|secrets/*.yaml|secrets/*.yml|secrets/*.json)
-      matched="secrets/ dir (sops)"
-      ;;
-    */.aws/credentials|.aws/credentials)
-      matched=".aws/credentials"
-      ;;
+# Normalised aliases add denials; they must never remove a denial of the original spelling.
+for candidate_path in "$target_original_n" "$target_written_n" "$target_n"; do
+  case "/$candidate_path/" in
+    */.secrets/*) matched=".secrets/ dir" ;;
+    */.railway/*) matched=".railway/ dir" ;;
   esac
-fi
+  if [ -z "$matched" ]; then
+    case "$candidate_path" in
+      */secrets/*.yaml|*/secrets/*.yml|*/secrets/*.json|secrets/*.yaml|secrets/*.yml|secrets/*.json)
+        matched="secrets/ dir (sops)" ;;
+      */.aws/credentials|.aws/credentials) matched=".aws/credentials" ;;
+    esac
+  fi
+  [ -z "$matched" ] || break
+done
 if [ -z "$matched" ]; then
-  case "$base_n" in
+  for candidate_base in "$base_original_n" "$base_n"; do
+  case "$candidate_base" in
     .env|.env.*|*.env) matched="*.env" ;;
     *.pem|*.key|*.p12|*.pfx) matched="private-key" ;;
     *.token) matched="*.token" ;;
@@ -307,6 +328,8 @@ if [ -z "$matched" ]; then
     .git-credentials) matched="git-credentials" ;;
     wrangler.toml) matched="wrangler.toml" ;;
   esac
+  [ -z "$matched" ] || break
+  done
 fi
 
 EXTRA="$HOME/.iwe/secret-read-extra.deny"
@@ -315,8 +338,15 @@ if [ -z "$matched" ] && [ -f "$EXTRA" ]; then
     [ -z "$pat" ] && continue
     case "$pat" in \#*) continue ;; esac
     # shellcheck disable=SC2254
-    case "$base_n" in $pat) matched="extra-file-policy"; break ;; esac
-    case "/$target_n/" in *"/$pat/"*) matched="extra-directory-policy"; break ;; esac
+    for candidate_base in "$base_original_n" "$base_n"; do
+      # shellcheck disable=SC2254
+      case "$candidate_base" in $pat) matched="extra-file-policy"; break ;; esac
+    done
+    [ -z "$matched" ] || break
+    for candidate_path in "$target_original_n" "$target_written_n" "$target_n"; do
+      case "/$candidate_path/" in *"/$pat/"*) matched="extra-directory-policy"; break ;; esac
+    done
+    [ -z "$matched" ] || break
   done < "$EXTRA"
 fi
 

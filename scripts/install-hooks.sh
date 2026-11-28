@@ -58,17 +58,98 @@ points_at_platform_hooks() {
 # copy that differs from the platform one, or one in their own hooks folder). When it never calls the
 # secret scan, commits are not checked for secrets, and the only trace used to be the line
 # "pre-commit отличается от канонического шаблона", easy to miss. Say it plainly, with the line to
-# add. The user's hook is never changed (WP-484). A call of .githooks/pre-commit counts as a call of
-# the scan: that hook runs it.
-SECRET_SCAN_CALL_RE='pre-commit-secret-scan|\.githooks/pre-commit'
+# add. The user's hook is never changed (WP-484). Only a verified target counts as delegation.
+# Complex custom shell is conservatively unconfirmed; never execute a hook to inspect it.
+simple_hook_calls() { # <file> <scan|delegate>
+  command -v python3 >/dev/null 2>&1 || return 1
+  python3 - "$1" "$2" "$REPO" <<'PY_HOOK'
+import os
+import re
+import shlex
+import sys
+
+path, wanted, repo = sys.argv[1:]
+try:
+    with open(path, encoding="utf-8") as stream:
+        lines = stream.readlines()
+except (OSError, UnicodeError):
+    sys.exit(1)
+if not lines or lines[0].strip() not in {
+    "#!/bin/sh", "#!/bin/bash", "#!/usr/bin/sh", "#!/usr/bin/bash",
+    "#!/usr/bin/env sh", "#!/usr/bin/env bash",
+}:
+    sys.exit(1)
+errexit = False
+delegates = {
+    ".githooks/pre-commit", "./.githooks/pre-commit",
+    "$(git rev-parse --show-toplevel)/.githooks/pre-commit",
+    os.path.join(repo, ".githooks", "pre-commit"),
+}
+for line in lines:
+    try:
+        words = shlex.split(line, comments=True)
+    except ValueError:
+        sys.exit(1)
+    if not words:
+        continue
+    replaced_shell = words[0] == "exec"
+    if words[0] in ("exec", "command"):
+        words = words[1:]
+    if not words:
+        sys.exit(1)
+    command = words[0]
+    called = words[1:] if os.path.basename(command) in {"bash", "sh"} else words
+    if called and called[0] == "--":
+        called = called[1:]
+    script = called[0] if called else ""
+    matched = (
+        wanted == "scan" and os.path.basename(script) == "pre-commit-secret-scan.sh"
+        or wanted == "delegate" and script in delegates
+    )
+    if matched:
+        tail = called[1:]
+        # The call must gate the commit, rather than run asynchronously or swallow failure.
+        aborts_on_failure = "#" not in line and tail == ["||", "exit", "1"] and re.search(
+            r"\s\|\|\s+exit\s+1\s*(?:#.*)?$", line
+        )
+        if aborts_on_failure or not tail and (errexit or replaced_shell):
+            sys.exit(0)
+        sys.exit(1)
+    if replaced_shell:
+        sys.exit(1)
+    if command == "set":
+        flags = words[1] if len(words) > 1 else ""
+        if not (
+            len(words) == 2 and re.fullmatch(r"-[eux]+", flags)
+            or len(words) == 3 and re.fullmatch(r"-[eux]*o", flags) and words[2] == "pipefail"
+        ):
+            sys.exit(1)
+        errexit = errexit or "e" in flags
+        continue
+    # Only an unambiguous prologue is supported: a conditional continuation cannot
+    # make its following physical line look like an unconditional scanner invocation.
+    if command != "echo" or any(
+        any(char in word for char in ";&|<>$(){}" + chr(96)) for word in words[1:]
+    ):
+        sys.exit(1)
+sys.exit(1)
+PY_HOOK
+}
+
+hook_calls_scan() { # <pre-commit>
+  [ -f "$1" ] || return 1
+  if [ -n "$CANONICAL_HOOKS_DIR" ] && cmp -s "$1" "$CANONICAL_HOOKS_DIR/pre-commit"; then
+    return 0
+  fi
+  simple_hook_calls "$1" scan
+}
 
 # secret_scan_gap <core.hooksPath value or empty>: prints the pre-commit that will run and returns 0
-# when it has no call of the scan; returns 1 when the scan is called, or when the platform folder
-# simply has no pre-commit yet (the installer copies it).
+# when a scanner call cannot be established; returns 1 for the current canonical hook,
+# a simple scanner invocation or delegation to a target with one of those forms.
 secret_scan_gap() {
-  local hooks_path="$1" pre_commit own_folder=false
+  local hooks_path="$1" pre_commit
   if [ -n "$hooks_path" ] && [ "$hooks_path" != /dev/null ] && ! points_at_platform_hooks "$hooks_path"; then
-    own_folder=true
     case "$hooks_path" in
       /*) pre_commit="${hooks_path%/}/pre-commit" ;;
       *) pre_commit="$REPO/${hooks_path%/}/pre-commit" ;;
@@ -76,17 +157,20 @@ secret_scan_gap() {
   else
     pre_commit="$HOOK_DIR/pre-commit"
   fi
-  if [ -f "$pre_commit" ]; then
-    ! grep -Eq "$SECRET_SCAN_CALL_RE" "$pre_commit" || return 1
-  else
-    $own_folder || return 1
+  if hook_calls_scan "$pre_commit"; then
+    return 1
+  fi
+  if [ "$pre_commit" != "$HOOK_DIR/pre-commit" ] \
+      && simple_hook_calls "$pre_commit" delegate \
+      && hook_calls_scan "$HOOK_DIR/pre-commit"; then
+    return 1
   fi
   printf '%s\n' "$pre_commit"
 }
 
 warn_secret_scan_gap() { # <pre-commit path>
   local scanner="${CANONICAL_HOOKS_DIR%/seed/strategy/.githooks}/scripts/pre-commit-secret-scan.sh"
-  echo "⚠️  СЕКРЕТЫ НЕ ПРОВЕРЯЮТСЯ при сохранении в $REPO: свой pre-commit не вызывает pre-commit-secret-scan.sh (#1670)."
+  echo "⚠️  СЕКРЕТЫ НЕ ПРОВЕРЯЮТСЯ при сохранении в $REPO: проверяемый вызов pre-commit-secret-scan.sh не найден (#1670)."
   if [ -f "$1" ]; then
     echo "   Файл: $1"
   else
@@ -96,16 +180,6 @@ warn_secret_scan_gap() { # <pre-commit path>
   echo "     bash \"$scanner\" || exit 1"
   echo "   Свой pre-commit установщик не меняет."
 }
-
-if $CHECK_SECRET_SCAN; then
-  hooks_path_rc=0
-  current_hooks_path=$(git -C "$REPO" config --get core.hooksPath) || hooks_path_rc=$?
-  [ "$hooks_path_rc" -le 1 ] || exit 1
-  if secret_scan_gap "$current_hooks_path" >/dev/null; then
-    exit 3
-  fi
-  exit 0
-fi
 
 CANONICAL_HOOKS_DIR=""
 for candidate in \
@@ -118,6 +192,16 @@ do
     break
   fi
 done
+
+if $CHECK_SECRET_SCAN; then
+  hooks_path_rc=0
+  current_hooks_path=$(git -C "$REPO" config --get core.hooksPath) || hooks_path_rc=$?
+  [ "$hooks_path_rc" -le 1 ] || exit 1
+  if secret_scan_gap "$current_hooks_path" >/dev/null; then
+    exit 3
+  fi
+  exit 0
+fi
 
 MISSING_SOURCE=""
 for hook in pre-commit pre-push; do

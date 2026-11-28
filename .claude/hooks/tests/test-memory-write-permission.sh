@@ -5,7 +5,7 @@
 # Every case also requires an empty stderr, so a crash inside the hook cannot pass as "silent".
 set -uo pipefail
 
-HOOK="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/memory-write-permission.sh"
+HOOK="${HOOK_UNDER_TEST:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/memory-write-permission.sh}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 ERR="$TMP/stderr"
@@ -188,6 +188,59 @@ SPMEM="$CONFIG/projects/$(slug_of "$SP")/memory"
 mkdir -p "$SPMEM"
 ln -s "$SPMEM" "$SP/memory"
 expect_allow "workspace path with a space" "$(run_hook "$SP" "$(payload auto Write "$SP/memory/my note.md")")"
+
+# Execute the real hook's Python body with Windows path semantics. No Windows files are read.
+if python3 - "$HOOK" <<'PY_WINDOWS'
+import io
+import json
+import ntpath
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+
+hook = Path(sys.argv[1]).read_text()
+body = hook.split("python3 -I -c '\n", 1)[1].rsplit("\n'\nexit 0", 1)[0]
+namespace = {}
+exec(compile(body.rsplit("\nmain()", 1)[0], sys.argv[1], "exec"), namespace)
+link = r"C:\workspace\memory"
+memory = r"C:\config\projects\test\memory"
+
+def realpath(value):
+    value = ntpath.normpath(value)
+    return memory + value[len(link):] if value == link or value.startswith(link + "\\") else value
+
+paths = SimpleNamespace(
+    isabs=ntpath.isabs, normpath=ntpath.normpath, join=ntpath.join, dirname=ntpath.dirname,
+    realpath=realpath, isdir=lambda _: True,
+)
+namespace["os"] = SimpleNamespace(
+    sep="\\", path=paths, environ={
+        "MEMORY_PROJECT_DIR": r"C:\workspace",
+        "CLAUDE_CODE_PROJECT_DIR_NAME": "test",
+        "CLAUDE_CONFIG_DIR": r"C:\config",
+    },
+)
+for target, allowed in [
+    ("C:/workspace/memory/note.md", True),
+    ("C:/workspace/memory/.git/../note.md", False),
+    (r"C:\workspace\memory\.git\..\note.md", False),
+]:
+    output = io.StringIO()
+    namespace["sys"] = SimpleNamespace(
+        stdin=io.StringIO(json.dumps({
+            "permission_mode": "auto", "tool_name": "Write", "tool_input": {"file_path": target},
+        })),
+        stdout=output,
+    )
+    namespace["main"]()
+    assert bool(output.getvalue()) == allowed, (target, output.getvalue())
+PY_WINDOWS
+then
+  PASS=$((PASS + 1))
+else
+  echo "FAIL Windows path separators"
+  FAIL=$((FAIL + 1))
+fi
 
 echo "memory-write-permission: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

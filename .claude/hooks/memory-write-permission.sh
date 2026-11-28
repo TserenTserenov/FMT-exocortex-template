@@ -98,7 +98,7 @@ def main():
     # A ".." segment in the path as written is refused: normalisation would drop it together
     # with the name before it (memory/.git/../x becomes memory/x) and hide that name from the
     # checks below, while the OS resolves a link first and applies ".." to its target (N10).
-    if ".." in target.split(os.sep):
+    if ".." in re.split(r"[\\/]", target):
         return
     # The path as written must go through <workspace>/memory/ before symlinks are resolved.
     if not inside(os.path.normpath(target), os.path.normpath(link)):

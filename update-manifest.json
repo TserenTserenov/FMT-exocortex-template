@@ -125,7 +125,7 @@
     },
     {
       "path": ".claude/hooks/memory-write-permission.sh",
-      "sha256": "a9998d17f4e65366e6390521afa1096ba794da34e0c4c4e57d60e9fa792200bb"
+      "sha256": "238376a7fe477dc9340aba5b8b042791cd19b8e2560703ad699dd62697082b18"
     },
     {
       "path": ".claude/hooks/pack-creator-spf-guard.sh",
@@ -189,7 +189,7 @@
     },
     {
       "path": ".claude/hooks/secret-file-read-block.sh",
-      "sha256": "c38698b1b22918f0d7e61ae35c44d9b73b59d25c5c3e7cf5ca10d5b832803aed"
+      "sha256": "256ac139423a95eb459b9531cc618c01a4e3a61f3e3d4b482299fff21302e6a9"
     },
     {
       "path": ".claude/hooks/secret-leak-block.sh",
@@ -313,7 +313,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-memory-write-permission.sh",
-      "sha256": "0b739bc54b4f4eab4ee4550d782d57e654700a109ce5ad66a6cfdbf42f216319"
+      "sha256": "f76fab176291ae644326244b122d70b06f0a79a8685b587fa654d8d72ff79fab"
     },
     {
       "path": ".claude/hooks/tests/test-protocol-artifact-validate-mandatory-fail-closed.sh",
@@ -329,7 +329,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-secret-file-read-block-names-and-env.sh",
-      "sha256": "ad08d4268805a5a3b0fa16bcb93417a30d59cbc0fbc2e4da6f8bc04eabc87577"
+      "sha256": "88bf95fcc7f22ee75bfe9910cff83190c90810dabc0597ecc83ff007bec5f8f6"
     },
     {
       "path": ".claude/hooks/tests/test-secret-leak-block-heredoc-in-dollar-paren.sh",
@@ -1057,7 +1057,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d3f34e52d35f1b623b0aed0725a0914419457c2ebfe9e72aaac0da7d928674e4"
+      "sha256": "79c090132a2596ed96488a588c5f1de43632866402c701c3944d9b2cd0608a80"
     },
     {
       "path": "CLAUDE.md",
@@ -2721,7 +2721,7 @@
     },
     {
       "path": "scripts/install-hooks.sh",
-      "sha256": "c4a68b8fd710b8a75ac4d248b91d922309a7f16fc7c19496a8c500ec80d199c8"
+      "sha256": "20a27a9c8b893b0c602f3f04b66597a115d2a240097f6bd9eca5e3deb8198ee2"
     },
     {
       "path": "scripts/isolate-push.sh",
@@ -3289,7 +3289,7 @@
     },
     {
       "path": "scripts/tests/test_install_hooks.py",
-      "sha256": "c336e9f5d47f635f02b9581bf826774291dd1149ab32ee4fd5cf51f26a41d25b"
+      "sha256": "a224524bc7a0973d0e0d1c37e787ae06b468a46df162c00c081989a952c90b18"
     },
     {
       "path": "scripts/tests/test_issue_1032_strategy_session_offline.sh",
@@ -3581,7 +3581,7 @@
     },
     {
       "path": "seed/strategy/scripts/install-hooks.sh",
-      "sha256": "c4a68b8fd710b8a75ac4d248b91d922309a7f16fc7c19496a8c500ec80d199c8"
+      "sha256": "20a27a9c8b893b0c602f3f04b66597a115d2a240097f6bd9eca5e3deb8198ee2"
     },
     {
       "path": "seed/strategy/scripts/isolate-push.sh",

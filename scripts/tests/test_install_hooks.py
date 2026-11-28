@@ -578,6 +578,37 @@ def test_local_pre_commit_that_calls_the_secret_scan_gets_no_warning(tmp_path):
     assert _check_secret_scan(repo).returncode == 0
 
 
+@pytest.mark.parametrize(
+    "content",
+    [
+        "#!/bin/sh\n# TODO pre-commit-secret-scan.sh\necho lint\n",
+        "#!/bin/sh\necho pre-commit-secret-scan.sh\n",
+        "#!/bin/sh\necho 'example\nbash pre-commit-secret-scan.sh\n'\n",
+        "#!/bin/sh\ncat <<EOF\nbash pre-commit-secret-scan.sh\nEOF\n",
+        "#!/bin/sh\nunused () {\n  bash pre-commit-secret-scan.sh\n}\necho lint\n",
+        "#!/bin/sh\nSCANNER=pre-commit-secret-scan.sh\necho lint\n",
+        "#!/bin/sh\nexit 0\nbash pre-commit-secret-scan.sh\n",
+        "#!/bin/sh\nset -n;\nbash pre-commit-secret-scan.sh\n",
+        "#!/bin/sh\ntrue ||\nbash pre-commit-secret-scan.sh\nexit 0\n",
+        "#!/bin/sh\nfalse &&\nbash pre-commit-secret-scan.sh\nexit 0\n",
+        "#!/bin/sh\nbash pre-commit-secret-scan.sh &\nexit 0\n",
+        "#!/bin/sh\nbash pre-commit-secret-scan.sh || true\n",
+        "#!/bin/bash -n\nbash pre-commit-secret-scan.sh || exit 1\n",
+        "#!/bin/bash\nprintf -v PATH /tmp/fakebin\nbash pre-commit-secret-scan.sh || exit 1\n",
+        '#!/bin/sh\nbash pre-commit-secret-scan.sh "||" exit 1\nexit 0\n',
+        "#!/bin/sh\nbash pre-commit-secret-scan.sh \\|\\| exit 1\nexit 0\n",
+        '#!/bin/sh\nbash pre-commit-secret-scan.sh "||" exit 1 # || exit 1\nexit 0\n',
+    ],
+)
+def test_mentions_of_scanner_are_not_a_call(tmp_path, content):
+    repo = _repo_with_githooks_pre_commit(tmp_path, content)
+    result = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert SECRET_SCAN_WARNING in result.stdout
+    assert _check_secret_scan(repo).returncode == 3
+    assert (repo / ".githooks" / "pre-commit").read_text() == content
+
+
 def test_canonical_hooks_get_no_secret_scan_warning(tmp_path):
     repo = tmp_path / "repo"
     _init_repo(repo)
@@ -614,6 +645,20 @@ def test_user_hooks_folder_pre_commit_that_delegates_to_platform_hook_gets_no_wa
     assert result.returncode == 0, result.stdout + result.stderr
     assert SECRET_SCAN_WARNING not in result.stdout
     assert _check_secret_scan(repo).returncode == 0
+
+
+def test_delegation_to_an_old_platform_hook_does_not_prove_a_scan(tmp_path):
+    repo = _repo_with_own_husky_hook(tmp_path)
+    (repo / ".husky" / "pre-commit").write_text(
+        '#!/bin/sh\nbash "$(git rev-parse --show-toplevel)/.githooks/pre-commit" || exit 1\n'
+    )
+    (repo / ".githooks").mkdir()
+    (repo / ".githooks" / "pre-commit").write_text(OLD_HOOK_WITHOUT_SCAN)
+    result = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert SECRET_SCAN_WARNING in result.stdout
+    assert _check_secret_scan(repo).returncode == 3
+    assert (repo / ".githooks" / "pre-commit").read_text() == OLD_HOOK_WITHOUT_SCAN
 
 
 def test_user_hooks_folder_without_pre_commit_is_warned(tmp_path):
