@@ -2,7 +2,7 @@
 name: day-close
 description: "Протокол закрытия дня (Day Close). Алиас для /run-protocol close day — симметрия с /day-open."
 argument-hint: ""
-version: 1.1.0
+version: 1.1.1
 layer: L1
 status: active
 browser_safe: false
@@ -47,9 +47,9 @@ Day Close = протокол. Блокирующее требование — н
 ### 0г. Session-guard: привязка к РП-1 (S-68 — каждый коммит обязан нести реальный РП)
 Day Close сам по себе не рабочий продукт, но `session-open-gate.sh` (S-68) не делает для него исключения — финальный коммит шага 3 ниже без привязки к `--wp` будет отклонён. Если сессия уже привязана к другому РП, вторая привязка не нужна:
 ```bash
-HARNESS_ID="${CLAUDE_CODE_SESSION_ID:-}"
+HARNESS_ID=$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" whoami --field harness 2>/dev/null) || HARNESS_ID="${CLAUDE_CODE_SESSION_ID:-}"
 SESSION_DIR="${IWE_ROOT:-$HOME/IWE}/.iwe-runtime/sessions"
-AGENT="${IWE_AGENT:-claude-code}"
+AGENT=$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" whoami --field agent 2>/dev/null) && [ -n "$AGENT" ] || AGENT="${IWE_AGENT:-claude-code}"
 ALREADY_BOUND=0
 if [ -n "$HARNESS_ID" ]; then
   while IFS= read -r sem; do
@@ -169,7 +169,7 @@ jq -n \
 ### 10d. Снять служебную отметку шага 0г (issue #1506)
 После push шага 10b коммитов в этом протоколе больше нет. Отметка `day-close` этого агента, открытая на шаге 0г, иначе остаётся в `.iwe-runtime/sessions/`, и следующее `session-guard.sh open` предупреждает о сессии без прав на коммит. Закрывается только отметка, записанная этим же разговором (строка `harness_session_id` совпадает; `--only-own-harness` сверяет её внутри `session-guard.sh` под блокировкой, код 3 — отметка не наша), чтобы не снять отметку параллельной сессии того же агента. Нет отметки — команда ничего не делает; отметка чужая или нет номера разговора — `session-guard.sh` отказывает с кодом 3 и ничего не меняет:
 ```bash
-AGENT="${IWE_AGENT:-claude-code}"
+AGENT=$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" whoami --field agent 2>/dev/null) && [ -n "$AGENT" ] || AGENT="${IWE_AGENT:-claude-code}"
 HK_SEM="${IWE_ROOT:-$HOME/IWE}/.iwe-runtime/sessions/${AGENT}-housekeeping-day-close.open"
 [ ! -f "$HK_SEM" ] || bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" close --housekeeping day-close --agent "$AGENT" --only-own-harness
 ```

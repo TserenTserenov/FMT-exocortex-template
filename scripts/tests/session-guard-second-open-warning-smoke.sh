@@ -14,7 +14,7 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 # Pull the two functions out of the script as written, without running its main.
 extract() { awk -v name="$1" '$0 ~ "^"name"\\(\\) \\{" {p=1} p {print} p && /^}$/ {exit}' "$SG"; }
 FUNCS="$TMP/funcs.sh"
-{ extract _wp_key; extract warn_sibling_semaphores; } > "$FUNCS"
+{ for f in _caller_resolution _agent_family_of _caller_harness_id _wp_key warn_sibling_semaphores; do extract "$f"; done; } > "$FUNCS"
 grep -q '^warn_sibling_semaphores() {' "$FUNCS" || fail "warn_sibling_semaphores not found in session-guard.sh"
 grep -q 'warn_sibling_semaphores "\$AGENT" "\$WP"' "$SG" || fail "open does not call warn_sibling_semaphores"
 
@@ -30,7 +30,7 @@ sem() { # <file> <conversation id or empty> <wp or empty> <slug or empty>
 # Runs the function the way open does: strict mode, then a marker line that
 # proves execution continued past it.
 run() { # <conversation id or empty>
-  env -u CLAUDE_CODE_SESSION_ID ${1:+CLAUDE_CODE_SESSION_ID="$1"} bash -c '
+  env -u CLAUDE_CODE_SESSION_ID -u CODEX_THREAD_ID -u IWE_AGENT ${1:+CLAUDE_CODE_SESSION_ID="$1"} bash -c '
     set -euo pipefail
     . "$1/scripts/lib/wp-num.sh"
     type wp_num_normalize >/dev/null 2>&1 || { echo "no wp_num_normalize"; exit 3; }
