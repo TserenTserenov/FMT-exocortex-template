@@ -54,9 +54,9 @@ Month Close = протокол. Исполнять ТОЛЬКО пошагово
 ### 0а. Session-guard: привязка к РП-1 (S-68 — каждый коммит обязан нести реальный РП)
 Month Close сам по себе не рабочий продукт, но `session-open-gate.sh` (S-68) не делает для него исключения — коммит шага ниже (`git commit -m "month-close: close YYYY-MM"`) без привязки к `--wp` будет отклонён. Если сессия уже привязана к другому РП, вторая привязка не нужна:
 ```bash
-HARNESS_ID=$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" whoami --field harness)
+HARNESS_ID=$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" whoami --field harness 2>/dev/null) || HARNESS_ID="${CLAUDE_CODE_SESSION_ID:-}"
 SESSION_DIR="${IWE_ROOT:-$HOME/IWE}/.iwe-runtime/sessions"
-AGENT=$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" whoami --field agent)
+AGENT=$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" whoami --field agent 2>/dev/null) && [ -n "$AGENT" ] || AGENT="${IWE_AGENT:-claude-code}"
 ALREADY_BOUND=0
 if [ -n "$HARNESS_ID" ]; then
   while IFS= read -r sem; do

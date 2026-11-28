@@ -577,7 +577,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "e5cee86c76fcd70fce82ac7e6c93f68ea41429767ad94fcd80249293a8cdd016"
+      "sha256": "1a913f1687808af7e67c2e6f4eea8fcf9d6d5b710b0110a54ef78a18a5a7b3ec"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -589,7 +589,7 @@
     },
     {
       "path": ".claude/skills/day-open/SKILL.md",
-      "sha256": "0027b70252ce652e87bf0c83dbfe39a8373730de08decf407f4bb3c535e478d7"
+      "sha256": "154e33cfa87ad205a63eac453ed334027fb2dedc988c19fa12ee78764891c5ba"
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
@@ -737,7 +737,7 @@
     },
     {
       "path": ".claude/skills/month-close/SKILL.md",
-      "sha256": "2e08fd7f21711edcc398a2e1a543a570b1844fb3c9cf2b46171b2851998f5fec"
+      "sha256": "f4810c54a4537a0d70d5c95664abfbe826520844b55871e9585f1b6804b93e2f"
     },
     {
       "path": ".claude/skills/onboarding/SKILL.md",
@@ -909,7 +909,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "d33dc38436a45bcdbbbc5df589aaa5fe1e2a66218cc840c4d24a5161239e5d99"
+      "sha256": "8a6af8eeacc762a581cb0fb1be5b60e7e2d6cd87603de57134a7d49425f0a111"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -957,7 +957,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "0c1df7265b877c963c7511291d99096ba516d5f7c841d4e374433ec90fcefc74"
+      "sha256": "594cf612b0bd9b427935912e2716fe4d392aa19bd30759476b930f29be65e0e0"
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
@@ -1053,7 +1053,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "575a877f10a130702348a5b2ed3c1d078adcd7c9863df44016e9eb0f155ea7ca"
+      "sha256": "9ea5558edfb0cfd05dcdbb45d6215d1200639f796f3a39e142c350623ef922e0"
     },
     {
       "path": "CLAUDE.md",
@@ -3085,7 +3085,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "4905d34a2de20788d05ac75c5e4db89de1d4fe114af78d377e6a2f931cbfad7a"
+      "sha256": "c7d3351da1b4cfe5fa09ec84caaa36a7a64e898a40e87ddd00ccc263c1592d2d"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3205,7 +3205,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "d0b59d3c78387c53e22bc1c5e13ad00e3cfa01b4ee7f1d966742009bd7d1620b"
+      "sha256": "42a561ad2e371d7e5ea2d27928dc79a1faa3b658539ba5348a05869dcf23b81f"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3281,7 +3281,7 @@
     },
     {
       "path": "scripts/tests/test_hook_classification.sh",
-      "sha256": "dca3047457c8598dae1c01c316195c9cec95f5c57887caa86539ae3419f1c22b"
+      "sha256": "31ce270bfd515be579cc9e03b4c875d5364fbcf5419d1f5c2a21a8425fd0408d"
     },
     {
       "path": "scripts/tests/test_install_hooks.py",

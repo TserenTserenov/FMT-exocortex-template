@@ -84,6 +84,9 @@ check_case() {
 
   run_as "$root" "$prefix" "$oa" "$oc" "$ox" open --housekeeping day-open --agent "$agent"
   [ "$rc" -eq 0 ] || fail "$mode/$label: open rc=$rc: $out"
+  if [ "$mode" = gitbash ]; then
+    printf '%s\n' "$out" | grep -q 'упрощённый режим Git Bash' || fail "$mode/$label: the Git Bash implementation did not run"
+  fi
   if [ "$want" = - ]; then
     ! grep -q '^harness_session_id: ' "$sem" || fail "$mode/$label: a conversation id was recorded: $(cat "$sem")"
   else
@@ -92,8 +95,10 @@ check_case() {
 
   # A previous run's receipt and an older archive: a close that archives
   # before it checks ownership would move them, and the snapshot would differ.
-  printf 'previous run %s\n' "$label" > "$sem.closed"
-  printf 'older archive %s\n' "$label" > "$sem.closed.20260101T000000Z.1.1"
+  # Owner-only, as the guard writes them: it refuses a group-writable receipt (umask 002).
+  ( umask 077
+    printf 'previous run %s\n' "$label" > "$sem.closed"
+    printf 'older archive %s\n' "$label" > "$sem.closed.20260101T000000Z.1.1" )
   before=$(snapshot "$sessions")
   run_as "$root" "$prefix" "$xa" "$xc" "$xx" close --housekeeping day-open --agent "$agent" --only-own-harness
   [ "$rc" -eq 3 ] || fail "$mode/$label: foreign close rc=$rc, want 3: $out"
@@ -132,7 +137,9 @@ check_mode() { # <mode> <PATH prefix>
   # The owner's own id under another family's IWE_AGENT does not close the mark.
   check_case "$m" "$p" family-close    claude-code -           "$CLAUDE_ID" -            codex       "$CLAUDE_ID" -            "$CLAUDE_ID"
   check_case "$m" "$p" family-close-codex codex    -           -            "$CODEX_ID"  claude-code -            "$CODEX_ID"  "$CODEX_ID"
-  # Kimi has no native conversation id: an inherited Claude id is not borrowed.
+  # Kimi named by IWE_AGENT has no native id: an inherited Claude id is not borrowed.
+  # (A child agent with no id and no IWE_AGENT cannot be told from its parent by the
+  # environment and takes the parent's identity: a known limit, not tested here.)
   check_case "$m" "$p" kimi-in-claude  kimi        kimi        "$CLAUDE_ID" -            -           "$CLAUDE_ID" -            -
   echo "ok: $m"
 }
@@ -145,6 +152,13 @@ check_ambiguous_marked() {
   [ "$rc" -eq 0 ] || fail "ambiguous-marked: open rc=$rc: $out"
   grep -qx 'agent_resolution: ambiguous' "$root/.iwe-runtime/sessions/claude-code-housekeeping-day-open.open" \
     || fail "ambiguous-marked: no agent_resolution line"
+  printf '%s\n' "$out" | grep -q 'номер разговора не записан' || fail "ambiguous-marked: open did not warn: $out"
+  # The same warning on a WP session, which the Claude commit gate could not match.
+  run_as "$root" "" - "$CLAUDE_ID" "$CODEX_ID" open --wp WP-001 --slug nested --agent claude-code
+  [ "$rc" -eq 0 ] || fail "ambiguous-marked: WP open rc=$rc: $out"
+  printf '%s\n' "$out" | grep -q 'номер разговора не записан' || fail "ambiguous-marked: WP open did not warn: $out"
+  ! grep -q '^harness_session_id: ' "$root"/.iwe-runtime/sessions/claude-code-*.open \
+    || fail "ambiguous-marked: a nested WP session recorded a conversation id"
   run_as "$root" "" - "$CLAUDE_ID" "$CODEX_ID" close --housekeeping day-open --agent claude-code --only-own-harness
   [ "$rc" -eq 3 ] || fail "ambiguous-marked: close rc=$rc, want 3"
   printf '%s\n' "$out" | grep -q 'запущен из другого агента' \
@@ -155,7 +169,47 @@ check_ambiguous_marked() {
   echo "ok: ambiguous mark labelled, refusals name the reason"
 }
 
+# The protocol skills run their binding block (step 0a/0г/0) as written in SKILL.md:
+# with this guard a Codex run gets its own mark; with an older guard that has no
+# `whoami` the block keeps the previous behaviour (agent claude-code) instead of
+# losing the mark.
+check_skills() {
+  local skill reason block root stub
+  stub="$TMP_DIR/old-guard"
+  mkdir -p "$stub"
+  cat > "$stub/session-guard.sh" <<'STUB'
+#!/usr/bin/env bash
+# An older guard: no whoami; records every other call.
+[ "${1:-}" != whoami ] || { echo "session-guard: неизвестный флаг: --field" >&2; exit 1; }
+printf '%s\n' "$*" >> "$STUB_LOG"
+STUB
+  for skill in day-open day-close week-close month-close; do
+    reason="$skill"
+    block="$TMP_DIR/$skill-binding.sh"
+    awk '/^```bash$/ {inb=1; buf=""; next}
+         inb && /^```$/ {inb=0; if (buf ~ /whoami --field harness/) {printf "%s", buf; exit}; next}
+         inb {buf = buf $0 "\n"}' "$ROOT_DIR/.claude/skills/$skill/SKILL.md" > "$block"
+    grep -q "open --housekeeping $reason" "$block" || fail "skills/$skill: binding block not found"
+
+    root="$TMP_DIR/skill-$skill"
+    mkdir -p "$root/DS-strategy" "$root/.iwe-runtime/sessions"
+    env -u IWE_AGENT -u CLAUDE_CODE_SESSION_ID CODEX_THREAD_ID="$CODEX_ID" \
+      IWE_ROOT="$root" IWE_SCRIPTS="$ROOT_DIR/scripts" IWE_GOVERNANCE_REPO=DS-strategy \
+      bash "$block" >/dev/null 2>&1 || true
+    grep -qx "harness_session_id: $CODEX_ID" "$root/.iwe-runtime/sessions/codex-housekeeping-$reason.open" 2>/dev/null \
+      || fail "skills/$skill: Codex did not get its own $reason mark"
+
+    : > "$TMP_DIR/stub.log"
+    env -u IWE_AGENT -u CODEX_THREAD_ID CLAUDE_CODE_SESSION_ID="$CLAUDE_ID" STUB_LOG="$TMP_DIR/stub.log" \
+      IWE_ROOT="$root" IWE_SCRIPTS="$stub" bash "$block" >/dev/null 2>&1 || true
+    grep -qx -- "open --housekeeping $reason --agent claude-code" "$TMP_DIR/stub.log" \
+      || fail "skills/$skill: with an older guard the block lost its binding: $(cat "$TMP_DIR/stub.log")"
+  done
+  echo "ok: skills bind with this guard and with an older one"
+}
+
 check_whoami
+check_skills
 check_mode full ""
 check_ambiguous_marked
 STUBS="$TMP_DIR/stubs"

@@ -96,8 +96,10 @@ git -C "$PRIMARY" add -- .claude/hooks/post-tool-use-scope-track.sh scripts/sess
 git -C "$PRIMARY" commit -qm "test: seed primary hook"
 git -C "$PRIMARY" worktree add -q -b linked "$LINKED"
 
+# The open plays one Claude conversation: a Codex id or agent name inherited from
+# the agent running the suite would leave it without a conversation id (WP-592 F7).
 CLAUDE_CODE_SESSION_ID="hook-harness" IWE_ROOT="$PRIMARY" IWE_GOVERNANCE_REPO="DS-strategy" \
-  bash "$PRIMARY/scripts/session-guard.sh" open --wp WP-001 --slug hook-test \
+  env -u CODEX_THREAD_ID -u IWE_AGENT bash "$PRIMARY/scripts/session-guard.sh" open --wp WP-001 --slug hook-test \
     --agent claude-code --session-id hook-session --owner-pid "$$" --close-path peer-session >/dev/null
 
 mv "$PRIMARY/.claude/hooks/post-tool-use-scope-track.sh" \

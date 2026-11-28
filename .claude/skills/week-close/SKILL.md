@@ -45,9 +45,9 @@ Week Close = протокол. Блокирующее требование — �
 ### 0а. Session-guard: привязка к РП-1 (S-68 — каждый коммит обязан нести реальный РП)
 Week Close сам по себе не рабочий продукт (см. `gates_rationale` выше — исключение из WP Gate уже заявлено для этого скилла), но `session-open-gate.sh` (отдельный, более узкий гейт именно на `git commit`/`push`, S-68) исключения не делает — финальный коммит протокола без привязки к `--wp` будет отклонён. Если сессия уже привязана к другому РП, вторая привязка не нужна:
 ```bash
-HARNESS_ID=$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" whoami --field harness)
+HARNESS_ID=$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" whoami --field harness 2>/dev/null) || HARNESS_ID="${CLAUDE_CODE_SESSION_ID:-}"
 SESSION_DIR="${IWE_ROOT:-$HOME/IWE}/.iwe-runtime/sessions"
-AGENT=$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" whoami --field agent)
+AGENT=$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" whoami --field agent 2>/dev/null) && [ -n "$AGENT" ] || AGENT="${IWE_AGENT:-claude-code}"
 ALREADY_BOUND=0
 if [ -n "$HARNESS_ID" ]; then
   while IFS= read -r sem; do

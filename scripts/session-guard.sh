@@ -132,11 +132,13 @@ _not_own_reason() {  # <agent>
   fi
 }
 
-_print_harness_line() {  # <agent>; one semaphore line, or nothing
+_print_harness_line() {  # <agent>; one semaphore line on stdout, or nothing
   local own
   own=$(_caller_harness_id "$1")
   [ -z "$own" ] || echo "harness_session_id: $own"
-  [ "$(_caller_resolution)" != ambiguous ] || echo "agent_resolution: ambiguous"
+  [ "$(_caller_resolution)" = ambiguous ] || return 0
+  echo "agent_resolution: ambiguous"
+  echo "session-guard: ВНИМАНИЕ: номер разговора не записан: видны номера и Claude, и Codex, то есть агент запущен изнутри другого агента. Эта сессия не привязана к разговору: свою служебную отметку она не снимет, а коммит из Claude проверка открытой сессии не пропустит. Запустите агента отдельно." >&2
 }
 
 # The transition lock below uses Unix fcntl, directory fsync through Python and
@@ -300,7 +302,7 @@ _gb_main() {
       _gb_semaphore_trusted "$file" "$agent" "$session_id" || { echo "session-guard: close --housekeeping: семафор не прошёл проверку подлинности" >&2; exit 1; }
       # issue #1506: checked under the lock, so a marker swapped in after the caller's check is not closed.
       if [ "$only_own_harness" = 1 ] && ! _caller_owns_record "$file" "$agent"; then
-        echo "session-guard: close --housekeeping: '$reason' — $(_not_own_reason "$agent"); не трогаю" >&2; exit 3
+        echo "session-guard: close --housekeeping: '$reason': $(_not_own_reason "$agent"); не трогаю" >&2; exit 3
       fi
       _gb_archive_previous "${file}.closed" "$file" || exit 1
       [ ! -e "${file}.closed" ] || { echo "session-guard: close --housekeeping: terminal destination занят; open сохранён" >&2; exit 1; }
@@ -2714,7 +2716,7 @@ if [ "$CMD" = "close" ]; then
     # issue #1506: checked under the transition lock, so a marker swapped in
     # after the caller's own check is not closed.
     if [ "$ONLY_OWN_HARNESS" = 1 ] && ! _caller_owns_record "$HK_FILE" "$AGENT"; then
-      fail "close --housekeeping: '${HOUSEKEEPING}' — $(_not_own_reason "$AGENT"); не трогаю" 3
+      fail "close --housekeeping: '${HOUSEKEEPING}': $(_not_own_reason "$AGENT"); не трогаю" 3
     fi
     _archive_previous_terminal "${HK_FILE}.closed" "$HK_FILE" \
       || fail "close --housekeeping: прошлый .closed не удалось перенести в архив; open сохранён" 1

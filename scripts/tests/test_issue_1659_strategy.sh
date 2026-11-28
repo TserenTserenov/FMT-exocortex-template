@@ -51,6 +51,9 @@ cp "$PUSH" "$IWE_ROOT/scripts/isolate-push.sh"
 chmod +x "$IWE_ROOT/scripts/isolate-push.sh"
 export IWE_ROOT IWE_GOVERNANCE_REPO=DS-strategy IWE_FROZEN_CANONICAL_PATH="" IWE_AGENT=claude-code
 export CLAUDE_CODE_SESSION_ID="test-1659-$$"
+# The test plays one Claude conversation; a Codex id inherited from the agent
+# running the suite would make it a nested caller that owns no mark (WP-592 F7).
+unset CODEX_THREAD_ID
 SEM="$IWE_ROOT/.iwe-runtime/sessions/claude-code-housekeeping-strategy-session.open"
 STORE_REAL=$(mkdir -p "$IWE_ROOT/.iwe-runtime/isolated-worktrees" && realpath "$IWE_ROOT/.iwe-runtime/isolated-worktrees")
 

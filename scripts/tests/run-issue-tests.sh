@@ -12,6 +12,10 @@
 # scripts/tests and are listed here, not run — silence would read as coverage.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# The tests run as no agent, as in CI: a conversation id or agent name inherited
+# from the agent that started the suite changes what the session guard records
+# (WP-592 F7). Tests that need an identity set their own.
+unset CLAUDE_CODE_SESSION_ID CODEX_THREAD_ID IWE_AGENT
 shopt -s nullglob
 # Many tests swap HOME for a fake one. A `pip install --user` PyYAML lives under
 # the real HOME and vanished with it, so those tests failed only on machines

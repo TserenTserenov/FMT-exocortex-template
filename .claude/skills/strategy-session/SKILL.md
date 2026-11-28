@@ -1,7 +1,7 @@
 ---
 name: strategy-session
 description: Стратегическая сессия — диспетчер. День-0 (маркер IWE-INITIAL-NEEDED или нет Strategy.md/WeekPlan) → initial flow (разметка принесённого, цели, неудовлетворённости, первый WeekPlan). Первая сессия календарного месяца или прямая просьба пилота о полной сессии → полный monthly flow (стратегическая сверка + линза калибра). Остальные дни → короткий weekly flow (требует черновик от session-prep). Триггеры — «проведём стратегическую сессию», «первая стратегическая сессия», «strategy session», «давай стратегировать».
-version: 1.0.0
+version: 1.0.1
 layer: L1
 status: active
 browser_safe: false
@@ -50,6 +50,9 @@ GUARD="${IWE_SCRIPTS:-}/session-guard.sh"
 [ -f "$GUARD" ] || GUARD="${IWE_WORKSPACE:-$HOME/IWE}/scripts/session-guard.sh"
 [ -f "$GUARD" ] || GUARD="$CANON/scripts/session-guard.sh"
 [ -f "$GUARD" ] && GUARD_MODE=required || GUARD_MODE=absent
+# the guard names the agent (WP-592 F7); a guard without `whoami` keeps the old default
+SG_AGENT=""; [ -f "$GUARD" ] && SG_AGENT=$(bash "$GUARD" whoami --field agent 2>/dev/null) || SG_AGENT=""
+[ -n "$SG_AGENT" ] || SG_AGENT="${IWE_AGENT:-claude-code}"
 CANON_C=$(cd -- "$CANON" 2>/dev/null && pwd -P) || { echo "ERROR: канон $CANON недоступен" >&2; exit 1; }
 CANON_COMMON=$(git -C "$CANON_C" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
   || { echo "ERROR: $CANON_C не git-репозиторий" >&2; exit 1; }
@@ -80,7 +83,7 @@ if [ "$GUARD_MODE" = required ]; then
 fi
 if [ "$GUARD_MODE" = required ]; then
   if [ -z "$GOV_WT" ] || [ "$GOV_WT" = "$CANON_C" ]; then
-    echo "NOT ISOLATED: канон под freeze, запись запрещена. Открой копию: (cd -- \"$CANON_C\" && bash \"$GUARD\" open --housekeeping strategy-session --isolate --agent \"${IWE_AGENT:-claude-code}\"), затем повтори этот шаг внутри копии: (cd -- \"<worktree_path>\" || exit 1; <блок шага 0>)" >&2
+    echo "NOT ISOLATED: канон под freeze, запись запрещена. Открой копию: (cd -- \"$CANON_C\" && bash \"$GUARD\" open --housekeeping strategy-session --isolate --agent \"$SG_AGENT\"), затем повтори этот шаг внутри копии: (cd -- \"<worktree_path>\" || exit 1; <блок шага 0>)" >&2
     LOCAL_BASE_SHA=$(git -C "$CANON_C" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)
     if [ -n "$LOCAL_BASE_SHA" ]; then
       echo "Если origin недоступен: проверь локальный коммит: git -C \"$CANON_C\" show -s --format='%H %s' \"$LOCAL_BASE_SHA\"" >&2
@@ -98,7 +101,9 @@ fi
 - Код выхода 0 -> **запиши абсолютный путь `GOV_WT` в свой ответ пользователю** (контекст сессии): независимые вызовы Bash не разделяют переменные, а `cd` в подоболочке каталог не меняет.
 - Код выхода 2 (`NOT ISOLATED`) -> ничего не записывай. Открой копию из канона, возьми `worktree_path` из вывода `open --isolate` и повтори блок шага 0 внутри копии; `<CANON_C>` и `<GUARD>` — пути из сообщения `NOT ISOLATED`. Переход в каталог — только в подоболочке `( … )`: верхнеуровневый `cd` хук `destructive-guard.sh` блокирует. Номер РП не нужен: документы недели — не рабочий продукт (`memory/protocol-open.md`, масштаб «Неделя»), поэтому сессия открывается служебной причиной `strategy-session` (#1659). Та же команда в этой беседе повторно возвращает ту же копию; копия другой беседы отказывает, пока её не закроют.
   ```bash
-  (cd -- "<CANON_C>" && bash "<GUARD>" open --housekeeping strategy-session --isolate --agent "${IWE_AGENT:-claude-code}")
+  (cd -- "<CANON_C>" || exit 1
+   A=$(bash "<GUARD>" whoami --field agent 2>/dev/null) && [ -n "$A" ] || A="${IWE_AGENT:-claude-code}"
+   bash "<GUARD>" open --housekeeping strategy-session --isolate --agent "$A")
   ```
   ```bash
   (cd -- "<worktree_path>" || exit 1
@@ -140,12 +145,14 @@ fi
   `mode=legacy` -> сохраняй штатным способом установки (коммит и push своими средствами; если у репозитория нет `origin`, достаточно коммита); `ds-publish.sh` используй, только если он есть.
 - Привязка сессии для коммита (#1659). Проверка сохранения (`session-open-gate.sh`) пропускает коммит только под открытой сессией: на РП или со служебной причиной из закрытого списка, где есть `strategy-session`. В режиме `mode=isolated` привязку уже открыла команда `open --housekeeping strategy-session --isolate`. В режиме `mode=legacy`, если `session-guard.sh` есть и беседа ещё не привязана к РП, открой привязку без копии до первого коммита (отказ открытия, например параллельная сессия, протокол не останавливает):
   ```bash
-  GUARD="<путь GUARD из шага 0>"; AGENT="${IWE_AGENT:-claude-code}"
+  GUARD="<путь GUARD из шага 0>"
+  AGENT=$(bash "$GUARD" whoami --field agent 2>/dev/null) && [ -n "$AGENT" ] || AGENT="${IWE_AGENT:-claude-code}"
   [ -f "$GUARD" ] && bash "$GUARD" open --housekeeping strategy-session --agent "$AGENT" 2>&1 || true
   ```
   В конце сессии, после публикации, закрой привязку; в режиме `mode=isolated` закрытие само опубликует неопубликованные коммиты копии и удалит её:
   ```bash
-  GUARD="<путь GUARD из шага 0>"; AGENT="${IWE_AGENT:-claude-code}"
+  GUARD="<путь GUARD из шага 0>"
+  AGENT=$(bash "$GUARD" whoami --field agent 2>/dev/null) && [ -n "$AGENT" ] || AGENT="${IWE_AGENT:-claude-code}"
   [ -f "$GUARD" ] && bash "$GUARD" close --housekeeping strategy-session --agent "$AGENT" --only-own-harness
   ```
 
