@@ -577,7 +577,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "737a578198d57d0279d5574e088fb3bbadce464dea8175712121271b17963c5a"
+      "sha256": "e5cee86c76fcd70fce82ac7e6c93f68ea41429767ad94fcd80249293a8cdd016"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -589,7 +589,7 @@
     },
     {
       "path": ".claude/skills/day-open/SKILL.md",
-      "sha256": "9f642759fb212f752639a5b63a58b812507227c156527f88eecc07299e56bcf3"
+      "sha256": "0027b70252ce652e87bf0c83dbfe39a8373730de08decf407f4bb3c535e478d7"
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
@@ -737,7 +737,7 @@
     },
     {
       "path": ".claude/skills/month-close/SKILL.md",
-      "sha256": "872f2798649c16a669069fc209b7895b3171664594e49ab80b351e8e8bac13fe"
+      "sha256": "2e08fd7f21711edcc398a2e1a543a570b1844fb3c9cf2b46171b2851998f5fec"
     },
     {
       "path": ".claude/skills/onboarding/SKILL.md",
@@ -957,7 +957,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "b0362587102f0889623be79f255adf34d3b219bf7ad4c39100b88a672d75cd56"
+      "sha256": "0c1df7265b877c963c7511291d99096ba516d5f7c841d4e374433ec90fcefc74"
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
@@ -1053,7 +1053,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "ebf62773242987d68fc4d66ad8bdf679c4d4368b9a4faec813fea8cf5be964e0"
+      "sha256": "26a3f63eb7f36e2df6a11baa1096858134849ba1e090b764d0f8b44a746b2c76"
     },
     {
       "path": "CLAUDE.md",
@@ -1089,7 +1089,7 @@
     },
     {
       "path": "docs/CHATGPT-CODEX-SETUP.md",
-      "sha256": "58d5f177ed06c5d07fe0852bb935afa30ff6732d2abd0350abcc1cf950904ec6"
+      "sha256": "36f667cde0d0fea191692479336702a79d93a5de4e956b9d675063e891e6d84c"
     },
     {
       "path": "docs/CLOUD-SCHEDULER.md",
@@ -3085,7 +3085,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "b809240aa764f9c996fe3c647ffb4eec4f4f7aaa8094d2a47806574362eb83c8"
+      "sha256": "4905d34a2de20788d05ac75c5e4db89de1d4fe114af78d377e6a2f931cbfad7a"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3205,7 +3205,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "9005cf60eef847ee2320b6d147ab86ea728a412b5067968e95c34163af39fa68"
+      "sha256": "d0b59d3c78387c53e22bc1c5e13ad00e3cfa01b4ee7f1d966742009bd7d1620b"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -4048,6 +4048,7 @@
     "scripts/tests/test_validate_skill_hook_claims_path.sh",
     "scripts/tests/test_week_pool.py",
     "scripts/tests/test_wp568_strategist_auth_and_retry_message.sh",
+    "scripts/tests/test_wp592_caller_identity.sh",
     "scripts/tests/test_wp_inbox_bundle_signal.sh",
     "scripts/tests/wp-inbox-close-gate-smoke.sh",
     "scripts/tests/wp-sync-bundle-origin-pinned-smoke.sh",

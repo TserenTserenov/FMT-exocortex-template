@@ -2,7 +2,7 @@
 name: day-open
 description: "Day Open protocol. Collects yesterday's commits, issues, notes, calendar, bot QA, Scout, world events — builds DayPlan and compact dashboard."
 argument-hint: ""
-version: 1.2.0
+version: 1.2.1
 layer: L1
 status: active
 browser_safe: false
@@ -43,9 +43,9 @@ Day Open = протокол. Блокирующее требование — н�
 ### 0а. Session-guard: привязка к РП-1 (S-68 — каждый коммит обязан нести реальный РП)
 Day Open сам по себе не рабочий продукт, но `session-open-gate.sh` (S-68) не делает для него исключения — коммит шага 7c без привязки к `--wp` будет отклонён. Если сессия уже привязана к другому РП, вторая привязка не нужна:
 ```bash
-HARNESS_ID="${CLAUDE_CODE_SESSION_ID:-}"
+HARNESS_ID=$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" whoami --field harness)
 SESSION_DIR="${IWE_ROOT:-$HOME/IWE}/.iwe-runtime/sessions"
-AGENT="${IWE_AGENT:-claude-code}"
+AGENT=$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" whoami --field agent)
 ALREADY_BOUND=0
 if [ -n "$HARNESS_ID" ]; then
   while IFS= read -r sem; do
@@ -157,7 +157,7 @@ case "$SCOPE" in *hours-scope=week*) HOURS_SCOPE=week ;; *) HOURS_SCOPE=day ;; e
 **7d.** Compact dashboard → вывести в VS Code по шаблону «Шаблон compact dashboard» из `templates.md`.
 **7e.** Снять служебную отметку шага 0а (issue #1506): без этого она остаётся в `.iwe-runtime/sessions/` до следующего дня, и каждое `session-guard.sh open` предупреждает о сессии без прав на коммит. Закрывается только отметка `day-open`, записанная этим же разговором (строка `harness_session_id` совпадает; `--only-own-harness` сверяет её внутри `session-guard.sh` под блокировкой, код 3 — отметка не наша): если шаг 0а не открыл свою отметку, потому что её уже держала параллельная сессия того же агента, чужая отметка не трогается. Нет отметки — команда ничего не делает; отметка чужая или нет номера разговора — `session-guard.sh` отказывает с кодом 3 и ничего не меняет:
 ```bash
-AGENT="${IWE_AGENT:-claude-code}"
+AGENT=$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" whoami --field agent)
 HK_SEM="${IWE_ROOT:-$HOME/IWE}/.iwe-runtime/sessions/${AGENT}-housekeeping-day-open.open"
 [ ! -f "$HK_SEM" ] || bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" close --housekeeping day-open --agent "$AGENT" --only-own-harness
 ```

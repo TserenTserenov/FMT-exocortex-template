@@ -51,6 +51,8 @@ ADDITIONAL_ISSUE_TESTS=(
     "scripts/tests/peer-fanout-smoke.sh"
     "scripts/tests/test-check-repo-residue.sh"
     "scripts/tests/wp-inbox-close-gate-smoke.sh"
+    "scripts/tests/test_wp592_caller_identity.sh"
+    "scripts/tests/session-guard-second-open-warning-smoke.sh"
 )
 
 run_shell_test() {

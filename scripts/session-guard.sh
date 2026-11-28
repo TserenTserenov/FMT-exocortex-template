@@ -17,7 +17,8 @@
 #                                                      # confirmed (all_pushed: true)
 #   close --housekeeping <reason> [--agent ...]       # close a housekeeping session
 #   close --housekeeping <reason> --only-own-harness  # close it only if this conversation
-#                                                      # (CLAUDE_CODE_SESSION_ID) opened it; else exit 3
+#                                                      # (its own CLAUDE_CODE_SESSION_ID or CODEX_THREAD_ID) opened it; else exit 3
+#   whoami [--field agent|harness|resolution]       # read-only: caller agent, own conversation id, how it was resolved
 #   audit [--since YYYY-MM-DD] [--cleanup-orphans]
 #   renew [--wp WP-N] [--slug "..."] [--agent ...]    # extend the right to commit
 #   heartbeat --agent <agent> --session-id <id> --owner-pid <pid>
@@ -62,6 +63,80 @@ _SG_PROCESS_IDENTITY_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/proc
 _owner_pid_start_id() {  # <pid>
   [ -r "$_SG_PROCESS_IDENTITY_LIB" ] || return 0
   ( . "$_SG_PROCESS_IDENTITY_LIB" && process_identity "$1" ) 2>/dev/null || true
+}
+
+# Caller identity (WP-592 F7). IWE_AGENT, when set, names the agent. A child
+# agent inherits the parent's variables, IWE_AGENT included (Codex applies its
+# project settings only in a trusted project), so ownership never rests on
+# IWE_AGENT: a caller that sees both conversation ids (one agent started from
+# another) owns no mark, and an id of the other family is never borrowed.
+# Defined before _gb_main, which calls it.
+# resolution: ambiguous (both ids) | explicit (IWE_AGENT, at most one id) |
+# inferred (no IWE_AGENT, one id) | none (no IWE_AGENT, no id).
+_caller_resolution() {
+  if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && [ -n "${CODEX_THREAD_ID:-}" ]; then echo ambiguous
+  elif [ -n "${IWE_AGENT:-}" ]; then echo explicit
+  elif [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] || [ -n "${CODEX_THREAD_ID:-}" ]; then echo inferred
+  else echo none
+  fi
+}
+
+_caller_agent() {  # default agent name for this caller
+  if [ -n "${IWE_AGENT:-}" ]; then echo "$IWE_AGENT"
+  elif [ -n "${CODEX_THREAD_ID:-}" ] && [ -z "${CLAUDE_CODE_SESSION_ID:-}" ]; then echo codex
+  else echo claude-code
+  fi
+}
+
+_agent_family_of() {  # <agent> -> claude | codex | other
+  case "$1" in
+    claude*) echo claude ;;
+    codex*) echo codex ;;
+    *) echo other ;;
+  esac
+}
+
+# Own conversation id of the caller acting as <agent>; prints nothing when the
+# caller has none: ambiguous environment, an agent family without a native id
+# (Kimi, Hermes, Grok), or IWE_AGENT naming another family than <agent>.
+_caller_harness_id() {  # <agent>
+  local family native=""
+  [ "$(_caller_resolution)" != ambiguous ] || return 0
+  family=$(_agent_family_of "$1")
+  if [ -n "${IWE_AGENT:-}" ] && [ "$(_agent_family_of "$IWE_AGENT")" != "$family" ]; then
+    return 0
+  fi
+  case "$family" in
+    claude) native="${CLAUDE_CODE_SESSION_ID:-}" ;;
+    codex) native="${CODEX_THREAD_ID:-}" ;;
+  esac
+  [[ "$native" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,255}$ ]] || return 0
+  printf '%s\n' "$native"
+}
+
+# A record is the caller's own only when both ids are non-empty and equal.
+_caller_owns_record() {  # <file> <agent>
+  local own
+  own=$(_caller_harness_id "$2")
+  [ -n "$own" ] && grep -qxF "harness_session_id: $own" "$1"
+}
+
+# Why an --only-own-harness close is refused, in words for the person.
+_not_own_reason() {  # <agent>
+  if [ -n "$(_caller_harness_id "$1")" ]; then
+    echo "отметку открыл другой разговор"
+  elif [ "$(_caller_resolution)" = ambiguous ]; then
+    echo "этот агент запущен из другого агента (видны оба номера разговора), такой вызов отметками не владеет"
+  else
+    echo "у этого вызова нет своего номера разговора"
+  fi
+}
+
+_print_harness_line() {  # <agent>; one semaphore line, or nothing
+  local own
+  own=$(_caller_harness_id "$1")
+  [ -z "$own" ] || echo "harness_session_id: $own"
+  [ "$(_caller_resolution)" != ambiguous ] || echo "agent_resolution: ambiguous"
 }
 
 # The transition lock below uses Unix fcntl, directory fsync through Python and
@@ -203,7 +278,7 @@ _gb_main() {
         echo "slug: $reason"
         echo "session_id: $session_id"
         echo "created_at: $now"
-        [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && echo "harness_session_id: $CLAUDE_CODE_SESSION_ID"
+        _print_harness_line "$agent"
         _hk_open_pid="${owner_pid:-${CLAUDE_PID:-$$}}"
         echo "pid: $_hk_open_pid"
         _hk_open_pid_start_id=$(_owner_pid_start_id "$_hk_open_pid")
@@ -224,8 +299,8 @@ _gb_main() {
       [ -f "$file" ] || { echo "session-guard: close --housekeeping: нет активной housekeeping-сессии '$reason' для $agent" >&2; exit 3; }
       _gb_semaphore_trusted "$file" "$agent" "$session_id" || { echo "session-guard: close --housekeeping: семафор не прошёл проверку подлинности" >&2; exit 1; }
       # issue #1506: checked under the lock, so a marker swapped in after the caller's check is not closed.
-      if [ "$only_own_harness" = 1 ] && ! { [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && grep -qxF "harness_session_id: $CLAUDE_CODE_SESSION_ID" "$file"; }; then
-        echo "session-guard: close --housekeeping: отметку '$reason' открыл другой разговор; не трогаю" >&2; exit 3
+      if [ "$only_own_harness" = 1 ] && ! _caller_owns_record "$file" "$agent"; then
+        echo "session-guard: close --housekeeping: '$reason' — $(_not_own_reason "$agent"); не трогаю" >&2; exit 3
       fi
       _gb_archive_previous "${file}.closed" "$file" || exit 1
       [ ! -e "${file}.closed" ] || { echo "session-guard: close --housekeeping: terminal destination занят; open сохранён" >&2; exit 1; }
@@ -262,6 +337,26 @@ _gb_main() {
   esac
   exit 0
 }
+
+# Read-only: who the guard takes the caller for (WP-592 F7). Skills ask here
+# for the name of their own housekeeping mark instead of guessing the agent;
+# commands that change a mark resolve the identity themselves, never from this
+# output. Answered before the Git Bash path, so it works there too.
+if [ "${1:-}" = whoami ]; then
+  _wa_agent=$(_caller_agent)
+  [[ "$_wa_agent" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,255}$ ]] \
+    || { echo "session-guard: whoami: небезопасный IWE_AGENT '$_wa_agent'" >&2; exit 1; }
+  _wa_harness=$(_caller_harness_id "$_wa_agent")
+  _wa_resolution=$(_caller_resolution)
+  case "$#:${2:-}:${3:-}" in
+    1::) printf 'agent: %s\nharness: %s\nresolution: %s\n' "$_wa_agent" "$_wa_harness" "$_wa_resolution" ;;
+    3:--field:agent) printf '%s\n' "$_wa_agent" ;;
+    3:--field:harness) printf '%s\n' "$_wa_harness" ;;
+    3:--field:resolution) printf '%s\n' "$_wa_resolution" ;;
+    *) echo "session-guard: whoami [--field agent|harness|resolution]" >&2; exit 1 ;;
+  esac
+  exit 0
+fi
 
 case "$(uname -s)" in
   MINGW*|MSYS*) _gb_main "$@" ;;
@@ -1466,13 +1561,15 @@ _wp_key() { # <wp> — comparable form: WP-44, 044 and 44 name one card
 
 warn_sibling_semaphores() { # <agent> <wp> <slug> <own .open path>
   local agent="$1" wp_key slug="$3" own="$4" file other_wp other_slug
-  [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] || return 0
+  local own_harness
+  own_harness=$(_caller_harness_id "$agent")
+  [ -n "$own_harness" ] || return 0
   wp_key=$(_wp_key "$2")
   # Same agent only: `close --slug` selects among this agent's semaphores, so the
   # printed exit must address one of them.
   for file in "$SESSION_DIR/$agent"-*.open; do
     [ -f "$file" ] && [ "$file" != "$own" ] || continue
-    grep -qxF "harness_session_id: $CLAUDE_CODE_SESSION_ID" "$file" || continue
+    grep -qxF "harness_session_id: $own_harness" "$file" || continue
     # Housekeeping semaphores carry no wp: line; a file may vanish between reads.
     # Under `set -euo pipefail` a failed read must skip the file, not abort open.
     other_wp=$(grep -m1 '^wp: ' "$file" | cut -d' ' -f2-) || continue
@@ -1850,8 +1947,7 @@ if [ "$CMD" = "open" ]; then
     HK_EXISTING_WT=""
     [ -f "$HK_FILE" ] && HK_EXISTING_WT=$(grep "^isolated_worktree: " "$HK_FILE" | head -1 | cut -d' ' -f2- || true)
     if [ -n "$HK_EXISTING_WT" ] && [ -d "$HK_EXISTING_WT" ]; then
-      if [ "${ISOLATE_FLAG:-0}" = "1" ] && [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] \
-         && grep -qxF "harness_session_id: $CLAUDE_CODE_SESSION_ID" "$HK_FILE"; then
+      if [ "${ISOLATE_FLAG:-0}" = "1" ] && _caller_owns_record "$HK_FILE" "$AGENT"; then
         HK_EXISTING_BRANCH=$(grep "^isolated_branch: " "$HK_FILE" | head -1 | cut -d' ' -f2- || true)
         echo "Housekeeping OPEN (re-entry): $HK_FILE (reason: $HOUSEKEEPING)"
         printf '{"worktree_path": "%s", "branch": "%s", "session_id": "%s"}\n' \
@@ -1917,7 +2013,7 @@ if [ "$CMD" = "open" ]; then
       # day-close, week-close, month-close, update-delivery) are invisible to
       # that gate's whitelist check, same gap as the plain open path already
       # closes below (this fix mirrors that, scoped to housekeeping).
-      [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && echo "harness_session_id: $CLAUDE_CODE_SESSION_ID"
+      _print_harness_line "$AGENT"
       # $$ here is session-guard.sh's own transient process — already dead by
       # the time anyone checks it (verified live 08.08: recorded pid was dead
       # within the same second). $CLAUDE_PID is the actual long-lived Claude
@@ -2287,7 +2383,7 @@ if [ "$CMD" = "open" ]; then
     echo "opened_at: $(now_iso)"
     echo "created_at: $(now_iso)"
     echo "session_id: $SESSION_ID"
-    [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && echo "harness_session_id: $CLAUDE_CODE_SESSION_ID"
+    _print_harness_line "$AGENT"
     echo "close_path: ${CLOSE_PATH:-unknown}"
     # WP-484 point-patch + WP-485 Phase 14: without isolate, governance_worktree is
     # the canonical $IWE_ROOT/$GOV_REPO (helps root readers on close). With
@@ -2617,9 +2713,8 @@ if [ "$CMD" = "close" ]; then
       || fail "close --housekeeping: exact identity/terminal state не прошли проверку" 1
     # issue #1506: checked under the transition lock, so a marker swapped in
     # after the caller's own check is not closed.
-    if [ "$ONLY_OWN_HARNESS" = 1 ] && ! { [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] \
-        && grep -qxF "harness_session_id: $CLAUDE_CODE_SESSION_ID" "$HK_FILE"; }; then
-      fail "close --housekeeping: отметку '${HOUSEKEEPING}' открыл другой разговор; не трогаю" 3
+    if [ "$ONLY_OWN_HARNESS" = 1 ] && ! _caller_owns_record "$HK_FILE" "$AGENT"; then
+      fail "close --housekeeping: '${HOUSEKEEPING}' — $(_not_own_reason "$AGENT"); не трогаю" 3
     fi
     _archive_previous_terminal "${HK_FILE}.closed" "$HK_FILE" \
       || fail "close --housekeeping: прошлый .closed не удалось перенести в архив; open сохранён" 1
