@@ -1,6 +1,6 @@
 # Learning Path for the Intellectual Work Environment (IWE)
 
-> **IWE (Intellectual Work Environment)** is a personal intellectual work environment — the equivalent of an IDE for developing thinking. Just as an IDE gives a programmer an editor, compiler, linter, and debugger — IWE gives a person formalized knowledge (Pack), automatic extraction (Extractor), correctness checking (FPF/SPF), and gap diagnostics (Digital Twin). The person works together with AI agents, each playing its own role.
+> **IWE (Intellectual Work Environment)** is a personal intellectual work environment — the equivalent of an IDE for developing thinking. Just as an IDE gives a programmer an editor, compiler, linter, and debugger, IWE gives a person formalized knowledge (Pack), automatic extraction (Extractor), correctness verification (FPF/SPF), and gap diagnostics (Digital Twin). The person works together with AI agents, each playing a defined role.
 >
 > Each section: **why** → **what to study** → **where to find it**.
 > Not on macOS or not using Claude Code? → **[PORTABILITY.md](PORTABILITY.md)**
@@ -8,37 +8,37 @@
 ## How to use this file
 
 1. **Beginner:** Sections 1–2 (what IWE is, architecture). About 1 hour. You will understand how everything is structured.
-2. **First week:** Sections 3–5 (foundation, repositories, daily work). Use as needed.
+2. **First week:** Sections 3–5 (foundation, repositories, daily work). Read as needed.
 3. **Working user:** Sections 6–8 (knowledge, agents, quality). When you start creating Packs.
 4. **Advanced:** Sections 9–10 (platform, growth). When you want to scale.
 5. **Reference:** Section 11 — quick answers.
 
-> **Terminology:** IWE = Intellectual Work Environment, described through 5 architectural viewpoints: systems, descriptions, roles, methods, work products (§ 1.2). FPF triad A.7: Role → Method → Work Product. Exocortex = the description storage system inside IWE (CLAUDE.md + memory/). More detail: [DP.IWE.001](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/02-domain-entities/DP.IWE.001-intelligent-working-environment.md).
+> **Terminology:** IWE = Intellectual Work Environment, described through 5 architectural viewpoints: systems, descriptions, roles, methods, work products (§ 1.2). Triad A.7: Role → Method → Work Product. Exocortex = the description storage system inside IWE (CLAUDE.md + memory/). More detail: [DP.IWE.001](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/02-domain-entities/DP.IWE.001-intelligent-working-environment.md).
 
 > **Installation:** [SETUP-GUIDE.md](SETUP-GUIDE.md) | **Data policy:** [DATA-POLICY.md](DATA-POLICY.md) | **Quick reference:** [IWE-HELP.md](IWE-HELP.md) | **Principles vs skills:** [principles-vs-skills.md](principles-vs-skills.md)
 >
-> Links with `./` — files in this repo. Links with `github.com/...` — other repositories.
+> Links with `./` are files in this repository. Links with `github.com/...` point to other repositories.
 
-## 1. What is IWE
+## 1. What IWE is
 
 ### 1.1. Definition
 
-IWE is a personal system for intellectual work and development. Just as an IDE combines an editor, compiler, and debugger into one environment for a programmer — IWE combines knowledge, planning, and AI agents into one environment for thinking.
+IWE is a personal system for intellectual work and development. Just as an IDE unites an editor, compiler, and debugger into a single environment for a programmer, IWE unites knowledge, planning, and AI agents into a single environment for thinking.
 
 ### 1.1a. Key principle: Exoskeleton, not prosthesis
 
 > DP.ARCH.001 principle #21. Full detail: [DP.IWE.001 §5.1](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/02-domain-entities/DP.IWE.001-intelligent-working-environment.md).
 
-IWE amplifies the user's thinking — it does not replace it. The Distinction:
+IWE augments the user's thinking; it does not replace it. The Distinction:
 
 - **Prosthesis:** AI thinks for you → task is done, but you did not learn → atrophy
-- **Exoskeleton:** you think for yourself, AI amplifies → task is done + you became more competent → growth
+- **Exoskeleton:** you think yourself, AI amplifies → task is done + you became more competent → growth
 
 Three Exoskeleton mechanisms in IWE:
 
 1. **Presenting, not generating.** The AI shows your own knowledge (Pack, memory/, Digital Twin) at the right moment. You do the thinking.
 2. **Questions, not answers** (in strategic decisions). WP Gate requires planning before action. Consultation T2–T3 asks "what do you think?" in response to lazy requests.
-3. **Fading scaffolding.** Training: more support at early levels, less at advanced levels. Tiers T0→T4: from direct answers to co-thinking.
+3. **Fading scaffolding.** Training: more assistance at beginning levels, less at advanced levels. Tiers T0→T4: from direct answers to co-thinking.
 
 **Criterion:** after interacting with IWE, the user has become more competent — not merely received a result.
 
@@ -46,14 +46,14 @@ Three Exoskeleton mechanisms in IWE:
 
 IWE as a system is examined from five viewpoints (ISO/IEC/IEEE 42010): systems, descriptions, roles, methods, and work products. The central organizing principle is FPF triad A.7: **Role → Method → Work Product**.
 
-> **Three IWE classifications:** Viewpoints (this section) answer "through which lens are we looking." Contours L1–L4 (§ 2.1) — "where it lives." Tiers T0–T4 + TM/TA/TD (§ 9.1) — "what level of access."
+> **Three IWE classifications:** Viewpoints (this section) answer "through which lens are we looking." Perimeters L1–L4 (§ 2.1) answer "where it lives." Tiers T0–T4 + TM/TA/TD (§ 9.1) answer "what level of access."
 
 #### Viewpoint 1: Systems (U.System) — what has 4D boundaries
 
-Systems with boundaries, inputs, outputs, and an owner. Can be started, stopped, updated. The main IWE systems are listed here; additional ones (WakaTime etc.) are described in § 2.6.
+Systems with boundaries, inputs, outputs, and an owner. Can be started, stopped, updated. The main IWE systems are listed here; additional systems (WakaTime etc.) are described in § 2.6.
 
-| System | Type | What it does | Contour (§ 2.1) |
-|--------|------|-------------|-----------------|
+| System | Type | What it does | Perimeter (§ 2.1) |
+|--------|------|-------------|-------------------|
 | **Claude Code CLI** (A1) | LLM agent | Primary AI executor: code, analysis, planning | L4 Personal |
 | **Telegram bot** (I1, @aist_me_bot) | Service | Notes, programs, Digital Twin, notifications | L2 Platform |
 | **MCP servers** (I3–I8) | Protocol | Access to Pack, guides, DS descriptions from Claude Code | L2 Platform |
@@ -61,17 +61,17 @@ Systems with boundaries, inputs, outputs, and an owner. Can be started, stopped,
 | **Exocortex** | File system | Storage and delivery of descriptions (CLAUDE.md + memory/) | L3 Template / L4 |
 | **Neon DB** (Digital Twin) | DBMS | Storage of Digital Twin events | L2 Platform |
 
-> **Test:** Does it have 4D boundaries, an owner, inputs/outputs? → System.
+> **Test:** Has a 4D boundary, an owner, inputs and outputs? → System.
 >
-> **Exocortex** is visible from two viewpoints. Through the "Systems" lens: a file system with a lifecycle (Open/Close), owner, and boundaries. Through the "Descriptions" lens: the content of those files — distinctions, principles, protocols. Not two objects, but two perspectives on one (ISO 42010).
+> **Exocortex** appears in two viewpoints. Through the "Systems" lens: a file system with a lifecycle (Open/Close), an owner, and boundaries. Through the "Descriptions" lens: the content of those files — distinctions, principles, protocols. Not two objects, but two perspectives on one (ISO 42010).
 >
-> **Neon DB** — similarly. Through the "Systems" lens: a running DBMS with 4D boundaries (HD #27: the bot is a client, not an owner). Through the "Work Products" lens: events recorded in that DBMS.
+> **Neon DB** — similarly. Through the "Systems" lens: a running DBMS with 4D boundaries (HD #27: the bot is a client, not the owner). Through the "Work Products" lens: the events recorded in that DBMS.
 
 Roles (Viewpoint 3) are launched automatically through the OS system scheduler: launchd (macOS) or cron (Linux). The scheduler is not part of IWE — it is OS infrastructure. It is installed once during setup.
 
 #### Viewpoint 2: Descriptions (U.Description) — knowledge loaded into systems
 
-Text descriptions that are loaded into the AI context and define its behavior. They are not launched — they are read.
+Text descriptions that are loaded into the AI context and define its behavior. They are not executed — they are read.
 
 | Description | Composition | Purpose |
 |-------------|-------------|---------|
@@ -91,53 +91,53 @@ A role describes a function (WHAT to do), not a performer (WHO does it). One per
 | **Strategist** | R1 | Claude CLI (on schedule) | Planning, reflection, session preparation | Every morning, evening, week |
 | **Extractor** | R2 | Claude CLI | Extracting descriptions into Pack | On Close, on demand, every 3 h |
 | **Synchronizer** | R8 | bash script (on schedule) | Schedule coordination, notifications, nightly review | On schedule |
-| **Navigator** | R13 | Telegram bot | Guides the user through platform services | When the user reaches out |
+| **Guide** | R13 | Telegram bot | Navigating the user through platform services | When user contacts |
 | **User** | — | Person | Decision-making, creation, reflection | Always |
 
 > **Test:** A function described without naming a performer? → Role.
 >
-> **Role ≠ Performer (HD #5).** The notation "Strategist (R1) ← Claude" reads: role Strategist, holder — Claude. "Person" is not a role but a performer playing the role of "User."
+> **Role ≠ Performer (HD #5).** The notation "Strategist (R1) ← Claude" reads: role Strategist, holder — Claude. "Person" is not a role but a performer playing the role "User."
 >
 > **FPF notation:** `Holder#Role:Context@Window` (A.2). Full catalog: 21 platform roles in DP.ROLE.001 §3.2.
 
 #### Viewpoint 4: Methods (U.MethodDescription) — how a role produces a work product
 
-Method descriptions (procedures for "how to do") that link a role to a work product. They have their own lifecycle, owners, and correctness tests.
+Method descriptions (procedures for "how to do it") that link a role to a work product. They have their own lifecycle, owners, and correctness tests.
 
-| Method | What it describes | Owner role | Work Product |
-|--------|------------------|------------|-------------|
-| **ORZ protocol** | Open → Work → Close for each session | All roles | WP context, plans, reports |
+| Method | What it describes | Owner role | Work product |
+|--------|------------------|------------|--------------|
+| **IWE Runtime Cycle (ORZ) Protocol** | Open → Work → Close for each session | All roles | WP context, plans, reports |
 | **Capture-to-Pack** | Knowledge extraction at work milestones | R2 Extractor | Pack entities |
-| **ArchGate** (EMOGSSB) | Evaluation of architectural decisions against 7 characteristics | R1 Strategist | Evaluation table, decision |
+| **ArchGate** (EMOGSSB) | Evaluation of architectural decisions by 7 characteristics | R1 Strategist | Evaluation table, decision |
 | **Knowledge Extraction** (KE) | Transformation of raw data into Pack entities | R2 Extractor | Pack entities |
-| **Note-Review** | Processing notes, routing to the appropriate repos | R1 Strategist | Processed notes, tasks |
+| **Note-Review** | Processing notes, routing to appropriate repositories | R1 Strategist | Processed notes, tasks |
 
-> **Test:** A "how to do" procedure described independently of the performer? → Method.
+> **Test:** A "how to do it" procedure described independently of the performer? → Method.
 >
-> **Why a separate viewpoint?** Triad A.7 (Role → Method → Work) is the central distinction of FPF. Without the "Methods" viewpoint, protocols get lost among Descriptions — yet they are not merely knowledge, they are **procedures** that link roles to work products.
+> **Why a separate viewpoint?** Triad A.7 (Role → Method → Work) is the central Distinction of FPF. Without a "Methods" viewpoint, protocols get lost among Descriptions, even though they are not merely knowledge — they are **procedures** that connect roles to work products.
 
 #### Viewpoint 5: Work Products (U.Work) — what is produced
 
-Observable work products. Can be read, checked, versioned, and handed to another person without explanation.
+Observable work products. Can be read, verified, versioned, and handed to another person without explanation.
 
 | Work Product | Where | Who produces it | Purpose |
-|-------------|-------|----------------|---------|
-| **Strategic hub** | `DS-strategy/` | R1 Strategist + User | Storage of personal documents (plans, strategy, inbox) and conduct of strategizing sessions |
-| **Pack documents** | `PACK-{domain}/` | R2 Extractor + User | Accumulation of formalized domain descriptions (the sole source of truth) |
-| **Project repos** | `DS-{projects}/` | User + Claude Code | Creation of concrete products: code, bots, courses, content |
+|--------------|-------|-----------------|---------|
+| **Strategy hub** | `DS-strategy/` | R1 Strategist + User | Storing personal documents (plans, strategy, inbox) and running strategizing sessions |
+| **Pack documents** | `PACK-{domain}/` | R2 Extractor + User | Accumulating formalized domain descriptions (sole source of truth) |
+| **Project repositories** | `DS-{projects}/` | User + Claude Code | Creating concrete products: code, bots, courses, content |
 | **Digital Twin events** | Neon DB | Bot + LMS + Club | Personalization and reflection: profile, progress, self-assessment |
 | **Notes** | `DS-strategy/inbox/` | Bot (from Telegram) | Quick capture of thoughts and observations for subsequent processing by the Strategist |
-| **Posts, drafts** | `DS-strategy/drafts/`, Knowledge Index | User | Crystallization of thoughts and publishing |
+| **Posts, drafts** | `DS-strategy/drafts/`, Knowledge Index | User | Crystallizing thoughts and publishing |
 
-> **Test:** Can it be handed to another person without explanation? Does it remain after the work is finished? → Work Product.
+> **Test:** Can it be handed to another person without explanation? Does it remain after work is finished? → Work Product.
 
 #### How the viewpoints connect
 
 ```
          Role ──method──→ Method ──produces──→ Work Product
-              ↑                                    │
-         Descriptions                        Capture-to-Pack
-         loaded into roles                   back into Descriptions
+              ↑                                     │
+         Descriptions                         Capture-to-Pack
+         loaded into roles                    back into Descriptions
               ↑
          Systems
          execute roles
@@ -149,7 +149,7 @@ Example chains (Role → Method → Work Product):
   User ───────────── ArchGate ─────────── EMOGSSB table + decision
 ```
 
-> **Integrity principle:** Remove any viewpoint and IWE degrades. No systems → no execution. No descriptions → stateless assistant. No roles → task chaos. No methods → ad-hoc work. No work products → no result.
+> **Integrity principle:** Remove any viewpoint and IWE degrades. No Systems → no execution. No Descriptions → stateless assistant. No Roles → task chaos. No Methods → ad hoc work. No Work Products → no result.
 
 ### 1.3. User path
 
@@ -158,22 +158,22 @@ T axis (learner):
 T0 No Ory           T1 Start            T2 Learning         T3 Personalization   T4 Creation (IWE)
 ├── /start in bot   ├── Ory registration ├── Programs         ├── Digital Twin      ├── setup.sh
 ├── telegram_id     ├── UUID             ├── Marathon         ├── Profile + goals   ├── Claude Code
-├── 30-day trial    ├── 30-day trial     ├── Bot + content    ├── Mentor            ├── Strategist + plans
+├── trial 30 days   ├── trial 30 days    ├── Bot + content    ├── Mentor            ├── Strategist + plans
 └── Basic search    └── Assistant        └── Expert           └── Mentor            └── Co-thinker
 
 Orthogonal axes (assigned):
 TM1–TM3: Mentor    TA1–TA4: Administrator    TD1: Developer
 ```
 
-**Key point:** T0–T3 work without Git — everything goes through the bot. T4 adds Claude Code, Git, and automatic agents. TD1 (developer) is an orthogonal axis: access to source code, deployment, and architectural decisions. Owner = T4 + TA4 + TD1. The transition is gradual — everything accumulated so far (Digital Twin, profile, progress) is preserved.
+**Key point:** T0–T3 work without Git — everything goes through the bot. T4 adds Claude Code, Git, and automatic agents. TD1 (developer) is an orthogonal axis: access to source code, deployment, and architectural decisions. Owner = T4 + TA4 + TD1. The transition is gradual — everything accumulated earlier (Digital Twin, profile, progress) is preserved.
 
 **Central IWE invariant:** Platform updates (Standard) **never** affect user data (Personal). Your plans, knowledge, and strategy belong to you.
 
-## 2. Architecture: contours and spaces
+## 2. Architecture: perimeters and spaces
 
-### 2.1. Four system contours
+### 2.1. Four system perimeters
 
-IWE does not exist in isolation — it is part of a 4-contour system. Each contour corresponds to its own level in the principles hierarchy (§ 3.1):
+IWE does not exist in isolation — it is part of a 4-perimeter system. Each perimeter corresponds to its level in the principles hierarchy (§ 3.1):
 
 ```
 L1: Ecosystem    — the whole system: platform + community + all user IWEs
@@ -182,19 +182,19 @@ L1: Ecosystem    — the whole system: platform + community + all user IWEs
       L4: Personal IWE — your instance (configured, with personal Packs and data)
 ```
 
-| Contour | What it means for you | Example | How it is updated |
-|---------|----------------------|---------|------------------|
+| Perimeter | What it means for you | Example | How it is updated |
+|-----------|-----------------------|---------|------------------|
 | **L1: Ecosystem** | Community, seminars, content | systemsworld.club, Telegram channels | You participate |
 | **L2: Platform** | Services you connect to | Bot @aist_me_bot, Knowledge Index | Updated by the developer |
-| **L3: Template** | The template from which your IWE was created | This repo (IWE) | `update.sh` — Platform space |
+| **L3: Template** | The template your IWE was created from | This repository (IWE) | `update.sh` — Platform space |
 | **L4: Personal IWE** | Your work, plans, knowledge | ~/IWE/CLAUDE.md, DS-strategy/ | Only you (User space) |
 
 **Where to study:**
-- `DS-ecosystem-development/11-platform-contours.md` — full architectural model (ecosystem governance repo, created locally at deployment, not published to GitHub)
+- `DS-ecosystem-development/11-platform-contours.md` — full architectural model (ecosystem governance repository, created locally on deployment, not published to GitHub)
 
 ### 2.2. From template to workspace
 
-#### IWE repo structure
+#### IWE repository structure
 
 ```
 IWE/
@@ -214,7 +214,7 @@ IWE/
 ├── roles/                          # Roles (extension point)
 │   └── strategist/                  # Strategist: prompts + scripts + launchd
 │
-├── seed/                            # Templates → separate repos after setup
+├── seed/                            # Seeds → separate repositories after setup
 │   └── strategy/                    # → DS-strategy/
 │
 └── .claude/                         # Claude Code configuration
@@ -227,12 +227,12 @@ IWE/
 | Zone | What | update.sh | User |
 |------|------|-----------|------|
 | **PLATFORM** | `CLAUDE.md` (§1–7), `memory/protocol-*.md`, `roles/`, `docs/`, `.claude/` | Updates | Does not touch |
-| **USER-SPACE** | `CLAUDE.md` § "My rules" (section `<!-- USER-SPACE -->`) | **Does not touch** | Own rules, distinctions |
+| **USER-SPACE** | `CLAUDE.md` § "My Rules" (section `<!-- USER-SPACE -->`) | **Does not touch** | Own rules, distinctions |
 | **CONFIG** | `memory/day-rhythm-config.yaml` | Does not touch | Configures parameters |
 | **PERSONAL** | `memory/MEMORY.md`, AUTHOR-ONLY zones in protocols | Does not touch | Edits |
-| **SEED** | `seed/strategy/` | N/A | After setup → separate repo DS-strategy/ |
+| **SEED** | `seed/strategy/` | N/A | After setup → separate repository DS-strategy/ |
 
-> **USER-SPACE** is the "8. My rules" section at the end of CLAUDE.md. Add your own rules, distinctions, and lessons only here — they are preserved during updates. Everything above (§1–7) is platform-managed and updated via `update.sh`.
+> **USER-SPACE** is the "8. My Rules" section at the end of CLAUDE.md. Add your own rules, distinctions, and lessons only here — they are preserved during updates. Everything above (§1–7) is platform content and is updated through `update.sh`.
 > **AUTHOR-ONLY zones** are blocks inside PLATFORM files marked with `<!-- AUTHOR-ONLY -->` markers. They are preserved by update.sh. Details: [CLAUDE.md §7](../CLAUDE.md).
 
 #### What setup.sh does
@@ -241,7 +241,7 @@ IWE/
 2. Substitutes 7 placeholders (`{{GITHUB_USER}}`, `{{WORKSPACE_DIR}}`, etc.)
 3. Copies `CLAUDE.md` → workspace root directory
 4. Copies `memory/*.md` → `~/.claude/projects/.../memory/`
-5. Creates `DS-strategy/` from `seed/strategy/` (separate private repo)
+5. Creates `DS-strategy/` from `seed/strategy/` (separate private repository)
 6. Installs launchd agents for the Strategist
 
 #### Workspace after setup
@@ -254,8 +254,8 @@ IWE/
 │   ├── inbox/WP-*.md                  # task contexts
 │   └── docs/Strategy.md              # your strategy
 ├── IWE/            # DO NOT touch (updated via update.sh)
-├── PACK-{domain}/                     # when you create it: domain knowledge
-└── DS-{projects}/                     # when you create it: code, tools
+├── PACK-{domain}/                     # when created: domain knowledge
+└── DS-{projects}/                     # when created: code, tools
 ```
 
 ### 2.3. What the platform provides through the template (Standard)
@@ -268,9 +268,9 @@ Through the template and updates you receive a ready-made methodology:
 | **Memory** | Distinctions, SOTA, roles, checklists, navigation | `memory/*.md` |
 | **Strategist** | 7 automatic planning scenarios | `roles/strategist/prompts/` |
 | **Tools** | WakaTime hook, Claude Code skills | `.claude/hooks/`, `.claude/skills/` |
-| **Rules** | Repo architecture, processes, gates | `CLAUDE.md` |
+| **Rules** | Repository architecture, processes, gates | `CLAUDE.md` |
 
-All of this is updated via `update.sh` — you receive improvements without losing your personal data.
+All of this is updated through `update.sh` — you receive improvements without losing personal data.
 
 ### 2.4. What accumulates with you (Personal)
 
@@ -292,7 +292,7 @@ Your data lives separately and is **never affected by updates**:
 |---------|-----------|---------|---------|
 | **Config** | yaml file with parameters | `strategy_day: saturday` | Agent behavior settings |
 | **AUTHOR-ONLY zones** | HTML markers in protocols | Checks for specific systems | Extending protocols without update.sh conflicts |
-| **Placeholders** | `{{WORKSPACE_DIR}}` etc. | Paths, GitHub username | Auto-substitution at setup |
+| **Placeholders** | `{{WORKSPACE_DIR}}` etc. | Paths, GitHub username | Auto-substitution during setup |
 
 More about AUTHOR-ONLY zones: [CLAUDE.md §7](../CLAUDE.md).
 
@@ -300,11 +300,11 @@ More about AUTHOR-ONLY zones: [CLAUDE.md §7](../CLAUDE.md).
 
 **One command:** `cd ~/IWE/IWE && bash update.sh`
 
-The script downloads an update manifest from GitHub, compares sha256 hashes of local files with upstream, shows a preview, and applies after confirmation:
+The script downloads the update manifest from GitHub, compares sha256 hashes of local files against upstream, shows a preview, and applies after confirmation:
 
 | Step | What it does | Result |
 |------|-------------|--------|
-| 0. Self-update | Checks whether a new version of update.sh exists | Script is always current |
+| 0. Self-update | Checks whether a new version of update.sh is available | Script is always current |
 | 1. Manifest | Downloads `update-manifest.json` from GitHub | List of files to update |
 | 2. Comparison | sha256 of local files vs remote | List of new and changed files |
 | 3. Preview | Shows: new files, updated files, untouched files | You decide: apply or not |
@@ -315,15 +315,15 @@ The script downloads an update manifest from GitHub, compares sha256 hashes of l
 **What is NOT affected:**
 
 ```
-CLAUDE.md § "My rules"     ← USER-SPACE section (your rules and distinctions)
-MEMORY.md                   ← Your WP table
+CLAUDE.md § "My Rules"      ← USER-SPACE section (your rules and distinctions)
+MEMORY.md                   ← Your work product table
 DS-strategy/                ← Your plans, inbox/, docs/
 PACK-{domain}/              ← Your domain knowledge
 .secrets/, .mcp.json        ← Keys and configuration
 .claude/settings.local.json ← Your permissions
 ```
 
-**Your own rules:** add them to the "8. My rules" section at the end of CLAUDE.md (after the `<!-- USER-SPACE -->` marker). This section is preserved during updates. Rules in `<repo>/CLAUDE.md` of specific repos are not affected at all.
+**Your own rules:** add them to the "8. My Rules" section at the end of CLAUDE.md (after the `<!-- USER-SPACE -->` marker). This section is preserved during updates. Rules in `<repo>/CLAUDE.md` of specific repositories are not affected at all.
 
 **Additional modes:**
 - `bash update.sh --check` — only show whether updates are available (without applying)
@@ -331,11 +331,11 @@ PACK-{domain}/              ← Your domain knowledge
 
 **Cumulative update model:**
 
-Changes in the template accumulate. You can update once a day, once a week, or once a month — one `bash update.sh` command applies everything accumulated during that period. CHANGELOG.md shows what changed.
+Changes in the template accumulate. You can update once a day, once a week, or once a month — one `bash update.sh` command applies everything accumulated during that period. CHANGELOG.md will show what changed.
 
 **Telegram notifications:**
 
-Every morning at 7:28, the @aist_me_bot bot sends a digest of changes over the past 24 hours (if there were any). Subscribe to the updates channel so you do not miss anything. A notification is information. The decision to update is always yours.
+Every morning at 7:28 the bot @aist_me_bot sends a digest of changes from the last 24 hours (if any occurred). Subscribe to the update channel so you do not miss them. A notification is information. The decision to update is always yours.
 
 **Three ways to update:**
 1. Terminal: `bash update.sh`
@@ -344,7 +344,7 @@ Every morning at 7:28, the @aist_me_bot bot sends a digest of changes over the p
 
 ### 2.6. Optional services
 
-The template (L3) recommends, but does not require. Each is configured separately:
+The template (L3) recommends, but does not require. Each service is configured separately:
 
 | Service | Type | Setup | Role | Product |
 |---------|------|-------|------|---------|
@@ -355,19 +355,19 @@ The template (L3) recommends, but does not require. Each is configured separatel
 | Marp | Tool | VS Code extension + CLI | Markdown → slides | Sliduments (PDF/HTML) |
 | Cloud Scheduler | Automation | `setup/optional/setup-cloud-scheduler.sh` | IWE runs 24/7 when Mac is off | Backup, health check, notifications |
 
-**Cloud Scheduler — cloud IWE automation:** A GitHub Actions workflow runs backup and health check daily at 04:00 MSK — even when the Mac is off. Base level ($0/month, no LLM). Optional: Telegram notifications with a report. Install: `bash setup/optional/setup-cloud-scheduler.sh`. Details: `setup/optional/README.md`, scenario [DP.SC.019](../../PACK-digital-platform/pack/digital-platform/08-service-clauses/DP.SC.019-autonomous-cloud-runtime.md).
+**Cloud Scheduler — IWE cloud automation:** A GitHub Actions workflow runs backup and health check daily at 04:00 MSK — even when Mac is off. Basic tier ($0/month, no LLM). Optional: Telegram notifications with a report. Installation: `bash setup/optional/setup-cloud-scheduler.sh`. Details: `setup/optional/README.md`, scenario [DP.SC.019](../../PACK-digital-platform/pack/digital-platform/08-service-clauses/DP.SC.019-autonomous-cloud-runtime.md).
 
-**Health Check setup (extended):** By default, health check monitors only the strategy repo. For multi-repo monitoring:
-1. GitHub → Settings → Variables → Actions → add `HEALTH_CHECK_REPOS` — your repos as a comma-separated list (`owner/repo, owner/repo2`)
-2. (Optional) Add `BOT_HEALTH_URL` — URL of the bot's health endpoint to check availability
+**Health Check setup (extended):** By default the health check monitors only the strategy repository. For multi-repository monitoring:
+1. GitHub → Settings → Variables → Actions → add `HEALTH_CHECK_REPOS` — comma-separated list of your repositories (`owner/repo, owner/repo2`)
+2. (Optional) Add `BOT_HEALTH_URL` — URL of the bot health endpoint to check availability
 3. (Optional) Add Secrets: `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` for Telegram notifications
-4. PAT (`STRATEGY_REPO_TOKEN`) must have access to all listed repos
+4. PAT (`STRATEGY_REPO_TOKEN`) must have access to all listed repositories
 
-Manual run: `gh workflow run cloud-scheduler.yml --field task=health-check`. Report: commits (24h + 7d by repo), DayPlan, WeekPlan, backup (<48h), sessions, bot status, WP statistics, traffic light.
+Manual run: `gh workflow run cloud-scheduler.yml --field task=health-check`. Report: commits (24 h + 7 d by repository), DayPlan, WeekPlan, backup (<48 h), sessions, bot status, WP statistics, traffic light.
 
-**Marp — presentation preparation:** Marp converts Markdown files into slides (PDF, HTML, PPTX). Workflow: write `.md` with `---` separator → preview in VS Code (Marp extension) → export `marp --pdf slides.md`. Sliduments (MIM.WP.001) are text-based, so Markdown + Git = versions, diffs, edits via Claude Code. Install: `npm install -g @marp-team/marp-cli` + VS Code → Extensions → "Marp for VS Code."
+**Marp — presentation preparation:** Marp converts Markdown files to slides (PDF, HTML, PPTX). Workflow: write `.md` with `---` separator → preview in VS Code (Marp extension) → export `marp --pdf slides.md`. Sliduments (MIM.WP.001) are text-based, so Markdown + Git = versions, diffs, edits through Claude Code. Installation: `npm install -g @marp-team/marp-cli` + VS Code → Extensions → "Marp for VS Code."
 
-**IntegrationGate rule:** Before adding a new tool to your IWE: (1) type, (2) contour (L2/L3/L4), (3) roles, (4) products, (5) processes.
+**IntegrationGate rule:** Before adding a new tool to your IWE: (1) type, (2) perimeter (L2/L3/L4), (3) roles, (4) products, (5) processes.
 
 ## 3. Thinking foundation
 
@@ -376,16 +376,16 @@ Manual run: `gh workflow run cloud-scheduler.yml --field task=health-check`. Rep
 All knowledge is organized into 4 levels. Each subsequent level is constrained by the previous one:
 
 ```
-Level 0: ZP (zero principles)         ← axioms, no framework
+Level 0: ZP (zero principles)           ← axioms, no framework
     ↓ discipline
-Level 1: FPF (first principles)        ← principles + framework (bundled)
+Level 1: FPF (first principles)          ← principles + framework (bundle)
     ↓ constrain
-Level 2: SPF → Pack (second principles) ← framework + principles (separate)
+Level 2: SPF → Pack (second principles)  ← framework + principles (separate)
     ↓ define
-Level 3: S-2R etc. → DS               ← frameworks + principles (separate)
+Level 3: FMT-s2r etc. → DS              ← frameworks + principles (separate)
 ```
 
-**Fallback chain:** DS (level 3) → Pack (level 2) → Base.Principles (SPF → FPF → ZP). If the current level is unclear — move up one level.
+**Fallback chain:** DS (3rd) → Pack (2nd) → Base Principles (SPF → FPF → ZP). If the current level is unclear — move up one level.
 
 **Zero principles (ZP)** — 6 trans-disciplinary constraints:
 
@@ -394,7 +394,7 @@ Level 3: S-2R etc. → DS               ← frameworks + principles (separate)
 | ZP.1 Axiomaticity | Build on axioms, not intuition |
 | ZP.2 Structurality and Symmetries | Describe through invariants, not objects |
 | ZP.3 Multi-Scale | The model must work at different scales |
-| ZP.4 Optimization | Find the extremum, do not enumerate |
+| ZP.4 Optimization | Find an extremum, do not enumerate |
 | ZP.5 Probability and Information | Describe uncertainty quantitatively |
 | ZP.6 Computational Constraints | Account for the finiteness of resources |
 
@@ -410,7 +410,7 @@ Level 3: S-2R etc. → DS               ← frameworks + principles (separate)
 | # | Pair | Essence |
 |---|------|---------|
 | 1 | System ≠ Episteme | Physical boundaries vs. knowledge domain |
-| 2 | Method ≠ Tool | Way of working vs. instrument of working |
+| 2 | Method ≠ Tool | Way of working vs. instrument of work |
 | 3 | Work Product ≠ Description | Observable artifact vs. text about it |
 | 4 | Recording ≠ Planning | Capturing facts vs. intentions |
 | 5 | Role ≠ Agent ≠ Tool | Mask vs. who wears the mask vs. instrument |
@@ -418,7 +418,7 @@ Level 3: S-2R etc. → DS               ← frameworks + principles (separate)
 | 7 | Observation ≠ Judgment | Fact vs. interpretation |
 | 8–11 | Data ≠ Insight, Artifact ≠ Process, Pack ≠ Governance, Process ≠ Service ≠ Scenario | Ontological |
 | 12–22 | Description ≠ Knowledge, DDD strategic ≠ tactical, Platform ≠ Template ≠ Personal IWE, … | Methodological and operational |
-| 25–26 | Draft ≠ Slug, Slug ≠ Post | Stages of the creative pipeline |
+| 25–26 | Draft ≠ Seed, Seed ≠ Post | Stages of the creative pipeline |
 | 27 | Bot ≠ Platform; Neon = one Digital Twin | Digital Twin architecture |
 | 28 | Prosthesis ≠ Exoskeleton | AI–human interaction pattern (§ 1.1a) |
 | 29 | Pack knowledge ≠ Implementation decision | Domain truth → Pack. Technical choice → DS |
@@ -428,9 +428,9 @@ Level 3: S-2R etc. → DS               ← frameworks + principles (separate)
 **Where to study:**
 - [memory/hard-distinctions.md](../memory/hard-distinctions.md) — all 22 pairs with examples and tests
 
-### 3.3. FPF first principles
+### 3.3. First principles FPF
 
-FPF (First Principles Framework) is an "operating system for thinking." It defines basic constructs and rules for combining them.
+FPF (First Principles Framework) is the "operating system for thinking." It defines basic constructs and rules for combining them.
 
 | Part | Content | When to read |
 |------|---------|-------------|
@@ -442,7 +442,7 @@ FPF (First Principles Framework) is an "operating system for thinking." It defin
 | F | Terminology: UTS, Bridges | Cross-domain alignment |
 | G | SoTA Kit | Knowledge work patterns |
 
-**How to read:** NOT sequentially. Start with the table of contents, then find the sections you need by searching for codes (for example `FPF A.7` = Strict Distinction).
+**How to read:** NOT sequentially. Start with the table of contents, then find needed sections by searching for a code (e.g., `FPF A.7` = Strict Distinction).
 
 **Where to study:**
 - [FPF/README.md](https://github.com/ailev/FPF) — overview
@@ -452,7 +452,7 @@ FPF (First Principles Framework) is an "operating system for thinking." It defin
 
 ### 4.1. Three repository types
 
-Each repository belongs to one of 3 types. The type determines who creates it and what it stores:
+Every repository belongs to one of 3 types. The type determines who creates it and what it stores:
 
 | Type | Subtype | What it stores | Source of truth? | Examples |
 |------|---------|---------------|-----------------|---------|
@@ -461,7 +461,7 @@ Each repository belongs to one of 3 types. The type determines who creates it an
 | **Pack** | — | Domain passport | Yes | PACK-{domain} |
 | **DS** | instrument / governance / surface | Downstream from Pack | No | DS-strategy, DS-ai-systems |
 
-**Key point:** **Base = the platform provides** (principles, frameworks, templates). **Pack and DS = the user creates.** Pack is the **sole** source of truth for domain knowledge. DS consumes — it does not create.
+**Key point:** **Base = the platform provides** (principles, frameworks, templates). **Pack and DS = the user creates.** Pack is the **sole** source of truth for domain knowledge. DS consumes; it does not create.
 
 **Where to study:**
 - [CLAUDE.md](../CLAUDE.md) § 1 — full table, fallback chain
@@ -472,9 +472,9 @@ Each repository belongs to one of 3 types. The type determines who creates it an
 DS is the most common repository type you will create:
 
 | Subtype | What it stores | Examples | When to create |
-|---------|---------------|---------|---------------|
+|---------|---------------|---------|----------------|
 | **governance** | Plans, strategy, coordination | DS-strategy, DS-ecosystem-development (local) | At setup (DS-strategy — automatically) |
-| **instrument** | Code, bots, agents, MCP | DS-ai-systems, DS-aist-bot | When building a system based on Pack |
+| **instrument** | Code, bots, agents, MCP | DS-ai-systems, DS-aist-bot | When building a system based on a Pack |
 | **surface** | Courses, guides, posts, content | DS-Knowledge-Index, DS-blog | When creating educational content |
 
 ### 4.3. Base/Formats — standard templates
@@ -484,11 +484,11 @@ The platform provides standard formats (Base/Formats) — repository structure p
 | Format | Purpose | For whom |
 |--------|---------|---------|
 | **IWE** | Personal workspace (IWE) | Every T4+ user |
-| **FMT-s2r** | Project repos: 3×3 matrix (systems × roles) | Advanced users with multi-component projects |
+| **FMT-s2r** | Project repositories: 3×3 matrix (systems × roles) | Advanced users with multi-component projects |
 
-**FMT-s2r (System-to-Role)** organizes a project by kernels, each described through 9 documents (3 systems × 3 roles). Useful when a project has multiple systems: mobile app + backend + infrastructure.
+**FMT-s2r (System-to-Role)** organizes a project into kernels, each described through 9 documents (3 systems × 3 roles). It is useful when a project has multiple systems: mobile app + backend + infrastructure.
 
-> **Your own formats:** A user can create a custom format — it will be a DS repo marked with `template: true` in REPO-TYPE.md.
+> **Own formats:** A user can create their own format — it will be a DS repository with `template: true` in REPO-TYPE.md.
 
 **Where to study:**
 - [FMT-s2r/README.md](https://github.com/TserenTserenov/FMT-s2r) — overview and structure
@@ -499,25 +499,25 @@ The platform provides standard formats (Base/Formats) — repository structure p
 
 | Situation | What to create | How |
 |-----------|---------------|-----|
-| You have defined a knowledge domain | `PACK-{domain}` | `/pack-new` — guided flow through SPF (checks/clones SPF+FPF, defines domain, creates scaffold) |
+| Defined a knowledge domain | `PACK-{domain}` | `/pack-new` — guided flow through SPF (checks/clones SPF+FPF, defines domain, creates scaffold) |
 | Building a system (bot, tool) | `DS-{project}` (instrument) | `gh repo create DS-my-tool --private` |
 | Creating a course or content | `DS-{project}` (surface) | `gh repo create DS-my-course --private` |
 | Coordinating multiple systems | `DS-{hub}` (governance) | `gh repo create DS-my-hub --private` |
 
 **What every DS-* must contain:**
-- `CLAUDE.md` — rules for Claude Code (specific to this repo)
-- `inbox/WP-*.md` — contexts of active Work Products (single source — aggregated by `scripts/active-wp-sweep.sh`)
+- `CLAUDE.md` — rules for Claude Code (specific to this repository)
+- `inbox/WP-*.md` — contexts of active work products (single source — aggregated by `scripts/active-wp-sweep.sh`)
 - `MAPSTRATEGIC.md` — where THIS system is heading
 
 **MAPSTRATEGIC.md vs Strategy.md:**
 
 | | MAPSTRATEGIC.md | Strategy.md |
 |---|----------------|-------------|
-| **Where** | In each system repo | `DS-strategy/docs/` |
+| **Where** | In each system repository | `DS-strategy/docs/` |
 | **Who writes** | System owner | Strategist (aggregation) |
 | **What** | "Where THIS system is heading" | "Where I am heading" |
 
-**Flow:** MAPSTRATEGIC (each repo) → Strategist (session-prep) → Strategy.md → WeekPlan
+**Flow:** MAPSTRATEGIC (each repository) → Strategist (session-prep) → Strategy.md → WeekPlan
 
 ### 4.5. Naming and coding
 
@@ -545,13 +545,13 @@ The platform provides standard formats (Base/Formats) — repository structure p
 
 ## 5. Daily work
 
-### 5.1. ORZ fractal: Day and Session (two scales out of four)
+### 5.1. ORZ fractal: Day and Session (two of four scales)
 
-ORZ (Opening → Work → Closing) is a **fractal pattern** that operates at four scales: session, day, week, month. A day consists of sessions; each session is a complete ORZ cycle inside the daily cycle. The week and month are closed with Week Close and Month Close protocols.
+ORZ (Opening → Work → Closing) is a **fractal pattern** that operates at four scales: session, day, week, month. A day consists of sessions; each session is a complete ORZ cycle inside the daily cycle. Week and month are closed by the Week Close and Month Close protocols.
 
 ```
 Day
-├── Day Open   — morning ritual: yesterday → plan → learning → world
+├── Day Open   — morning ritual: yesterday → plan → development → world
 │   ├── Session 1: Open → Work → Close
 │   ├── Session 2: Open → Work → Close
 │   └── ...
@@ -569,23 +569,23 @@ Session
 |-------|-------|---------|------|
 | **Day** | Opening | "open the day" | R1 Strategist |
 | **Day** | Work | Between Day Open and Day Close | R1 + R6 |
-| **Day** | Closing | "closing the day" / "day results" | R1 Strategist |
+| **Day** | Closing | "close the day" / "day results" | R1 Strategist |
 | **Session** | Opening | Any assignment (no exceptions) | R6 Coder |
 | **Session** | Work | After passing Opening | R6 Coder |
-| **Session** | Closing | "closing" / "done" / "close" | R6 Coder |
+| **Session** | Closing | "close" / "done" / "close it" | R6 Coder |
 
-> **Distinction: Day ≠ Session.** Day Open/Close are standalone ritual sessions (trigger only, no assignment). Session Open/Close always occur in the context of specific work.
+> **Distinction: Day ≠ Session.** Day Open/Close are separate ritual sessions (trigger only, no assignment). Session Open/Close always occur in the context of specific work.
 
 #### Day Open (morning ritual)
 
 The Strategist (R1) performs 7 steps:
 
-1. **Yesterday** — commits from yesterday across all repos → 1–3 key results
-2. **Plan for today** — full carry-over from Day Close + 2–4 focus Work Products from WeekPlan (≥1h). **Slot 1 = learning** (mandatory)
-3. **Learning** — current guide, where you stopped, active drafts
-4. **Strategizing** — if today is `strategy_day` (from `day-rhythm-config.yaml`) → **do NOT create DayPlan** (the day plan is already in WeekPlan → section "Plan for Monday"). Show WeekPlan, skip step 7
-4b. **Pomodoros** — show current settings (work/break/long break), suggest adjustments
-5. **IWE overnight** — automation logs (sync-agent, reindex) — did they run?
+1. **Yesterday** — commits from yesterday across all repositories → 1–3 key results
+2. **Plan for today** — full carry-over from Day Close + 2–4 focus work products from WeekPlan (≥1 h). **Slot 1 = development** (mandatory)
+3. **Development** — current guide, where I left off, active drafts
+4. **Strategizing** — if today is `strategy_day` (from `day-rhythm-config.yaml`) → **do NOT create DayPlan** (the daily plan is already in WeekPlan → section "Plan for Monday"). Show WeekPlan, skip step 7
+4b. **Pomodoros** — show current settings (work/break/long break), suggest adjusting
+5. **IWE overnight** — automation logs (sync-agent, reindex) — did they complete?
 6. **World** — digest on configured topics (RSS / WebSearch)
 7. **Record** — create/update `DayPlan YYYY-MM-DD.md` in DS-strategy/current/. **Skipped on strategy_day** (step 4)
 
@@ -595,18 +595,18 @@ The Strategist (R1) performs 7 steps:
 
 The Strategist (R1) collects the day's results:
 
-1. **Review** — table "Work Product × status" (done / partial / not started)
+1. **Review** — table "work product × status" (done / partial / not started)
 2. **What I learned** — captures in Pack, distinctions, insights, guide
 3. **Praise** — what went well, what was difficult
-4. **Anything forgotten?** — uncommitted changes, branch sync, promises
+4. **Forgotten?** — uncommitted changes, branch synchronization, promises
 5. **Setup for tomorrow** — where to start, what context to prepare (Agent→Agent handoff)
 6. **Record** — append "Day results" to DayPlan, update statuses in WeekPlan + MEMORY.md
 
-#### Day Work (day rules)
+#### Day Work (daily rules)
 
 | # | Rule | Essence |
 |---|------|---------|
-| 1 | Slot 1 = learning | Do not move to current work until the slot is done |
+| 1 | Slot 1 = development | Do not move to routine tasks until the slot is complete |
 | 2 | Sessions = ORZ | Every session is a full Open → Work → Close cycle |
 | 3 | Pomodoros | 25/5, long break after 4 cycles |
 | 4 | Reminder | Session > 50 min without a break → reminder |
@@ -618,63 +618,63 @@ The Strategist (R1) collects the day's results:
 
 **First action for ANY assignment:** check whether the task is in the plan.
 
-1. Read MEMORY.md → section "Work Products of the current week"
-2. Match found → proceed + **DayPlan Gate:** if the Work Product is not in today's DayPlan → add a line
-3. No match → STOP → record the Work Product in 4 places (MEMORY.md, WP-REGISTRY, WeekPlan, WP context file) → only then begin
+1. Read MEMORY.md → section "Work products for the current week"
+2. Match found → proceed + **DayPlan Gate:** if the work product is not in today's DayPlan → add a line
+3. No match → STOP → record the work product in 4 places (MEMORY.md, WP-REGISTRY, WeekPlan, WP context file) → only then begin
 
-**Exceptions:** tasks ≤15 min, questions without changes, emergency bug fixes. But if an exception grows into real work → *"This is becoming a Work Product. Shall I record it?"*
+**Exceptions:** tasks ≤15 min, questions with no changes, emergency bug fixes. But if an exception grows into real work → *"This is growing into a work product. Record it?"*
 
 #### Alignment Ritual
 
-Before work begins, Claude announces:
+Before work, Claude announces:
 
 > **User role:** [one of 4 roles]
 > **Claude role:** [from catalog]
 > **Work:** [what]
-> **Work Product:** [artifact]
+> **Work product:** [artifact]
 > **Verification class:** [trivial / closed-loop / open-loop / problem-framing]
 > **Method:** [how]
-> **Estimate:** ~Xh
-> **Model:** [current] — I recommend [model] ([reason])
+> **Estimate:** ~X h
+> **Model:** [current] — recommend [model] ([reason])
 
-**4 user roles** (Tseren in his own IWE):
+**4 user roles** (Tseren in his IWE):
 1. Platform developer → Pack, DS-ecosystem, FMT
 2. Platform user → bot, LMS, courses
 3. Own IWE developer → exocortex, CLAUDE.md, protocols (ABOVE the system)
-4. Own IWE user → plans, reviews, posts, captures (INSIDE the system)
+4. Own IWE user → plans, reviews, posts, captures (IN the system)
 
 **Verification class** (determines the working mode):
 
-| Class | Check | Mode | Model recommendation |
-|-------|-------|------|---------------------|
+| Class | Verification | Mode | Model recommendation |
+|-------|-------------|------|---------------------|
 | **trivial** | Not needed (result is obvious) | Agent autonomously, no captures | Haiku |
 | **closed-loop** | Cheap, automated (tests) | Agent autonomously | Sonnet |
 | **open-loop** | Expensive, deferred | Collaborative, captures mandatory | Opus |
 | **problem-framing** | Unknown | Exoskeletal: questions > answers | Opus |
 
 > **Model switching — two scenarios:**
-> - **Entire session on a different model:** If at opening Claude determines that the task is trivial/closed-loop and the current model is excessive, it will say: *"This task is trivial; I recommend switching to Haiku via `/model`. I cannot switch automatically."* The user switches manually → the entire session runs on the cheaper model.
-> - **Separate task within a session:** A trivial task appears mid-session → Claude delegates to a sub-agent on a cheaper model. The session is not interrupted. Delegation is downward only: Opus→Sonnet/Haiku, Sonnet→Haiku. Upward switching requires `/model`.
+> - **Entire session on another model:** If during opening Claude determines the task is trivial/closed-loop and the current model is excessive, it will say: *"This task is trivial; I recommend switching to Haiku via `/model`. I cannot switch automatically."* The user switches manually → the entire session runs on the cheaper model.
+> - **A single task within a session:** A trivial task appears mid-session → Claude delegates to a sub-agent on a cheaper model. The session is not interrupted. Delegation is downward only: Opus→Sonnet/Haiku, Sonnet→Haiku. Upward switching requires `/model`.
 
 **Exoskeletal mode** (problem-framing only): Claude does NOT propose a solution immediately. First 3 clarifying questions (What? Why? Constraints?) → answers → 2–3 approach options with trade-offs → user chooses → work begins.
 
-**Session registration:** after the ritual → a line in `<governance-repo>/inbox/open-sessions.log`.
+**Session registration:** after alignment → a line in `<governance-repo>/inbox/open-sessions.log`.
 
 ### 5.1c. Session Close: full checklist
 
 - [ ] Pull → `cd DS-strategy && git pull --rebase`
 - [ ] Knowledge Extraction (R2): collect captures → Extraction Report → approval
-- [ ] Update MEMORY.md (Work Product statuses)
-- [ ] Update WP-REGISTRY.md (statuses + new Work Products)
+- [ ] Update MEMORY.md (work product statuses)
+- [ ] Update WP-REGISTRY.md (statuses + new work products)
 - [ ] Git commit + push
-- [ ] Update WeekPlan (Work Product statuses)
-- [ ] Update DayPlan (statuses of ALL lines: Work Products + ad-hoc)
+- [ ] Update WeekPlan (work product statuses)
+- [ ] Update DayPlan (statuses of ALL lines: work products + ad-hoc)
 - [ ] Backup: memory/ + CLAUDE.md → DS-strategy/exocortex/
 - [ ] WP Context File: update (in_progress) or archive (done → archive/wp-contexts/)
 - [ ] Selective Reindex: Pack changed? → `selective-reindex.sh`
 - [ ] Repo CLAUDE.md: feat commits → new rules?
 - [ ] Draft list: Pack enriched → suggest a draft?
-- [ ] Template CHANGELOG: commits in IWE? → update
+- [ ] Template CHANGELOG: commits to IWE? → update
 - [ ] Session log: remove line from open-sessions.log
 - [ ] Close report: what was done, what remains
 
@@ -696,11 +696,11 @@ Before work begins, Claude announces:
 ### 5.2. Three-layer memory
 
 | Layer | File | Contents | Limit | When read |
-|-------|------|---------|-------|----------|
-| 1 | `MEMORY.md` | Weekly tasks, lessons, navigation | Per token budget; pointers to existing files are never deleted (issue #1555) | Every session (auto) |
-| 2 | `CLAUDE.md` | Slim core: blocking rules + navigation | ~90 lines | At start (auto) |
-| 3 | `memory/*.md` | Protocols, distinctions, SOTA, roles, checklists | Per token budget (HOT/WARM/COLD) | On triggers from CLAUDE.md |
-| 4 | `.claude/skills/` | Templates, rituals (lazy loading) | On call | Only via `/skill` command |
+|-------|------|---------|-------|-----------|
+| 1 | `MEMORY.md` | Weekly tasks, lessons, navigation | Within token budget; pointers to existing files are never deleted (issue #1555) | Every session (auto) |
+| 2 | `CLAUDE.md` | Slim core: blocking rules + navigation | ~90 lines | At startup (auto) |
+| 3 | `memory/*.md` | Protocols, distinctions, SOTA, roles, checklists | Within token budget (HOT/WARM/COLD) | On triggers from CLAUDE.md |
+| 4 | `.claude/skills/` | Templates, rituals (lazy loading) | On call | Only on `/skill` command |
 
 **memory/ files:**
 
@@ -709,33 +709,33 @@ Before work begins, Claude announces:
 | `protocol-open.md` | Opening protocol | Every session (auto) |
 | `protocol-work.md` | Work protocol | After opening |
 | `protocol-close.md` | Closing protocol | On completion |
-| `navigation.md` | Repo navigation | Finding files |
-| `hard-distinctions.md` | 30+ distinctions | When terms are confused |
+| `navigation.md` | Repository navigation | Finding files |
+| `hard-distinctions.md` | 30+ distinctions | When terminology is unclear |
 | `fpf-reference.md` | FPF navigation | When creating/reviewing Pack |
 | `sota-reference.md` | SOTA practices | For architectural decisions |
 | `checklists.md` | Quality checklists | Before responding, before modifying |
-| `repo-type-rules.md` | Rules by repo type | When working with a specific type |
-| `roles.md` | Role catalog (AI + human) | During the session-opening ritual |
+| `repo-type-rules.md` | Rules by repository type | When working with a specific type |
+| `roles.md` | Role catalog (AI + human) | During the session opening ritual |
 
-> **`roles.md` is an evolving file.** The template ships platform roles (R1–R21). Add your own roles to the "User roles" section (R100+). This helps Claude select the right behavior for each task — not guess, but check the table.
+> **`roles.md` is an evolving file.** The template ships platform roles (R1–R21). Add your own roles in the "User roles" section (R100+). This helps Claude select the correct behavior for each task — not guess, but check the table.
 
-**Policy:** Reference files ≤100 lines, protocols ≤150, registries ≤200 + cleanup on Close; total budget — per tokens (HOT/WARM/COLD, `memory/memory-lifecycle-spec.md`), not by number of files. Cross-system → memory/. System-specific → `<repo>/CLAUDE.md`.
+**Policy:** reference files ≤100 lines, protocols ≤150, registries ≤200 + cleanup on Close; total budget is in tokens (HOT/WARM/COLD, `memory/memory-lifecycle-spec.md`), not in number of files. Cross-system → memory/. System-specific → `<repo>/CLAUDE.md`.
 
 ### 5.3. Capture-to-Pack: knowledge capture
 
 At every milestone (subtask completed, pattern found, decision made) ask: **is there knowledge to record? Is there a seed for a post?**
 
 | Knowledge type | Where | When | Who writes |
-|---------------|-------|------|-----------|
-| Rule for all repos (1–3 lines) | `~/IWE/CLAUDE.md` | Immediately | Claude |
-| Rule for one repo | `<repo>/CLAUDE.md` | Immediately | Claude |
-| Domain (architecture, patterns) | The corresponding Pack | On Close | R2 Extractor → Pack |
-| Distinction, method, FM, WP | The corresponding Pack | On Close | R2 Extractor → Pack |
+|----------------|-------|------|-----------|
+| Rule for all repositories (1–3 lines) | `~/IWE/CLAUDE.md` | Immediately | Claude |
+| Rule for one repository | `<repo>/CLAUDE.md` | Immediately | Claude |
+| Domain (architecture, patterns) | Corresponding Pack | On Close | R2 Extractor → Pack |
+| Distinction, method, FM, work product | Corresponding Pack | On Close | R2 Extractor → Pack |
 | Implementation (protocols, processes, configs) | DS docs/, PROCESSES.md, protocol-*.md | Immediately/Close | Claude / R2 |
 | Post seed | `DS-strategy/drafts/draft-list.md` + `drafts/` | On Close | Claude |
 | Major lesson | `memory/<topic>.md` | Immediately | Claude |
 
-> **Dual KE routing (HD #29):** Pack knowledge ≠ Implementation decision. At Close, the Extractor (R2) proposes recording knowledge in two places: domain → Pack, implementation → DS docs/. One pipeline, two outputs.
+> **Dual KE routing (HD #29):** Pack knowledge ≠ Implementation decision. The Extractor (R2) at Close proposes recording knowledge in two places: domain → Pack, implementation → DS docs/. One pipeline, two outputs.
 
 **Announcement format:** *"Capture: [what] → [where]"*
 
@@ -744,35 +744,35 @@ At every milestone (subtask completed, pattern found, decision made) ask: **is t
 The system uses two levels of CLAUDE.md:
 
 | Level | File | Scope | Who updates |
-|-------|------|-------|------------|
-| **Root** | `~/IWE/CLAUDE.md` | All repos in the workspace | Platform (update.sh) + you (lessons) |
-| **Repo** | `<repo>/CLAUDE.md` | Only this repo | You (rules for this specific repo) |
+|-------|------|-------|-------------|
+| **Root** | `~/IWE/CLAUDE.md` | All repositories in workspace | Platform (update.sh) + you (lessons) |
+| **Repository** | `<repo>/CLAUDE.md` | This repository only | You (rules for this specific repository) |
 
 **When to use which:**
 - Rule applies to all projects → root CLAUDE.md
-- Rule is specific to one repo → `<repo>/CLAUDE.md`
-- Example: "Always pull before commit in DS-strategy" → root. "Commit format in DS-aist-bot: feat/fix/chore" → repo-level.
+- Rule is specific to one repository → `<repo>/CLAUDE.md`
+- Example: "Always pull before commit in DS-strategy" → root. "Commit format in DS-aist-bot: feat/fix/chore" → repository.
 
-**When you create a new DS-* repo**, add a CLAUDE.md to it with:
-- Repo type (downstream/instrument)
+**When you create a new DS-* repository**, add a CLAUDE.md to it with:
+- Repository type (downstream/instrument)
 - Related Packs (source of knowledge)
-- Specific rules (commit format, tests, deploy)
+- Specific rules (commit format, tests, deployment)
 
 ### 5.5. Strategist: automatic planning
 
-The Strategist is role R1, executed by Claude Code on a schedule (launchd on macOS, cron on Linux) or by trigger:
+The Strategist is role R1, executed by Claude Code on a schedule (launchd on macOS, cron on Linux) or on a trigger:
 
 | Scenario | When | What it does | Product |
 |----------|------|-------------|---------|
-| **Day Open** | Morning (trigger "open the day") | 7 steps: yesterday → plan → learning → pomodoros → IWE overnight → world → record | DayPlan |
-| **Day Close** | Evening (trigger "closing the day") | Results → what I learned → praise → setup for tomorrow | Updated DayPlan |
-| **Session-Prep** | Monday morning (auto) | Analysis of last week + MAPSTRATEGIC | WeekPlan draft |
+| **Day Open** | Morning (trigger "open the day") | 7 steps: yesterday → plan → development → pomodoros → IWE overnight → world → record | DayPlan |
+| **Day Close** | Evening (trigger "close the day") | Results → what I learned → praise → setup for tomorrow | Updated DayPlan |
+| **Session-Prep** | Monday morning (auto) | Analysis of previous week + MAPSTRATEGIC | Draft WeekPlan |
 | **Strategy-Session** | After session-prep | Interactive plan discussion | Approved WeekPlan |
 | **Week-Review** | Sunday evening (auto) | WakaTime metrics, achievements, lessons | "Results W{N}" section in WeekPlan |
 | **Note-Review** | As needed | Processing fleeting notes and captures | Routing to Pack/inbox |
-| **Add-WP** | When a new task appears | Adding a Work Product to the plan (4 places) | Updated WeekPlan + WP file |
+| **Add-WP** | When a new task appears | Adding a work product to the plan (4 places) | Updated WeekPlan + WP file |
 
-**DS-strategy — the strategic hub:**
+**DS-strategy — strategy hub:**
 
 | Folder | Contents |
 |--------|---------|
@@ -784,11 +784,11 @@ The Strategist is role R1, executed by Claude Code on a schedule (launchd on mac
 | `archive/` | Completed plans |
 | `exocortex/` | Backup memory/ + CLAUDE.md |
 
-**Single-source pattern:** DS-strategy (hub) is the sole registry (`WP-REGISTRY.md` + `inbox/WP-*.md`), aggregated via `scripts/active-wp-sweep.sh`. The Hub-and-spoke pattern with WORKPLAN.md was retired by WP-283 F-H (May 2026).
+**Single-source pattern:** DS-strategy (hub) is the sole registry (`WP-REGISTRY.md` + `inbox/WP-*.md`), aggregated by `scripts/active-wp-sweep.sh`. The Hub-and-spoke with WORKPLAN.md was cancelled by WP-283 (May 2026).
 
 #### Configuring the strategizing day
 
-By default the strategizing session runs on **Sunday** (`strategy_day: sunday` in `memory/day-rhythm-config.yaml`). You can choose any day of the week:
+By default, the strategizing session runs on **Sunday** (`strategy_day: sunday` in `memory/day-rhythm-config.yaml`). You can choose any day of the week:
 
 ```yaml
 # memory/day-rhythm-config.yaml
@@ -797,29 +797,29 @@ day_open:
 ```
 
 On that day:
-- `strategist.sh` runs `session-prep` instead of `day-plan`
-- `scheduler.sh` runs `week-review`
-- **Day Open does not create a DayPlan** — the day plan is already embedded in WeekPlan (section "Plan for [day]")
-- All three components read `strategy_day` from the config — no hardcoding is used
+- `strategist.sh` launches `session-prep` instead of `day-plan`
+- `scheduler.sh` launches `week-review`
+- **Day Open does not create a DayPlan** — the daily plan is embedded in WeekPlan (section "Plan for [day]")
+- All three components read `strategy_day` from the config — no hardcoding
 
-#### Activation Gate: how pending Work Products enter the plan
+#### Activation Gate: how pending work products enter the plan
 
-Every Work Product in ⏳ pending status has an **activation condition** — the answer to "under what condition does this Work Product enter the WeekPlan?"
+Every work product in ⏳ pending status has an **activation condition** — the answer to "under what condition does this work product enter the WeekPlan?"
 
-| Condition type | Example | How it is checked |
-|---------------|---------|------------------|
+| Condition type | Example | How verified |
+|----------------|---------|-------------|
 | **date** | `W15`, `after Apr 1` | Strategist at Session-Prep: `date ≤ current week?` |
 | **dep** | `dep: WP-73` | On dependency Close: `WP-73 = done → alert` |
-| **on-demand** | `when budget is available` | Only manually at a strategizing session |
+| **on-demand** | `when budget is available` | Only manually during strategizing |
 
-**Dormant Review:** `on-demand` older than 3 weeks → automatically added to the strategizing agenda. Question: "Archive (📦) or assign a specific condition?" This prevents accumulation of "dead" Work Products.
+**Dormant Review:** `on-demand` older than 3 weeks → automatically added to the strategizing agenda. Question: "Archive (📦) or assign a specific condition?" This prevents accumulation of "dead" work products.
 
-Conditions are stored in the Work Product context file (`inbox/WP-NNN/WP-NNN.md`, `activation:` field in frontmatter — for example `activation: on-demand` or `activation: dep:WP-73`). WP-REGISTRY is an index only (number/priority/name/status/repo/budget); the details of a specific Work Product, including the activation condition, live in its context file (issue #263).
+Conditions are stored in the work product context file (`inbox/WP-NNN/WP-NNN.md`, the `activation:` field in frontmatter — e.g., `activation: on-demand` or `activation: dep:WP-73`). WP-REGISTRY is an index only (number/priority/name/status/repository/budget); details of a specific work product, including the activation condition, live in its context file (issue #263).
 
 **Where to study:**
 - [roles/strategist/prompts/](../roles/strategist/prompts/) — 9 prompts for each scenario
 
-### 5.6. Creative Pipeline: from note to post
+### 5.6. Creative pipeline: from note to post
 
 > Formalization: [PD.FORM.005 Creative Pipeline](https://github.com/MimEcoSys/PACK-personal/blob/main/pack/personal-development/02-domain-entities/formalizations/PD.FORM.005-creative-pipeline.md)
 
@@ -828,37 +828,37 @@ The Creative Pipeline is a closed process for turning thoughts into published te
 #### 4 artifact stages
 
 ```
-Note (≤7d) → Draft (≤7d) → Slug (≤14d) → Post
+Note (≤7d) → Draft (≤7d) → Seed (≤14d) → Post
 fleeting-notes   DS-strategy/     Knowledge Index      Published
-inbox/           drafts/           status: draft        status: published
+inbox/           drafts/           status: draft         status: published
 ```
 
 | Stage | Where stored | TTL | Visibility |
 |-------|-------------|-----|-----------|
 | **Note** | `DS-strategy/inbox/fleeting-notes.md` | ≤7 days | Personal |
 | **Draft** | `DS-strategy/drafts/*.md` | ≤7 days | Personal |
-| **Slug** | `DS-Knowledge-Index/docs/` (status: draft) | ≤14 days | Public |
+| **Seed** | `DS-Knowledge-Index/docs/` (status: draft) | ≤14 days | Public |
 | **Post** | `DS-Knowledge-Index/docs/` (status: published) | — | Public |
 
 #### 7 note directions
 
-Note-Review classifies each note into one direction. A draft is a recommendation only — it is created after confirmation.
+Note-Review classifies each note into one direction. A draft is only a recommendation; it is created after agreement.
 
 | # | Category | Criterion | Where |
 |---|----------|----------|-------|
-| 1 | **DEP** | Dissatisfaction, discomfort, "I want to change" | `Dissatisfactions.md` |
+| 1 | **DEP** | Dissatisfaction, discomfort, "I want to change something" | `Dissatisfactions.md` |
 | 2 | **Task** | Concrete action, "do tomorrow" | WeekPlan / DayPlan |
 | 3 | **Knowledge** | Pattern, distinction, method, rule, insight | `captures.md` → Pack |
-| 4 | **Draft** | Post seed, reflection with concepts | Recommendation → `drafts/` (after confirmation) |
-| 5 | **Idea** 🔄 | Reflection, no concrete action | Stays in notes (revisit at strategizing session) |
+| 4 | **Draft** | Seed for a post, reflection with concepts | Recommendation → `drafts/` (after agreement) |
+| 5 | **Idea** 🔄 | Reflection, no concrete action | Stays in notes (revisit during strategizing) |
 | 6 | **Personal data** | Contact, account, token, credentials | `personal/*.md` |
 | 7 | **Noise** | Test, duplicate, already done, link without context | Marked `✅suggested (noise)`; you cross it out → then archive |
 
 #### Two key distinctions
 
-1. **Draft ≠ Slug.** A draft is a personal text (`DS-strategy/drafts/`), it can be raw. A slug is a public text (`DS-Knowledge-Index/`, status: draft) and must be coherent. *Test:* can it be shown to someone else? No → draft.
+1. **Draft ≠ Seed.** A Draft is personal text (`DS-strategy/drafts/`), may be raw. A Seed is public text (`DS-Knowledge-Index/`, status: draft) and must be coherent. *Test:* can it be shown to someone else? No → draft.
 
-2. **Slug ≠ Post.** A slug is published but not promoted. A post is actively promoted. *Test:* ready to attract attention? No → slug.
+2. **Seed ≠ Post.** A Seed is published but not promoted. A Post is actively promoted. *Test:* ready to attract attention? No → seed.
 
 #### Anti-accumulation: TTL and guards
 
@@ -866,7 +866,7 @@ Every artifact MUST move to one of the directions within its TTL. When drafts ac
 
 | Threshold | Response | What to do |
 |-----------|---------|-----------|
-| ≤5 drafts | Normal | Work by priority |
+| ≤5 drafts | Normal | Work by priorities |
 | 6–10 drafts | **Warning** | Prioritize or close the excess to ≤5 |
 | >10 drafts | **Blocked** | Cannot add new ones. First advance or close to ≤5 |
 
@@ -877,16 +877,16 @@ Guards are checked at every Note-Review and when creating a new draft.
 The pipeline does not work linearly — it is a **closed loop**:
 
 1. **Feedback from posts** — reader reactions → new notes → new cycle.
-2. **Pack → Content** — when the Extractor adds ≥3 entities on one topic to Pack → a draft for a post is automatically suggested (popularization of formalized knowledge).
+2. **Pack → Content** — when the Extractor adds ≥3 entities on one topic to Pack → a draft for a post is automatically suggested (popularizing the formalized knowledge).
 
 #### Pipeline health test (at every strategizing session)
 
 1. Inputs ≈ outputs? (N notes created → ~N sorted)
-2. TTL not violated? (notes >7d? drafts >7d? slugs >14d?)
+2. TTL not violated? (notes >7d? drafts >7d? seeds >14d?)
 3. Guard not violated? (drafts ≤5?)
 4. Pack → post? (were there captures → was a draft suggested?)
 
-If ≥2 answers are "no" → the pipeline has stalled → raise as a question at the strategizing session.
+If ≥2 answers are "no" → pipeline has stalled → raise during strategizing.
 
 #### IWE materialization
 
@@ -899,17 +899,17 @@ If ≥2 answers are "no" → the pipeline has stalled → raise as a question at
 
 ## 6. Knowledge: Pack and extraction
 
-### 6.1. What is Pack
+### 6.1. What Pack is
 
-Pack is a formalized domain passport. The **sole source of truth** for domain knowledge.
+Pack is a formalized domain passport. It is the **sole source of truth** for domain knowledge.
 
 **Contains:**
 - Bounded Context (domain boundaries)
 - Distinctions (what must not be confused)
-- Ontology (entities and relations)
+- Ontology (entities and relationships)
 - Roles (who acts)
 - Methods (how to act)
-- Work Products (method results)
+- Work Products (results of methods)
 - Failure Modes (typical errors)
 - SOTA annotations (knowledge currency)
 
@@ -923,17 +923,17 @@ SPF defines the Pack creation process:
 |---|-------|---------|
 | 01 | Domain selection | Define and bound the domain |
 | 02 | Bounded Context | Establish semantic boundaries |
-| 03 | Working with distinctions | Which pairs must not be confused |
+| 03 | Work with distinctions | Which pairs must not be confused |
 | 04 | Entity identification | Roles, objects, constraints |
 | 05 | Information intake | Input materials for analysis |
 | 06 | Analysis and formalization | Formalization through distinctions |
-| 07 | Extraction of methods and Work Products | Methods → work products |
-| 08 | Extraction of failure modes | Typical interpretation errors |
+| 07 | Method and work product extraction | Methods → work products |
+| 08 | Failure mode extraction | Typical interpretation errors |
 | 09 | SOTA annotations | current / hypothesis / deprecated |
-| 10 | Map maintenance | Graph of relations between entities |
-| 11 | Review and evolution cycle | Protocol for continuous updating |
+| 10 | Map maintenance | Graph of relationships between entities |
+| 11 | Review and evolution cycle | Continuous update protocol |
 
-**Quick start:** `/pack-new` — the skill walks you through domain selection, Pack name, creates a scaffold, and shows a roadmap F1–F6.
+**Quick start:** `/pack-new` — the skill walks you through domain selection, Pack name, scaffold creation, and shows the Phase 1–6 roadmap.
 
 **Where to study:**
 - [SPF/process/](https://github.com/TserenTserenov/SPF/tree/main/process) — all 11 stages
@@ -948,7 +948,7 @@ PACK-{domain}/
 ├── 01-domain-contract/
 │   ├── 01A-bounded-context.md    # Semantic frame
 │   ├── 01B-distinctions.md       # Key distinctions
-│   └── 01C-ontology.md           # Entities and relations
+│   └── 01C-ontology.md           # Entities and relationships
 ├── 02-domain-entities/
 │   ├── 02A-roles.md              # Roles in the domain
 │   ├── 02B-objects-of-attention.md
@@ -969,19 +969,19 @@ PACK-{domain}/
 
 | Scenario | Trigger | When you see the result |
 |----------|---------|------------------------|
-| Session-Close | Close protocol | On session close, Claude proposes new Pack entities |
+| Session-Close | Close protocol | When closing, Claude will suggest new Pack entities |
 | On-Demand | Your command | Immediately in Claude Code |
 | Bulk-Extraction | Document processing | After analysis — Extraction Report |
-| Inbox-Check | Schedule | In DayPlan (if there is new content) |
+| Inbox-Check | Schedule | In DayPlan (if anything is new) |
 
 **Key rule:** The Extractor always **proposes** — it never writes without approval.
 
-**How it works for you:**
+**How this works for you:**
 1. You work in Claude Code → captures appear during the session
 2. On Close → Claude activates the Extractor role (R2) and shows the Extraction Report
 3. You approve → entities are written to Pack
 
-**Inbox-Check runs without you** — a headless scheduled run (every 3 hours) cannot use your interactive Claude Code login; it needs a separate long-lived subscription token. Connect once: `cd ~/IWE/IWE && bash roles/extractor/scripts/connect.sh` (after `roles/extractor/install.sh`, see [roles/extractor/README.md](../roles/extractor/README.md)). Session-Close, On-Demand, and Bulk-Extraction run in your already-open session — they do not require a separate connection.
+**Inbox-Check runs without you** — a headless scheduled run (every 3 hours) cannot use your interactive Claude Code login; it needs a separate long-lived subscription token. Connect once: `cd ~/IWE/IWE && bash roles/extractor/scripts/connect.sh` (after `roles/extractor/install.sh`, see [roles/extractor/README.md](../roles/extractor/README.md)). Session-Close, On-Demand, and Bulk-Extraction run in your already-open session — no separate connection needed.
 
 **Where to study:**
 - Close protocol (§ 5.1) — when the Extractor is activated
@@ -989,11 +989,11 @@ PACK-{domain}/
 
 ### 6.5. Knowledge MCP servers
 
-Claude Code connects to the platform Gateway MCP server (via https://claude.ai/settings/connectors). The `iwe-knowledge` Gateway (`mcp.aisystant.com/mcp`) aggregates all backends — one connection point for all knowledge tools.
+Claude Code connects to the platform's Gateway MCP server (through https://claude.ai/settings/connectors). Gateway `iwe-knowledge` (`mcp.aisystant.com/mcp`) aggregates all backends — one connection point for all knowledge tools.
 
 #### knowledge — knowledge base search
 
-Hybrid search (vector + keyword) across all Pack repositories and documentation. ~5400 documents.
+Hybrid search (vector + keyword) across all Pack repositories and documentation. ~5 400 documents.
 
 | Tool | What it does | Example |
 |------|-------------|---------|
@@ -1003,7 +1003,7 @@ Hybrid search (vector + keyword) across all Pack repositories and documentation.
 
 **Source types:** `pack` (domain knowledge), `guides` (guides), `ds` (processes).
 
-> Search in guides: `knowledge_search("query", source_type="guides")`. A separate guides server is not needed — the Gateway combines all sources.
+> Search in guides: `knowledge_search("query", source_type="guides")`. A separate guides server is not needed — Gateway combines all sources.
 
 #### digital-twin — participant digital twin
 
@@ -1015,7 +1015,7 @@ Participant data metamodel: goals, self-assessment, context, progress.
 | `dt_read_digital_twin` | Read data | `dt_read_digital_twin("1_declarative/1_2_goals")` → participant goals |
 | `dt_write_digital_twin` | Write to IND.1 | `dt_write_digital_twin("1_declarative/...", data)` |
 
-> **IND.1 (Declarative)** is the only writable category. IND.2 (Collected), IND.3 (Derived), IND.4 (Generated) — read-only.
+> **IND.1 (Declarative)** is the only writable category. IND.2 (Collected), IND.3 (Derived), IND.4 (Generated) — read only.
 
 #### When to use which tool
 
@@ -1025,20 +1025,20 @@ Participant data metamodel: goals, self-assessment, context, progress.
 | Specific document by code (DP.ROLE.001) | `knowledge_get_document("filename")` |
 | Learning, methodology, guides | `knowledge_search(query, source_type="guides")` |
 | Participant goals, self-assessment | `dt_read_digital_twin("path")` |
-| Before writing to Pack — check for duplicates | `knowledge_search` + `knowledge_get_document` |
+| Before writing to Pack — checking for duplicates | `knowledge_search` + `knowledge_get_document` |
 
 ### 6.6. Ontology: knowledge graph
 
-Ontology is a graph of concepts and relations. Each level has its own:
+Ontology is a graph of concepts and relationships. Each level has its own:
 
 | Level | Where | What |
 |-------|-------|------|
 | SPF-level | `SPF/ontology.md` | Universal framework concepts |
 | Pack-level | `PACK-{}/01-domain-contract/01C-ontology.md` | Entities of a specific Pack |
-| Ecosystem | `DS-ecosystem-development/ontology.md` (local repo) | 31 concepts: platform + ecosystem |
+| Ecosystem | `DS-ecosystem-development/ontology.md` (local repository) | 31 concepts: platform + ecosystem |
 | Personal | `DS-strategy/ontology.md` | Personal development + cross-links |
 
-**Principle:** SPF inherits FPF → Pack extends SPF → Downstream references Pack.
+**Principle:** SPF inherits from FPF → Pack extends SPF → Downstream references Pack.
 
 **Where to study:**
 - [SPF/ontology.md](https://github.com/TserenTserenov/SPF/blob/main/ontology.md) — SPF-level
@@ -1048,11 +1048,11 @@ Ontology is a graph of concepts and relations. Each level has its own:
 
 ### 7.1. Role-Centric approach (DP.D.033)
 
-In IWE a role is described **independently of its performer**. First: what to do, what obligations, what work products. Then: who performs it.
+In IWE, a role is described **independently of its performer**. First: what to do, what obligations, what work products. Then: who performs it.
 
 | Concept | Definition |
 |---------|-----------|
-| **Role** | Function: WHAT to do (obligations, Work Products, methods) |
+| **Role** | Function: WHAT to do (obligations, work products, methods) |
 | **Performer (holder)** | System: WHO does it (Claude, bash, person) |
 | **Agent** | A role performer whose description allows choosing a method (not by Grade count — CC-A13.4) |
 | **Tool** | A role performer whose description prescribes execution |
@@ -1060,7 +1060,7 @@ In IWE a role is described **independently of its performer**. First: what to do
 **Key principles:**
 - **Role ≠ System.** One name can denote both a role and a system — these are different perspectives
 - **One performer — many roles.** Claude plays the roles of Strategist, Extractor, Coder
-- **One role — many performers.** Synchronizer role: bash (mechanics) + Claude (audit)
+- **One role — many performers.** The Synchronizer role: bash (mechanics) + Claude (audit)
 
 **Notation:** `Holder#Role:Context@Window` (FPF A.2)
 
@@ -1077,16 +1077,16 @@ These agents run in your Claude Code, on your machine:
 
 #### On the platform (L2 Platform)
 
-These agents run on platform infrastructure. You see only the results:
+These agents run on platform infrastructure. You only see the results:
 
 | Agent | Role | What it does | How you see the result |
 |-------|------|-------------|----------------------|
 | **Synchronizer (R8)** | Coordination | Fleeting-notes sync, notifications | Telegram notifications |
 | **Template Manager (R9)** | Template updates | Drift detection, validation | On `update.sh` |
 | **Analyst (R10)** | Analytics | DAU/WAU/MAU, retention | `/analytics` in bot |
-| **Fixer (R11)** | Error correction | Auto-fix, restart, escalate | GitHub Issues, TG notifications |
+| **Fixer (R11)** | Error correction | Auto-fix, restart, escalate | GitHub Issues, Telegram notifications |
 
-> **For T4 users:** R1 (Strategist) and R2 (Extractor) are the primary agents. Platform agents (R8–R11) run in the background.
+> **For T4 user:** R1 (Strategist) and R2 (Extractor) are the primary agents. Platform agents (R8–R11) run in the background.
 
 ### 7.3. Agent interaction diagram
 
@@ -1103,7 +1103,7 @@ R8 Synchronizer (dispatcher)
     ├─→ R11 Fixer (bot errors)
     │   └─→ GitHub PR, Issues
     ├─→ R10 Analyst (analytics)
-    │   └─→ TG report, /analytics
+    │   └─→ Telegram report, /analytics
     └─→ Telegram notifications
 ```
 
@@ -1113,12 +1113,12 @@ R8 Synchronizer (dispatcher)
 
 ### 7.4. Role contract (for developers)
 
-Each role in `roles/` follows a formal contract — a specification of what the role directory must contain. The contract enables auto-discovery: `setup.sh` and `update.sh` automatically find and process roles without hardcoded lists.
+Every role in `roles/` follows a formal contract — a specification of what the role directory must contain. The contract enables auto-discovery: `setup.sh` and `update.sh` automatically find and process roles without hardcoded lists.
 
 **Minimum file set:**
-- `role.yaml` — machine-readable manifest (name, type, install mode)
+- `role.yaml` — machine-readable manifest (name, type, installation mode)
 - `README.md` — human-readable description
-- `install.sh` — install entry point
+- `install.sh` — installation entry point
 
 **Details and role.yaml schema:** [roles/ROLE-CONTRACT.md](../roles/ROLE-CONTRACT.md)
 
@@ -1131,16 +1131,16 @@ Each role in `roles/` follows a formal contract — a specification of what the 
 | Characteristic | Question |
 |----------------|---------|
 | **E**volvability | What breaks when it changes? |
-| **M**anageability (scalability) | What happens at 10x? |
-| **O**nboarding (learnability) | How much reading to get started? Exoskeleton or prosthesis? |
+| **M**anageability | What happens at 10x? |
+| **O**nboarding | How much reading to get started? Exoskeleton or prosthesis? |
 | **G**enerativity | Does it create a platform for new things? |
-| **S**peed | What is the latency? (bot <3 sec, CLI <1 sec) |
+| **S**peed | What is the latency? (bot <3 s, CLI <1 s) |
 | **S**tate of the art | How do the best solve this? Check SOTA. |
-| **B**ecurity (security) | What threats? PII, secrets, injection surface? |
+| **B**ecurity | What are the threats? PII, secrets, injection surface? |
 
 **Format:** Decision → principles (step 1) → evaluation table (step 2) → what is weak → how to strengthen (step 3).
 
-**Coordination cost check** (for multi-agent solutions): coordination cost < parallelism gain? Three conditions: (1) context isolation, (2) parallelism gain, (3) tool specialization. All three NOT met → single-agent.
+**Coordination cost check** (for multi-agent decisions): coordination cost < parallelism gain? Three conditions: (1) context isolation, (2) parallelism gain, (3) tool specialization. All three NOT met → single-agent.
 
 ### 8.2. SOTA practices
 
@@ -1148,9 +1148,9 @@ Priority three (check ALWAYS for architectural decisions):
 
 | # | Practice | Essence |
 |---|----------|---------|
-| 1 | Context Engineering | Write/Select/Compress/Isolate — what enters the agent context |
+| 1 | Context Engineering | Write/Select/Compress/Isolate — what enters the agent's context |
 | 2 | DDD Strategic | BC = Pack scope, UL = ontology, Context Map = typed `related:` |
-| 3 | Coupling Model | Relations along 3 dimensions: knowledge, distance, volatility |
+| 3 | Coupling Model | Relationships across 3 dimensions: knowledge, distance, volatility |
 
 Full list: platform + Pack architectural practices.
 
@@ -1161,8 +1161,8 @@ Full list: platform + Pack architectural practices.
 ### 8.3. Quality checklists
 
 | Checklist | When |
-|-----------|------|
-| Before responding | At least 1 file loaded, repo type known |
+|---------|-------|
+| Before responding | At least 1 file loaded, repository type known |
 | Before modifying | CLAUDE.md read, source of truth not broken |
 | When recording a process | Pack + PROCESSES.md + CLAUDE.md (all three) |
 | Before proposing a fix | ArchGate applied, root cause fixed |
@@ -1174,29 +1174,29 @@ Full list: platform + Pack architectural practices.
 
 **Before adding a new tool, agent, or system — STOP.** Answer 5 questions:
 
-1. **Type:** tool (execution by algorithm) or agent (method choice)?
-2. **Contour:** L2 Platform / L3 Template / L4 Personal?
+1. **Type:** tool (algorithmic execution) or agent (method selection)?
+2. **Perimeter:** L2 Platform / L3 Template / L4 Personal?
 3. **Roles:** which roles does it perform?
 4. **Products:** what does it create and for whom?
 5. **Processes:** which method descriptions are affected?
 
-No answers → DO NOT start. Define the level → describe it → then implement.
+No answers → do NOT start. Define the level → describe it → then implement.
 
 ### 8.5. Security in IWE
 
-IWE works with personal data: strategy, plans, goals, Digital Twin. Security is an architectural characteristic (EMOGSSB), not an afterthought.
+IWE works with personal data: strategy, plans, goals, Digital Twin. Security is an architectural characteristic (EMOGSSB), not an add-on.
 
 #### Security model: 3 zones
 
 ```
 ┌────────────────────────────────────────────────────┐
 │  Zone 1: LOCAL (your computer)                      │
-│  CLAUDE.md, memory/, DS-strategy/ (local copy)      │
-│  → Protection: OS level (FileVault, password)        │
+│  CLAUDE.md, memory/, DS-strategy/ (local copy)     │
+│  → Protection: OS level (FileVault, password)      │
 └───────────────────────┬────────────────────────────┘
                         │ git push (you control)
 ┌───────────────────────▼────────────────────────────┐
-│  Zone 2: PRIVATE REPOS (your GitHub)               │
+│  Zone 2: PRIVATE REPOSITORIES (your GitHub)        │
 │  DS-strategy/, PACK-*/, DS-*/ (private repos)      │
 │  → Protection: GitHub access control + SSH/OAuth   │
 └───────────────────────┬────────────────────────────┘
@@ -1214,9 +1214,9 @@ IWE works with personal data: strategy, plans, goals, Digital Twin. Security is 
 |-----------|-------------|----------------------|
 | **Secrets outside git** | API keys and tokens do not enter repositories | `~/.config/`, `~/.wakatime/`, env vars |
 | **Per-user blast radius** | Compromising one user does not affect others | Per-user OAuth 2.0, isolated data |
-| **Personal data isolated** | Your plans and strategy are yours only | Private repos, local memory/ |
+| **Personal data isolated** | Your plans and strategy are only yours | Private repositories, local memory/ |
 | **Platform space ≠ User space** | Methodology (shared) is separate from data (personal) | Standard vs Personal zones |
-| **CLI permission whitelist** | Claude Code executes only allowed commands | `.claude/settings.local.json` with explicit allowlist |
+| **CLI permission whitelist** | Claude Code executes only allowed commands | `.claude/settings.local.json` with an explicit allowlist |
 
 #### What Claude sees (and does not see)
 
@@ -1225,15 +1225,15 @@ IWE works with personal data: strategy, plans, goals, Digital Twin. Security is 
 | CLAUDE.md, memory/*.md (your instructions) | Passwords, SSH keys, API tokens |
 | Files in open sessions (while you work) | Files of other users |
 | Current conversation context | History of past conversations (reset on new session) |
-| Contents of repos you have granted access to | Repos outside the working directory |
+| Contents of repositories you granted access to | Repositories outside the working directory |
 
 > **Anthropic API:** Anthropic [does not use API data](https://www.anthropic.com/policies/privacy-policy) to train models. Data is processed but not retained for training.
 
 #### What the user should do
 
 1. **DS-strategy/ — private.** Confirm on creation: `gh repo create DS-strategy --private`
-2. **Do not commit `.env` files.** When working with API keys — add them to `.gitignore`
-3. **Use SSH for git.** `gh auth login` → SSH → more reliable than passwords
+2. **Do not commit `.env` files.** If working with API keys — add them to `.gitignore`
+3. **Use SSH for git.** `gh auth login` → SSH → more secure than passwords
 4. **FileVault (macOS) / LUKS (Linux).** Disk encryption protects the local zone
 5. **Token rotation.** If compromised — `gh auth refresh`, rotate keys in `~/.config/`
 
@@ -1245,11 +1245,11 @@ IWE uses an LLM (Claude) — this creates a specific class of threats:
 |--------|-------------|-----------------|
 | **Prompt injection** | Malicious instruction in data | CLAUDE.md — explicit allowlist, ArchGate checks injection surface |
 | **Context leakage** | Data from one session leaks into another | Each Claude Code session is a fresh context. Memory — only what you recorded |
-| **Over-trust in AI** | AI proposes but can be wrong | Protocols require confirmation: WP Gate, ArchGate, Capture |
+| **Excessive AI trust** | AI suggests, but can be wrong | Protocols require confirmation: WP Gate, ArchGate, Capture |
 
 **Where to study:**
 - [CLAUDE.md](../CLAUDE.md) § 5 — EMOGSSB (including the Security characteristic)
-- [DP.ARCH.001 § 4.7](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/02-domain-entities/DP.ARCH.001-platform-architecture.md) — Security architectural characteristic
+- [DP.ARCH.001 § 12.7](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/02-domain-entities/DP.ARCH.001-platform-architecture.md) — Security architectural characteristic
 
 ## 9. Platform: bot and tiers
 
@@ -1259,8 +1259,8 @@ IWE uses an LLM (Claude) — this creates a specific class of threats:
 
 | Tier | Name | Entry | AI role | Workspace |
 |------|------|-------|---------|-----------|
-| T0 | No Ory | /start in bot (telegram_id) + 30-day trial | Reference | Bot only (trial: all features) |
-| T1 | Start | Ory registration (UUID) + 30-day trial | Assistant | Bot only (trial: all features) |
+| T0 | No Ory | /start in bot (telegram_id) + trial 30 days | Reference | Bot only (trial: all features) |
+| T1 | Start | Ory registration (UUID) + trial 30 days | Assistant | Bot only (trial: all features) |
 | T2 | Learning | BR subscription (system-school.ru) | Expert | Bot + content |
 | T3 | Personalization | Digital Twin | Mentor | + Digital Twin |
 | T4 | Creation (IWE) | setup.sh | Co-thinker | + Git + Claude Code + Strategist |
@@ -1269,18 +1269,18 @@ IWE uses an LLM (Claude) — this creates a specific class of threats:
 
 **Orthogonal axes (assigned):**
 
-| Axis | Tiers | What it gives | Requires |
-|------|-------|--------------|---------|
-| TM (mentor) | TM1–TM3 | Homework review panel, groups | T2+ |
-| TA (administrator) | TA1–TA4 | Stream management, finances, access | T1+ |
-| TD (developer) | TD1 | Source code, deploy, template management | T2+ |
+| Axis | Tiers | What it provides | Requires |
+|------|-------|-----------------|---------|
+| TM (Mentor) | TM1–TM3 | Homework review panel, groups | T2+ |
+| TA (Administrator) | TA1–TA4 | Stream management, finances, access | T1+ |
+| TD (Developer) | TD1 | Source code, deployment, template management | T2+ |
 
 Each T tier is a configuration of 5 dimensions: knowledge, data, AI role, actions, workspace. TM/TA/TD axes are orthogonal: one person = T + TM? + TA? + TD?. Platform owner = T4 + TA4 + TD1.
 
-### 9.2. Mapping tiers to contours
+### 9.2. Mapping tiers to perimeters
 
-| Tier | Contours | What is accessible |
-|------|---------|-------------------|
+| Tier | Perimeters | What is available |
+|------|-----------|------------------|
 | T0–T3 | L2 (Platform) | Platform services through the bot |
 | T4 | L3 → L4 | Template instantiated as Personal IWE |
 | TD1 | L2 + L3 | Platform and template development |
@@ -1300,7 +1300,7 @@ The Telegram bot is the primary entry point for T1–T3. For T4+, the bot remain
 | Personalized responses | Auto (from Twin) | T3+ |
 | Class schedule | `/schedule` | T2+ |
 
-**Link to exocortex:** The bot synchronizes fleeting notes → `DS-strategy/inbox/fleeting-notes.md`. The Strategist sees them during Note-Review.
+**Connection to exocortex:** The bot synchronizes fleeting notes → `DS-strategy/inbox/fleeting-notes.md`. The Strategist sees them during Note-Review.
 
 **Where to study:**
 - [DP.ARCH.002](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/02-domain-entities/DP.ARCH.002-service-tiers.md) — service tiers
@@ -1311,9 +1311,9 @@ The Telegram bot is the primary entry point for T1–T3. For T4+, the bot remain
 
 | Term | What | Analogy |
 |------|------|---------|
-| **Process** | Logic inside one system | Room |
-| **Service** | Entry point into a process | Door |
-| **Scenario** | Cross-system path (ownership changes) | Path through buildings |
+| **Process** | Logic inside one system | A room |
+| **Service** | Entry point to a process | A door |
+| **Scenario** | Cross-system path (ownership changes) | A path through buildings |
 
 #### Key scenarios
 
@@ -1323,7 +1323,7 @@ The Telegram bot is the primary entry point for T1–T3. For T4+, the bot remain
 - 1.3: Daily cycle (DayPlan → focus → DayClose)
 
 **Platform:**
-- 2.1: Day-Close (commit collection, plan updates, backup)
+- 2.1: Day-Close (collecting commits, updating plans, backup)
 - 2.2: Exocortex backup (memory/ → DS-strategy/)
 - 2.3: Ontology sync (Pack → master)
 - 2.4: File sync (GitHub → local)
@@ -1332,7 +1332,7 @@ The Telegram bot is the primary entry point for T1–T3. For T4+, the bot remain
 
 **Where to study:**
 - [CLAUDE.md](../CLAUDE.md) § 3 — distinctions and placement
-- `DS-ecosystem-development/PROCESSES.md` — all scenarios (ecosystem governance repo, created locally at deployment, not published to GitHub)
+- `DS-ecosystem-development/PROCESSES.md` — all scenarios (ecosystem governance repository, created locally on deployment, not published to GitHub)
 
 ## 10. Growth and development
 
@@ -1340,28 +1340,28 @@ The Telegram bot is the primary entry point for T1–T3. For T4+, the bot remain
 
 **When to create:**
 - You work regularly in one domain
-- Preserving knowledge between sessions is important
+- It is important not to lose knowledge between sessions
 - You want Claude to know the terms and patterns of your domain
 
 **How to create:** type `/pack-new` in Claude Code (or "I want to create a pack", "new pack").
 
 The skill walks you through 5 steps:
-1. Checks/clones FPF and SPF (if not present)
+1. Verifies/clones FPF and SPF (if not present)
 2. Defines the domain through 3 questions (SPF §01)
 3. Suggests 2–3 name options → you choose
 4. Creates the `PACK-{slug}/` structure scaffold + starter files
-5. Shows the filling roadmap F1–F6
+5. Shows the Phase 1–6 filling roadmap
 
 **Roadmap after creation:**
 
 | Phase | What to do | Time |
 |-------|-----------|------|
-| F1. Distinctions | 7–10 domain distinctions (SPF §03) | 1–2 h |
-| F2. Entities | Roles, Work Products, methods — list (SPF §04) | 1–2 h |
-| F3. Methods | Describe key methods (SPF §07) | 2–4 h |
-| F4. Work Products | Artifacts + Definition of Done (SPF §07) | 1–2 h |
-| F5. Failure modes | 5–10 typical errors (SPF §08) | 1 h |
-| F6. SoTA | Sources, knowledge version (SPF §09) | 1–2 h |
+| Ph1. Distinctions | 7–10 domain distinctions (SPF §03) | 1–2 h |
+| Ph2. Entities | Roles, work products, methods — list (SPF §04) | 1–2 h |
+| Ph3. Methods | Describe key methods (SPF §07) | 2–4 h |
+| Ph4. Work Products | Artifacts + Definition of Done (SPF §07) | 1–2 h |
+| Ph5. Failure modes | 5–10 typical errors (SPF §08) | 1 h |
+| Ph6. SoTA | Sources, knowledge version (SPF §09) | 1–2 h |
 
 Tool for filling: `/ke` — captures knowledge into Pack during work.
 
@@ -1374,14 +1374,14 @@ Before adding — IntegrationGate (§ 8.4). After defining:
 | Extractor | Agent (Grade 2) | DP.ROLE.001 R2 | DS-ai-systems/extractor/ |
 | Synchronizer | Agent + Tool | DP.ROLE.001 R8 | DS-ai-systems/synchronizer/ |
 
-**Principle:** Minimum complexity at the start. The Strategist alone is sufficient for the first months. The Extractor — when Pack reaches 10+ entities. The Synchronizer — when there are 3+ repositories.
+**Principle:** Minimum complexity at the start. The Strategist alone is sufficient for the first months. Extractor — when Pack reaches 10+ entities. Synchronizer — when you have 3+ repositories.
 
 ### 10.3. MAPSTRATEGIC.md: strategy for each system
 
-When you create a new repo, add `MAPSTRATEGIC.md`:
+When you create a new repository, add `MAPSTRATEGIC.md`:
 
 ```markdown
-# MAPSTRATEGIC: {System name}
+# MAPSTRATEGIC: {System Name}
 
 ## Current phase
 {Description: which tasks are being addressed now}
@@ -1393,29 +1393,29 @@ When you create a new repo, add `MAPSTRATEGIC.md`:
 {Long-term vision}
 ```
 
-The Strategist reads all MAPSTRATEGIC files at Session-Prep and aggregates them into `Strategy.md`.
+The Strategist reads all MAPSTRATEGIC files during Session-Prep and aggregates them into `Strategy.md`.
 
 ### 10.4. How to develop IWE independently
 
-**Principle:** Start with the minimum, increase complexity as you grow.
+**Principle:** Start with the minimum, add complexity as you grow.
 
 ```
 Day 1:        setup.sh → FMT (fork) + DS-strategy          ← start
 Week 1:       Daily work with Claude Code + Strategist      ← habit
-Weeks 2–4:    First PACK-{domain}                           ← knowledge formalization
-Months 2–3:   DS-{projects} (code, content)                 ← creation
-As you grow:  Extractor, Synchronizer, own Format           ← scaling
+Weeks 2–4:    First PACK-{domain}                          ← knowledge formalization
+Months 2–3:   DS-{projects} (code, content)                ← creation
+As you grow:  Extractor, Synchronizer, own Format          ← scaling
 ```
 
 **Recommendations:**
 - **Do not clone** all repositories at once — start with FMT + DS-strategy
-- **Do not create Pack** until you have defined a domain and accumulated captures
+- **Do not create a Pack** until you have defined a domain and accumulated captures
 - **Do not add agents** until you manage without them (IntegrationGate, § 8.4)
 - **Clone SPF** only when you are ready to create a Pack (read-only reference)
 
 ## 11. Quick reference
 
-> **Architecture FAQ:** Practical questions ("how to do") — here. Domain questions ("what is", "why") — [DP.IWE.002 §11](../../PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.IWE.002-iwe-template-and-setup.md#11-frequently-asked-questions-faq) (source of truth for the bot).
+> **Architecture FAQ:** Practical questions ("how to do it") — here. Domain questions ("what is it", "why") — [DP.IWE.002 §11](../../PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.IWE.002-iwe-template-and-setup.md#11-chasto-zadavaemye-voprosy-faq) (source of truth for the bot).
 
 ### Protocols and workflow
 
@@ -1425,20 +1425,20 @@ As you grow:  Extractor, Synchronizer, own Format           ← scaling
 | Can WP Gate be skipped? | Only if ≤15 min, exploration, or emergency bug fix | [CLAUDE.md](../CLAUDE.md) § 2 |
 | How to propose a solution? | ArchGate first (7 characteristics, veto filter, no aggregate score) | [CLAUDE.md](../CLAUDE.md) § 5 |
 | How to end a session? | Close Protocol (15 steps) | § 5.1c |
-| Why is a pending Work Product not in the plan? | Check the activation condition in WP-REGISTRY (date/dep/on-demand) | § 5.5 |
-| What to do with old pending Work Products? | Dormant Review at strategizing: archive or assign a condition | § 5.5 |
+| Why does a pending work product not enter the plan? | Check activation condition in WP-REGISTRY (date/dep/on-demand) | § 5.5 |
+| What to do with old pending work products? | Dormant Review during strategizing: archive or assign a condition | § 5.5 |
 | How to change the strategizing day? | `strategy_day: saturday` in `memory/day-rhythm-config.yaml` | § 5.5 |
-| Why is there no DayPlan on Monday? | On strategy_day the day plan is embedded in WeekPlan | § 5.1, 5.5 |
+| Why is there no DayPlan on Monday? | On strategy_day the daily plan is embedded in WeekPlan | § 5.1, 5.5 |
 
 ### Repositories and structure
 
 | Question | Answer | Where |
 |----------|--------|-------|
-| What type is this repo? | See `REPO-TYPE.md` in the repo | `<repo>/REPO-TYPE.md` |
+| What type is this repository? | See `REPO-TYPE.md` in the repository | `<repo>/REPO-TYPE.md` |
 | Is this a system or an episteme? | Distinction #1 | [hard-distinctions.md](../memory/hard-distinctions.md) |
 | How to create a DS project? | `gh repo create DS-my-project --private` + CLAUDE.md | § 4.4 |
-| What is S2R? | Format for project repos (3×3 matrix) | § 4.3 |
-| How to configure CLAUDE.md for a new repo? | Type + related Packs + specific rules | § 5.4 |
+| What is FMT-s2r? | Format for project repositories (3×3 matrix) | § 4.3 |
+| How to configure CLAUDE.md for a new repository? | Type + related Packs + specific rules | § 5.4 |
 
 ### Knowledge and Pack
 
@@ -1453,8 +1453,8 @@ As you grow:  Extractor, Synchronizer, own Format           ← scaling
 
 | Question | Answer | Where |
 |----------|--------|-------|
-| Which contour am I in? | L4 (Personal IWE) if T4+. L2 (Platform) if T1–T3 | § 2.1 |
-| Where to add a tool? | IntegrationGate: define the contour | § 8.4 |
+| Which perimeter am I in? | L4 (Personal IWE) if T4+. L2 (Platform) if T1–T3 | § 2.1 |
+| Where to add a tool? | IntegrationGate: define the perimeter | § 8.4 |
 | How to update the template? | `bash update.sh` | § 2.5 |
 | Where is my strategy? | `DS-strategy/docs/Strategy.md` | § 5.5 |
 | How to configure WakaTime? | `/setup-wakatime` in Claude Code | § 2.6 |
@@ -1463,7 +1463,7 @@ As you grow:  Extractor, Synchronizer, own Format           ← scaling
 | What are FPF, SPF, ZP? | Three principle levels: ZP → FPF → SPF → Pack. Each generates the next | § 3.1 |
 | What can the bot do? | Marathon, Feed, Consultation, Notes, /twin, /profile | [DP.IWE.002 §11](../../PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.IWE.002-iwe-template-and-setup.md#bot-and-profile) |
 | What is my tier? | `/twin` or `/profile` in the bot. T0–T4, determined automatically | [DP.IWE.002 §11](../../PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.IWE.002-iwe-template-and-setup.md#bot-and-profile) |
-| How to use notes? | `.text` in bot → accumulate → Note-Review → routing | [DP.IWE.002 §11](../../PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.IWE.002-iwe-template-and-setup.md#notes) |
+| How to use notes? | `.text` in bot → accumulation → Note-Review → routing | [DP.IWE.002 §11](../../PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.IWE.002-iwe-template-and-setup.md#notes) |
 | How to configure IWE on Windows? | Git Bash (installed with Git for Windows) + VS Code — WSL is not required but remains an option | § 11 "Windows: Git Bash or WSL?" |
 
 ### Typical problems and solutions
@@ -1472,34 +1472,34 @@ As you grow:  Extractor, Synchronizer, own Format           ← scaling
 
 **What happens.** You describe a task in detail in the chat — Claude understands and works. New session — as if nothing happened.
 
-**Why.** Claude Code does not "remember" the chat. Between sessions only what is recorded in files is preserved: MEMORY.md, CLAUDE.md, memory/*.md, WP files in inbox/. If information stayed only in the chat — it is gone.
+**Why.** Claude Code does not "remember" the chat. Between sessions, only what is written to files persists: MEMORY.md, CLAUDE.md, memory/*.md, WP files in inbox/. If information stayed only in the chat — it is gone.
 
 **What to do.**
-1. **WP file = permanent task memory.** When creating a Work Product via WP Gate, Claude records the context in `DS-strategy/inbox/WP-{N}-slug.md`. In the next session it reads this file and restores context.
-2. **If the WP file was not created** — the task was probably assessed as ≤2h and ≤1 session. Say: *"Create a context file for this task."* Or add a rule to `<repo>/CLAUDE.md`: *"Always create a WP file when adding a Work Product."*
-3. **Bulk task intake** (from Obsidian, notes, backlog): create one Work Product "Triage tasks from [source]." The result is a set of WP files in inbox/ with full context for each task. Then sort them by Dissatisfactions at a strategizing session.
+1. **WP file = permanent task memory.** When creating a work product through WP Gate, Claude records the context in `DS-strategy/inbox/WP-{N}-slug.md`. In the next session it reads this file and restores the context.
+2. **If the WP file was not created** — the task was likely assessed as ≤2 h and ≤1 session. Say: *"Create a context file for this task."* Or add a rule to `<repo>/CLAUDE.md`: *"Always create a WP file when adding a work product."*
+3. **Bulk task intake** (from Obsidian, notes, backlog): create one work product "Task triage from [source]". The result is a set of WP files in inbox/ with full context for each task. Then sort them by dissatisfactions during a strategy session.
 
-**Key point:** Claude does not lose context — it does not record it unless told where. The Close protocol (§ 5.1) + WP files solve this.
+**Key point:** Claude does not lose context — it does not record it unless told where to put it. The Close protocol (§ 5.1) + WP files solve this.
 
 #### "Obsidian shows a white screen when opening IWE"
 
 **What happens.** Obsidian tries to index the entire `~/IWE`, including large technical Markdown files. For example, `FPF/FPF-Spec.md` can be many megabytes, and the interface hangs on a white screen.
 
-**What to do.** Open only a separate governance repo (`DS-strategy`) as the vault in Obsidian. The `~/IWE` root as a vault is not supported. Use VS Code to view the whole workspace; do not add large technical repositories to the Obsidian vault via a symlink.
+**What to do.** Open only a separate governance repository (`DS-strategy`) as an Obsidian vault. The `~/IWE` root as a vault is not supported. Use VS Code to view the whole workspace; do not add large technical repositories to an Obsidian vault via symlink.
 
 #### "Pack is not used during work"
 
-**What happens.** You have placed knowledge in a Pack repository. But during work, Claude does not see or use it.
+**What happens.** You placed knowledge in a Pack repository. But Claude does not see or use it during work.
 
 **Why.** Claude automatically sees only 3 things: MEMORY.md, CLAUDE.md, memory/*.md. Pack repositories are files on disk that Claude does not read without an explicit command.
 
-**Three ways to connect Pack** (simple to powerful):
+**Three ways to connect a Pack** (from simple to powerful):
 
-| Way | When | What to do |
-|-----|------|-----------|
-| **1. Direct link** | Pack < 50 files | Add the Pack path to `memory/navigation.md`. When setting the task, say: *"Context: see Pack-X/entity-Y.md"* |
+| Method | When | What to do |
+|--------|------|-----------|
+| **1. Direct link** | Pack <50 files | Add the path to Pack in `memory/navigation.md`. When setting a task, say: *"Context: see Pack-X/entity-Y.md"* |
 | **2. Index in CLAUDE.md** | Pack 50–100 files | Add a list of key Pack entities to `<repo>/CLAUDE.md` or `memory/navigation.md` |
-| **3. Gateway MCP** | Pack > 100 files | Configure knowledge search via Gateway for your Packs (DP.IWE.002 § 7.1). Claude can search the full base |
+| **3. Gateway MCP** | Pack >100 files | Configure knowledge search through Gateway for your Packs (DP.IWE.002 § 7.1). Claude can search across the full base |
 
 **Practical minimum:** Add a section with links to your Packs in `memory/navigation.md`:
 ```
@@ -1511,26 +1511,26 @@ As you grow:  Extractor, Synchronizer, own Format           ← scaling
 
 #### "I do not understand what goes where"
 
-**One-line rule:** if Claude must see this **every** session — MEMORY.md or CLAUDE.md. Everything else — files Claude reads on request.
+**One-line rule:** if Claude must see it **every** session — MEMORY.md or CLAUDE.md. Everything else is files Claude reads on demand.
 
 | What | Where | Why there |
-|------|-------|----------|
-| Weekly task list (Work Products) | `MEMORY.md` | Claude sees it every session, checks via WP Gate |
+|------|-------|-----------|
+| Weekly task list (work products) | `MEMORY.md` | Claude sees it every session, checks through WP Gate |
 | Rules for all projects | `~/IWE/CLAUDE.md` | Claude sees it every session |
-| Rules for one project | `<repo>/CLAUDE.md` | Claude sees it when working in that repo |
+| Rules for one project | `<repo>/CLAUDE.md` | Claude sees it when working in that repository |
 | Reference (terms, checklists) | `memory/*.md` | Claude reads on trigger (§ 5.2) |
-| Details of each task | `DS-strategy/inbox/WP-*.md` | Claude reads when opening the task (Ritual, step 3) |
-| Domain knowledge | Pack repositories | Claude reads on explicit request or via MCP |
-| Strategy, Dissatisfactions | `DS-strategy/docs/` | Strategist (R1) uses during planning |
+| Details of each task | `DS-strategy/inbox/WP-*.md` | Claude reads when opening a task (Ritual, step 3) |
+| Domain knowledge | Pack repositories | Claude reads on explicit request or through MCP |
+| Strategy, dissatisfactions | `DS-strategy/docs/` | Strategist (R1) uses during planning |
 
 **Where memory/ physically lives:** `~/.claude/projects/{workspace-hash}/memory/`. This is a hidden Claude Code folder. Backup → `DS-strategy/exocortex/`.
 
-#### "Work Products are not created automatically"
+#### "Work products are not created automatically"
 
-WP Gate **must** fire for every assignment. If it does not fire, check:
+WP Gate **must** fire for every assignment. If it does not, check:
 
 1. **Is CLAUDE.md in place?** The file `~/IWE/CLAUDE.md` must exist and contain the "Session stages — ORZ" section.
-2. **Is MEMORY.md in place?** `~/.claude/projects/{workspace-hash}/memory/MEMORY.md` must contain the "Work Products of the current week" table.
+2. **Is MEMORY.md in place?** `~/.claude/projects/{workspace-hash}/memory/MEMORY.md` must contain the "Work products for the current week" table.
 3. **Is protocol-open.md in place?** `memory/protocol-open.md` next to MEMORY.md.
 4. **Is the task >15 min?** Tasks ≤15 min are exceptions to WP Gate.
 5. **Model?** Opus follows protocols more reliably. Sonnet may skip steps. Opus is recommended for first sessions. Haiku — only for trivial tasks (renaming, formatting, search) and cron agents.
@@ -1539,16 +1539,16 @@ If everything is in place but WP Gate still does not fire — check that CLAUDE.
 
 #### "What can I change in CLAUDE.md, and what cannot I change?"
 
-| Zone | May I change? | Examples |
-|------|--------------|---------|
-| **My rules** | Yes, freely | "Always write commits in English", "Use pytest" |
+| Zone | Can change? | Examples |
+|------|------------|---------|
+| **My rules** | Yes, freely | "Always write commits in English," "Use pytest" |
 | **MEMORY.md** | Yes, this is your data | Tasks, statuses, notes |
-| **memory/*.md** | With care | Adding lessons is fine. Changing protocols — only with an understanding of consequences |
-| **Root CLAUDE.md** (standard) | With a caveat | update.sh will overwrite the standard part. Your additions — to the end of sections |
+| **memory/*.md** | With care | Adding lessons is fine. Changing protocols — understand the consequences first |
+| **Root CLAUDE.md** (standard) | With a caveat | update.sh will overwrite the standard part. Add your own additions to the end of sections |
 
 **Safe pattern:** Add your rules to `<repo>/CLAUDE.md` (not affected by update.sh).
 
-#### "Why is the folder structure like this?"
+#### "Why this folder structure?"
 
 ```
 DS-strategy/
@@ -1556,11 +1556,11 @@ DS-strategy/
 ├── current/     ← Current (week/day plan) — changes daily
 ├── inbox/       ← Incoming (task contexts, notes) — processed and moved out
 ├── drafts/      ← Drafts (posts, ideas) — TTL ≤7 days
-├── archive/     ← Closed (completed plans) — for retrospective
+├── archive/     ← Closed (completed plans) — for retrospectives
 └── exocortex/   ← Backup memory/ — safety net
 ```
 
-The **Inbox → Processing → Archive** pattern: incoming material is processed → result goes to docs/ or Pack → the source is archived. Nothing accumulates without control.
+Pattern **Inbox → Processing → Archive**: incoming is processed → result goes to docs/ or Pack → original is archived. Nothing accumulates uncontrolled.
 
 You can change it, but preserve the "active / incoming / closed" separation — without it, inbox will grow indefinitely.
 
@@ -1570,34 +1570,34 @@ Main scenarios:
 
 | # | Scenario | Launch | What it does | Result |
 |---|----------|--------|-------------|--------|
-| 1 | **Day Open** | Morning (trigger) | 7 steps: yesterday → plan → learning → pomodoros → IWE → world → record | DayPlan |
+| 1 | **Day Open** | Morning (trigger) | 7 steps: yesterday → plan → development → pomodoros → IWE → world → record | DayPlan |
 | 2 | **Day Close** | Evening (trigger) | Results → what I learned → praise → setup for tomorrow | Updated DayPlan |
-| 3 | session-prep | Monday morning (auto) | Analysis of last week + MAPSTRATEGIC from all repos | WeekPlan draft |
-| 3b | strategy-session | Manually | Interactive review of Dissatisfactions → priorities | Approved WeekPlan |
+| 3 | session-prep | Monday morning (auto) | Analysis of previous week + MAPSTRATEGIC from all repositories | Draft WeekPlan |
+| 3b | strategy-session | Manual | Interactive review of dissatisfactions → priorities | Approved WeekPlan |
 | 4 | week-review | Sunday evening (auto) | WakaTime metrics + what was done + lessons | "Results W{N}" section in WeekPlan |
-| 5 | add-wp | Manually | Add a new task to the plan (4 places) | Updated WeekPlan + WP file |
+| 5 | add-wp | Manual | Add a new task to the plan (4 places) | Updated WeekPlan + WP file |
 | 6 | note-review | As needed | Classify notes → Pack/inbox/archive | Routed notes |
 
 **The Strategist cannot:** write code, access Pack without MCP, deploy. It plans, reflects, and routes.
 
 #### "How to work with IWE on two devices (laptop + desktop)?"
 
-**What happens.** You have two computers (possibly on different OSes). You need an identical environment and the ability to switch between them.
+**What happens.** You have two computers (possibly on different OSes). You need a consistent environment and the ability to switch between them.
 
 **Architecture.** IWE consists of layers with different synchronization mechanisms:
 
 | # | Layer | Mechanism | Cross-OS |
 |---|-------|----------|---------|
-| 1 | Repos (code, Pack, DS) | git push/pull | Yes |
-| 2 | Exocortex (CLAUDE.md, memory/) | git backup in DS-strategy → restore on the second device | Yes |
+| 1 | Repositories (code, Pack, DS) | git push/pull | Yes |
+| 2 | Exocortex (CLAUDE.md, memory/) | git backup in DS-strategy → restore on second device | Yes |
 | 3 | Claude Code config (.claude/) | Part in git (exocortex backup), part local | Yes (JSON) |
 | 4 | VS Code | Settings Sync (built-in, via GitHub) | Yes |
 | 5 | MCP servers | Config template + envsubst (paths differ between OSes) | Template + platform-specific |
 | 6 | Secrets (.env, API keys) | Password manager (1Password CLI / Bitwarden CLI) | Yes |
-| 7 | Cron/LaunchAgents | macOS: plist. Linux: systemd/cron. Setup script in repo | Different formats |
+| 7 | Cron/LaunchAgents | macOS: plist. Linux: systemd/cron. Setup script in repository | Different formats |
 | 8 | Packages (brew, apt) | Brewfile (macOS) + Linux equivalent | Setup script |
 
-**Critical rule: Push before switch.** Before switching to the other device — push all dirty repos. Check:
+**Critical rule: Push before switch.** Before switching to another device — push all dirty repositories. Check:
 
 ```bash
 for repo in ~/IWE/*/; do
@@ -1605,21 +1605,21 @@ for repo in ~/IWE/*/; do
 done
 ```
 
-**Cross-OS notes:**
+**Cross-OS nuances:**
 - **Paths:** Use `~/IWE/` (tilde is cross-platform), or the `$IWE_HOME` variable
-- **Symlinks:** `memory/` → `.claude/...` — on each device `setup.sh` creates the symlinks
-- **LaunchAgents vs systemd:** Templates for both are stored in the repo, `setup.sh` installs the right one
+- **Symlinks:** `memory/` → `.claude/...` — each device has its own `setup.sh` that creates symlinks
+- **LaunchAgents vs systemd:** Templates for both are stored in the repository; `setup.sh` installs the right one
 - **MCP paths:** `claude_desktop_config.json` contains absolute paths — use a template + envsubst or platform-specific configs
 - **Line endings:** `.gitattributes` with `* text=auto`
 
-**Bootstrap a new device:**
+**Bootstrapping a new device:**
 
 ```bash
 git clone <all-repos> ~/IWE/
 cd ~/IWE && ./setup.sh   # creates symlinks, installs packages, configures cron
 ```
 
-`setup.sh` detects the OS (`uname`) and performs the appropriate actions. It lives in DS-ecosystem-development (local governance repo) or a dotfiles repo.
+`setup.sh` detects the OS (`uname`) and performs the appropriate actions. It lives in DS-ecosystem-development (local governance repository) or a dotfiles repository.
 
 **Where:** § 2.2 (from template to workspace), § 5.2 (memory)
 
@@ -1627,30 +1627,30 @@ cd ~/IWE && ./setup.sh   # creates symlinks, installs packages, configures cron
 
 **What happens.** You have Windows. Claude Code is installed, but it is unclear which terminal to use — Git Bash (MINGW64) or WSL.
 
-**Answer (revised 23.07, clarified 11.10 — issue #1180): Git Bash is sufficient for basic installation and daily hook work. `session-guard.sh` and peer sessions require WSL2** — the script uses `flock`/`fcntl` semaphores that are unavailable in native Git Bash (MINGW64). IWE consists of bash scripts + Node.js; the MCP server that actually appears in the template's `.mcp.json` (`iwe-knowledge`, HTTP at `mcp.aisystant.com`) is a remote service — it does not care which terminal launched Claude Code on the client side. The only real bash dependency is Claude Code hooks (pre/post-commit etc.), which call `.sh` files through the system shell: they work if `bash` (the one installed with Git for Windows) is in the system `PATH`. Details → [SETUP-GUIDE.md § Windows](SETUP-GUIDE.md#00-windows-without-wsl).
+**Answer (revised 23.07, clarified 11.10 — issue #1180): Git Bash is sufficient for basic installation and daily work with hooks. `session-guard.sh` and peer sessions require WSL2** — the script uses `flock`/`fcntl` semaphores that are not available in native Git Bash (MINGW64). IWE consists of bash scripts + Node.js; the MCP server that actually appears in the template's `.mcp.json` (`iwe-knowledge`, HTTP at `mcp.aisystant.com`) is a remote service and does not care which terminal the client uses to launch Claude Code. The only real bash dependency is Claude Code hooks (pre/post-commit etc.) that call `.sh` files through the system shell: they work if `bash` (the one installed with Git for Windows) is in the system `PATH`. Details → [SETUP-GUIDE.md § Windows](SETUP-GUIDE.md#00-windows-without-wsl).
 
-**When to choose WSL:** you need automation without a permanently open window (cron-like local scheduling — not natively available on plain Windows; WSL with `systemd` configured gives a full `cron`/`launchd` equivalent) **or** you prefer to work in a full Linux environment for other reasons. For scheduling without local automation there is an even simpler path — the cloud option via GitHub Actions (not OS-dependent).
+**When to use WSL instead:** you need automation without a permanently open window (cron-like local scheduling is not natively available on bare Windows; WSL with `systemd` configured gives a full `cron`/`launchd` equivalent) **or** you prefer to work in a full Linux environment for other reasons. For scheduling without local automation, there is a simpler path — the cloud option through GitHub Actions (not OS-dependent).
 
 **If you want WSL:**
 1. Install WSL: `wsl --install` in PowerShell (as administrator)
-2. Inside WSL: `mkdir -p ~/IWE && cd ~/IWE` — all repositories must be in the WSL file system, **not** on `/mnt/c/`
+2. Inside WSL: `mkdir -p ~/IWE && cd ~/IWE` — all repositories must be in the WSL file system, **not** in `/mnt/c/`
 3. VS Code: install the "WSL" extension (ms-vscode-remote.remote-wsl)
-4. Open VS Code: `code .` from the WSL terminal → VS Code connects to WSL
+4. Open VS Code: `code .` from a WSL terminal → VS Code connects to WSL
 5. Terminal in VS Code (Ctrl+`) → confirm it is WSL (bash/zsh), not PowerShell/MINGW64
 6. Claude Code: `npm install -g @anthropic-ai/claude-code` inside WSL
 7. `cd ~/IWE && claude` — ready
 
-**Why files in WSL, not on the Windows drive (if you chose WSL)?** The WSL file system (`~/`) is 5–10× faster than accessing `/mnt/c/` (Windows drive through WSL). Watch scripts, git operations, and MCP indexing on `/mnt/c/` are critically slow.
+**Why files in WSL, not on the Windows drive (if you chose WSL)?** The WSL file system (`~/`) is 5–10 times faster than accessing `/mnt/c/` (Windows drive through WSL). Watch scripts, git operations, and MCP indexing on `/mnt/c/` are critically slow.
 
-**Honest caveat.** Neither path has been tested live on Windows by this team (the template CI matrix runs only `ubuntu-latest`/`macos-latest`; there is no Windows runner). If you hit a specific breakage in Git Bash — not a general "something is wrong," but a reproducible symptom — open an issue in IWE. That is more valuable than guessing in advance.
+**Honest caveat.** Neither path has been tested live on Windows by this team (the template CI matrix runs only `ubuntu-latest`/`macos-latest`; there is no Windows runner). If you hit a specific breakage in Git Bash — not a general "something is wrong" but a reproducible symptom — open an issue in IWE. That is more valuable than guessing in advance.
 
 #### "I do not understand what to record in notes"
 
-**What happens.** You see the notes feature in the bot (`.text`), but do not understand what to put there — daily errands? ideas? everything?
+**What happens.** You see the notes feature in the bot (`.text`) but do not understand — what to record there? Daily tasks? Ideas? Everything?
 
-**Rule:** notes = the incoming stream for intellectual work (inbox). Record:
-- **Thoughts and ideas** — things that came to mind during the day that you do not want to lose
-- **Reading observations** — noticed something useful in a book/article → `.text`
+**Rule:** notes = incoming stream for intellectual work (inbox). Record:
+- **Thoughts and ideas** — what came to mind during the day and you do not want to lose
+- **Observations from reading** — noticed something useful in a book/article → `.text`
 - **Questions to explore** — did not understand something in a course → `.why is a meta-meta-model needed?`
 - **Captures** — knowledge that needs to be formalized in Pack
 
@@ -1658,26 +1658,26 @@ cd ~/IWE && ./setup.sh   # creates symlinks, installs packages, configures cron
 - Household tasks ("buy oil") — there are to-do apps for that (Todoist, Apple Reminders)
 - Exact quotes without your own interpretation — a quote without a thought is dead text
 
-**Note states:** `.text` → bot saves → accumulates → Note-Review (manually: "note review" section in the day plan, or "review my notes" request in a Claude Code session, or `bash roles/strategist/scripts/strategist.sh note-review` from the terminal — only tags and suggestions) → proposal where to route it: to Pack (knowledge), to a Work Product (task), or to archive (no longer relevant); the decision is yours.
+**Note states:** `.text` → bot saves → accumulates → Note-Review (manually: "process notes" section in the day plan, "process my notes" request in a Claude Code session, or `bash roles/strategist/scripts/strategist.sh note-review` from the terminal — only marks and suggestions) → proposal of where to route: to Pack (knowledge), to a work product (task), or to archive (no longer relevant); the decision is yours.
 
 #### "The bot gives irrelevant answers"
 
-**What happens.** You ask the bot a question, and the answer is off-topic, too shallow, or gets cut off.
+**What happens.** You ask the bot a question and the answer is either off-topic, too superficial, or cuts off.
 
 **Three causes and solutions:**
 
 | Cause | How to recognize | What to do |
 |-------|-----------------|-----------|
-| **Question outside the knowledge base** | Bot responds with generic phrases, not citing specific documents | The bot knows what is in the knowledge base (Gateway iwe-knowledge). Ask more precisely: "What does course X say about Y?" instead of the abstract "tell me about Y" |
-| **Long answer is cut off** | Text breaks mid-sentence | Telegram limits message length. Ask: "continue" or "give a brief version" |
-| **Context lost** | Bot does not remember what you asked a minute ago | Each question in Consultation mode is a separate request. Formulate the question in full, without references to "as I already said" |
+| **Question outside the knowledge base** | Bot responds with generic phrases, not citing specific documents | The bot knows what is in the knowledge base (Gateway iwe-knowledge). Ask more precisely: "What does course X say about Y?" instead of an abstract "tell me about Y" |
+| **Long answer is cut off** | Text cuts off mid-sentence | Telegram limits message length. Ask: "continue" or "give me a brief version" |
+| **Context lost** | Bot does not remember what you asked a minute ago | Each question in Consultation mode is a separate request. Formulate the question completely, without references to "as I already said" |
 
-**If the answer is completely irrelevant** — give a 👎. This triggers automatic classification (feedback_triage) and the problem will appear in the developer's report.
+**If the answer is completely irrelevant** — give 👎. This triggers automatic classification (feedback_triage) and the problem will appear in the developer's report.
 
 ### Recommended study sequence
 
 #### Day 1: Orientation (1.5 hours)
-1. System contours (§ 2.1) — 10 min
+1. System perimeters (§ 2.1) — 10 min
 2. From template to workspace (§ 2.2) — 15 min
 3. 3 repository types (§ 4.1) — 15 min
 4. Principles hierarchy (§ 3.1) — 15 min
@@ -1688,7 +1688,7 @@ cd ~/IWE && ./setup.sh   # creates symlinks, installs packages, configures cron
 2. Session Open: WP Gate + Ritual (§ 5.1b) — 15 min
 3. Three-layer memory (§ 5.2) — 10 min
 4. Capture-to-Pack (§ 5.3) — 10 min
-5. Key 10 of 30+ distinctions (§ 3.2) — 20 min
+5. Distinctions — key 10 of 30+ (§ 3.2) — 20 min
 6. Strategist, planning, and Activation Gate (§ 5.5) — 15 min
 
 #### Day 3: Tools and agents (1.5 hours)
@@ -1698,7 +1698,7 @@ cd ~/IWE && ./setup.sh   # creates symlinks, installs packages, configures cron
 4. Checklists (§ 8.3) — 10 min
 
 #### Day 4: Pack and SOTA (1 hour)
-1. What is Pack (§ 6.1) — 10 min
+1. What Pack is (§ 6.1) — 10 min
 2. Knowledge MCP (§ 6.5) — 10 min
 3. SOTA practices (§ 8.2) — 15 min
 4. Quick reference (§ 11) — 5 min

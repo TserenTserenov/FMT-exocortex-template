@@ -1,5 +1,1385 @@
-files_translated: []
-last_run_utc: '2026-11-28T12:58:24Z'
-last_synced_sha: a2fb39d771201f2a6eb37251854b080af460dda3
+files_translated:
+- docs/LEARNING-PATH.md
+last_run_utc: '2026-11-28T14:20:06Z'
+last_synced_sha: e7dd566b298a4ab2c5adb77630bdf42fd6130959
 schema_version: 1
-unapproved_terms: []
+unapproved_terms:
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Artifact
+  term_ru: Артефакт
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Architecture
+  term_ru: Архитектура
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Audit
+  term_ru: Аудит
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Blocking rule
+  term_ru: Блокирующее правило
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Roadmap
+  term_ru: Дорожная карта
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Closing
+  term_ru: Закрытие
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Knowledge
+  term_ru: Знание
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Interface
+  term_ru: Интерфейс
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Infrastructure
+  term_ru: Инфраструктура
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Role Performer
+  term_ru: Исполнитель роли
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Component
+  term_ru: Компонент
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: pipeline
+  term_ru: Конвейер
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Configuration
+  term_ru: Конфигурация
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Manifest
+  term_ru: Манифест
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Method
+  term_ru: Метод
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Skill
+  term_ru: Навык
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Knowledge Domain
+  term_ru: Область знаний
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Ontology
+  term_ru: Онтология
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Opening
+  term_ru: Открытие
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Assessment
+  term_ru: Оценка
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Pack
+  term_ru: Пак
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Memory
+  term_ru: Память
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Platform
+  term_ru: Платформа
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Subsystem
+  term_ru: Подсистема
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Understanding
+  term_ru: Понимание
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Flow/Stream
+  term_ru: Поток
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Priority
+  term_ru: Приоритет
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Progress
+  term_ru: Прогресс
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Protocol
+  term_ru: Протокол
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Profile
+  term_ru: Профиль
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Work Product
+  term_ru: Рабочий продукт
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Distinction
+  term_ru: Различение
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Review
+  term_ru: Ревью
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Registry
+  term_ru: Реестр
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Repository
+  term_ru: Репозиторий
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Service
+  term_ru: Сервис
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Session
+  term_ru: Сессия
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Skill
+  term_ru: Скилл
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Script
+  term_ru: Скрипт
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Environment
+  term_ru: Среда
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Phase
+  term_ru: Фаза
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Formatting
+  term_ru: Форматирование
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Template
+  term_ru: Шаблон
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Step
+  term_ru: Шаг
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Encryption
+  term_ru: Шифрование
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Fix
+  term_ru: Исправление
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: System
+  term_ru: Система
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: core
+  term_ru: Ядро
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Work
+  term_ru: Работа
+- file: docs/LEARNING-PATH.md
+  source: local-glossary
+  term_en: Verification
+  term_ru: Проверка
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Exocortex
+  term_ru: Экзокортекс
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Strategist
+  term_ru: Стратег
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Extractor
+  term_ru: Экстрактор
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Synchronizer
+  term_ru: Синхронизатор
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Guide
+  term_ru: Проводник
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Coder
+  term_ru: Кодировщик
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Template Manager
+  term_ru: Шаблонизатор
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Analyst
+  term_ru: Статистик
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Fixer
+  term_ru: Наладчик
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: User (role)
+  term_ru: Пользователь (роль)
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Alignment Ritual
+  term_ru: Ритуал согласования
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Digital Twin
+  term_ru: ЦД (Цифровой двойник)
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Tiers
+  term_ru: Тиры
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Zero principles
+  term_ru: Нулевые принципы
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Episteme
+  term_ru: Эпистема
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Seed
+  term_ru: Заготовка (стадия конвейера)
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Post seed
+  term_ru: Зерно для поста
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: EMOGSSB
+  term_ru: ЭМОГССБ
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: headless run
+  term_ru: Headless-запуск
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: governance repository
+  term_ru: Governance-репозиторий
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: WP context file
+  term_ru: Контекстный файл РП
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: veto filter
+  term_ru: Вето-фильтр
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: aggregate score
+  term_ru: Агрегатный балл
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Exoskeletal mode
+  term_ru: Экзоскелетный режим
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: fading scaffolding
+  term_ru: Убывающие подмостки
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: four zones
+  term_ru: Четыре зоны
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: placeholders
+  term_ru: Плейсхолдеры
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: why
+  term_ru: зачем
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: what to study
+  term_ru: что изучить
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: where to find it
+  term_ru: где найти
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Beginner:'
+  term_ru: 'Новичок:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'First week:'
+  term_ru: 'Первая неделя:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Working user:'
+  term_ru: 'Работающий пользователь:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Advanced:'
+  term_ru: 'Продвинутый:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Reference:'
+  term_ru: 'Справочник:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Terminology:'
+  term_ru: 'Терминология:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Installation:'
+  term_ru: 'Установка:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Data policy:'
+  term_ru: 'Политика данных:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Quick reference:'
+  term_ru: 'Быстрая справка:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Principles vs skills:'
+  term_ru: 'Принципы vs навыки:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Prosthesis:'
+  term_ru: 'Протез:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Exoskeleton:'
+  term_ru: 'Экзоскелет:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Presenting, not generating.
+  term_ru: Предъявление, а не генерация.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Questions, not answers
+  term_ru: Вопросы, а не ответы
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Fading scaffolding.
+  term_ru: Убывающие подмостки (scaffolding).
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Criterion:'
+  term_ru: 'Критерий:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Role → Method → Work Product
+  term_ru: Роль → Метод → Рабочий продукт
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Three IWE classifications:'
+  term_ru: 'Три классификации IWE:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Telegram bot
+  term_ru: Telegram-бот
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: MCP servers
+  term_ru: MCP-серверы
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Test:'
+  term_ru: 'Тест:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Principles
+  term_ru: Принципы
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Exocortex content
+  term_ru: Содержимое экзокортекса
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Pack entities
+  term_ru: Pack-сущности
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Role prompts
+  term_ru: Промпты ролей
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: User
+  term_ru: Пользователь
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Role ≠ Performer (HD #5).'
+  term_ru: 'Роль ≠ Исполнитель (HD #5).'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'FPF notation:'
+  term_ru: 'Нотация FPF:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: IWE Runtime Cycle (ORZ) Protocol
+  term_ru: Протокол ОРЗ
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Why a separate viewpoint?
+  term_ru: Почему отдельный вид?
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: procedures
+  term_ru: процедуры
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Strategy hub
+  term_ru: Стратегический хаб
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Pack documents
+  term_ru: Pack-документы
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Project repositories
+  term_ru: Проектные репо
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Digital Twin events
+  term_ru: События ЦД
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Notes
+  term_ru: Заметки
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Posts, drafts
+  term_ru: Посты, черновики
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Integrity principle:'
+  term_ru: 'Принцип целостности:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Key point:'
+  term_ru: 'Ключевое:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Central IWE invariant:'
+  term_ru: 'Центральный инвариант IWE:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: never
+  term_ru: никогда
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Where to study:'
+  term_ru: 'Где изучить:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Does not touch
+  term_ru: Не трогает
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: AUTHOR-ONLY zones
+  term_ru: AUTHOR-ONLY зоны
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Protocols
+  term_ru: Протоколы
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Tools
+  term_ru: Инструменты
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Rules
+  term_ru: Правила
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: never affected by updates
+  term_ru: никогда не затрагиваются обновлениями
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Content
+  term_ru: Контент
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Config
+  term_ru: Конфиг
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'One command:'
+  term_ru: 'Одна команда:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'What is NOT affected:'
+  term_ru: 'Что НЕ затрагивается:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Your own rules:'
+  term_ru: 'Свои правила:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Additional modes:'
+  term_ru: 'Дополнительные режимы:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Cumulative update model:'
+  term_ru: 'Накопительная модель обновлений:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Telegram notifications:'
+  term_ru: 'Оповещения в Telegram:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Three ways to update:'
+  term_ru: 'Три способа обновить:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Cloud Scheduler — IWE cloud automation:'
+  term_ru: 'Cloud Scheduler — облачная автоматика IWE:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Health Check setup (extended):'
+  term_ru: 'Настройка Health Check (расширенный):'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Marp — presentation preparation:'
+  term_ru: 'Marp — подготовка презентаций:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'IntegrationGate rule:'
+  term_ru: 'Правило IntegrationGate:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Zero principles (ZP)
+  term_ru: Нулевые принципы (ZP)
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: must not be confused
+  term_ru: нельзя путать
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'How to read:'
+  term_ru: 'Как читать:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Base = the platform provides
+  term_ru: Base = платформа выдаёт
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Pack and DS = the user creates.
+  term_ru: Pack и DS = пользователь создаёт.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: sole
+  term_ru: единственный
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Own formats:'
+  term_ru: 'Свои форматы:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'When to create:'
+  term_ru: 'Когда создавать:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'What every DS-* must contain:'
+  term_ru: 'Что должно быть внутри каждого DS-*:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Where
+  term_ru: Где
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Who writes
+  term_ru: Кто пишет
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: What
+  term_ru: Что
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Flow:'
+  term_ru: 'Поток:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Repository prefixes:'
+  term_ru: 'Префиксы репозиториев:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Pack entity coding:'
+  term_ru: 'Кодирование Pack-сущностей:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Examples:'
+  term_ru: 'Примеры:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: fractal pattern
+  term_ru: фрактальный паттерн
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Skipping Open
+  term_ru: Пропуск Open
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Skipping Close
+  term_ru: Пропуск Close
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Day
+  term_ru: День
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Distinction: Day ≠ Session.'
+  term_ru: 'Различение: День ≠ Сессия.'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Yesterday
+  term_ru: Вчера
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Plan for today
+  term_ru: План на сегодня
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Slot 1 = development
+  term_ru: Слот 1 = саморазвитие
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Development
+  term_ru: Саморазвитие
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: do NOT create DayPlan
+  term_ru: DayPlan НЕ создавать
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Pomodoros
+  term_ru: Помидорки
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: IWE overnight
+  term_ru: IWE за ночь
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: World
+  term_ru: Мир
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Record
+  term_ru: Запись
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Skipped on strategy_day
+  term_ru: Пропускается в strategy_day
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Product:'
+  term_ru: 'Продукт:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Review
+  term_ru: Обзор
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: What I learned
+  term_ru: Что нового узнал
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Praise
+  term_ru: Похвала
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Forgotten?
+  term_ru: Не забыто?
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Setup for tomorrow
+  term_ru: Задел на завтра
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'First action for ANY assignment:'
+  term_ru: 'Первое действие на ЛЮБОЕ задание:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Exceptions:'
+  term_ru: 'Исключения:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'User role:'
+  term_ru: 'Роль пользователя:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Claude role:'
+  term_ru: 'Роль Claude:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Work:'
+  term_ru: 'Работа:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Work product:'
+  term_ru: 'РП:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Verification class:'
+  term_ru: 'Класс верификации:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Method:'
+  term_ru: 'Метод:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Estimate:'
+  term_ru: 'Оценка:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Model:'
+  term_ru: 'Модель:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 4 user roles
+  term_ru: 4 роли пользователя
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Verification class
+  term_ru: Класс верификации
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Model switching — two scenarios:'
+  term_ru: 'Переключение модели — два сценария:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Entire session on another model:'
+  term_ru: 'Вся сессия на другой модели:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'A single task within a session:'
+  term_ru: 'Отдельная задача внутри сессии:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Session registration:'
+  term_ru: 'Регистрация сессии:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Status
+  term_ru: Статус
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Notification
+  term_ru: Уведомление
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'memory/ files:'
+  term_ru: 'Файлы memory/:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: is an evolving file.
+  term_ru: — развиваемый файл.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Policy:'
+  term_ru: 'Политика:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: is there knowledge to record? Is there a seed for a post?
+  term_ru: есть ли знание для записи? Есть ли зерно для поста?
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Dual KE routing (HD #29):'
+  term_ru: 'Двойной routing KE (HD #29):'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Announcement format:'
+  term_ru: 'Формат анонса:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Root
+  term_ru: Корневой
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Repository
+  term_ru: Репозиторный
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'When to use which:'
+  term_ru: 'Когда что использовать:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: When you create a new DS-* repository
+  term_ru: Когда ты создаёшь новый DS-* репо
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'DS-strategy — strategy hub:'
+  term_ru: 'DS-strategy — стратегический хаб:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Single-source pattern:'
+  term_ru: 'Паттерн single-source:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Sunday
+  term_ru: воскресенье
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Day Open does not create a DayPlan
+  term_ru: Day Open не создаёт DayPlan
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: activation condition
+  term_ru: условие активации
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: nothing accumulates
+  term_ru: ничего не накапливается
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Note
+  term_ru: Заметка
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Draft
+  term_ru: Черновик
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Seed
+  term_ru: Заготовка
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Post
+  term_ru: Пост
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: DEP
+  term_ru: НЭП
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Task
+  term_ru: Задача
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Idea
+  term_ru: Идея
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Personal data
+  term_ru: Личные данные
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Noise
+  term_ru: Шум
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Draft ≠ Seed.
+  term_ru: Черновик ≠ Заготовка.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Seed ≠ Post.
+  term_ru: Заготовка ≠ Пост.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Warning
+  term_ru: Предупреждение
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Blocked
+  term_ru: Блокировка
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: closed loop
+  term_ru: замкнутый цикл
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Feedback from posts
+  term_ru: Обратная связь от постов
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Pack → Content
+  term_ru: Pack → Контент
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: sole source of truth
+  term_ru: Единственный source-of-truth
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Contains:'
+  term_ru: 'Содержит:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Live example:'
+  term_ru: 'Живой пример:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Quick start:'
+  term_ru: 'Быстрый старт:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Role:'
+  term_ru: 'Роль:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Pipeline:'
+  term_ru: 'Пайплайн:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Key rule:'
+  term_ru: 'Ключевое правило:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: proposes
+  term_ru: предлагает
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'How this works for you:'
+  term_ru: 'Как это работает для тебя:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Inbox-Check runs without you
+  term_ru: Inbox-Check работает без тебя
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Source types:'
+  term_ru: 'Типы источников:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Principle:'
+  term_ru: 'Принцип:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: independently of its performer
+  term_ru: независимо от исполнителя
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Performer (holder)
+  term_ru: Исполнитель (holder)
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Agent
+  term_ru: Агент
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Tool
+  term_ru: Инструмент
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Key principles:'
+  term_ru: 'Ключевые принципы:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Role ≠ System.
+  term_ru: Роль ≠ Система.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: One performer — many roles.
+  term_ru: Один исполнитель — много ролей.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: One role — many performers.
+  term_ru: Одна роль — много исполнителей.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Notation:'
+  term_ru: 'Нотация:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Strategist (R1)
+  term_ru: Стратег (R1)
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Extractor (R2)
+  term_ru: Экстрактор (R2)
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Synchronizer (R8)
+  term_ru: Синхронизатор (R8)
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Template Manager (R9)
+  term_ru: Шаблонизатор (R9)
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Analyst (R10)
+  term_ru: Статистик (R10)
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Fixer (R11)
+  term_ru: Наладчик (R11)
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'For T4 user:'
+  term_ru: 'Для T4 пользователя:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Minimum file set:'
+  term_ru: 'Минимальный набор файлов:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Details and role.yaml schema:'
+  term_ru: 'Подробности и схема role.yaml:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Blocking rule:'
+  term_ru: 'Блокирующее правило:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: E
+  term_ru: Э
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: M
+  term_ru: М
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: O
+  term_ru: О
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: G
+  term_ru: Г
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: S
+  term_ru: С
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: B
+  term_ru: Б
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Format:'
+  term_ru: 'Формат:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Before adding a new tool, agent, or system — STOP.
+  term_ru: Перед добавлением нового инструмента, агента или системы — СТОП.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Type:'
+  term_ru: 'Тип:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Perimeter:'
+  term_ru: 'Контур:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Roles:'
+  term_ru: 'Роли:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Products:'
+  term_ru: 'Продукты:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Processes:'
+  term_ru: 'Процессы:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Secrets outside git
+  term_ru: Секреты вне git
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Personal data isolated
+  term_ru: Персональные данные изолированы
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: DS-strategy/ — private.
+  term_ru: DS-strategy/ — приватный.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Do not commit  files.
+  term_ru: Не коммитьте  файлы.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Use SSH for git.
+  term_ru: Используйте SSH для git.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Token rotation.
+  term_ru: Ротация токенов.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Excessive AI trust
+  term_ru: Чрезмерное доверие к ИИ
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'T axis (learner):'
+  term_ru: 'Ось T (учащийся):'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: T0/T1 — current nomenclature.
+  term_ru: T0/T1 — актуальная номенклатура.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Orthogonal axes (assigned):'
+  term_ru: 'Ортогональные оси (назначаются):'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'What the bot can do:'
+  term_ru: 'Что бот умеет:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Connection to exocortex:'
+  term_ru: 'Связь с экзокортексом:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Process
+  term_ru: Процесс
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Scenario
+  term_ru: Сценарий
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'User:'
+  term_ru: 'Пользовательские:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Platform:'
+  term_ru: 'Платформенные:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'How to create:'
+  term_ru: 'Как создать:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Roadmap after creation:'
+  term_ru: 'Дорожная карта после создания:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Recommendations:'
+  term_ru: 'Рекомендации:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Do not clone
+  term_ru: Не клонируй
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Do not create a Pack
+  term_ru: Не создавай Pack
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Do not add agents
+  term_ru: Не добавляй агентов
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Clone SPF
+  term_ru: Клонируй SPF
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Architecture FAQ:'
+  term_ru: 'Архитектура FAQ:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: What happens.
+  term_ru: Что происходит.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Why.
+  term_ru: Почему.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: What to do.
+  term_ru: Что делать.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: WP file = permanent task memory.
+  term_ru: WP-файл = постоянная память задачи.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: If the WP file was not created
+  term_ru: Если WP-файл не создался
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Bulk task intake
+  term_ru: Массовый приём задач
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Three ways to connect a Pack
+  term_ru: Три способа подключить Pack
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 1. Direct link
+  term_ru: 1. Прямая ссылка
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 2. Index in CLAUDE.md
+  term_ru: 2. Индекс в CLAUDE.md
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Practical minimum:'
+  term_ru: 'Практический минимум:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'One-line rule:'
+  term_ru: 'Правило одной строки:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: every
+  term_ru: каждую
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Where memory/ physically lives:'
+  term_ru: 'Где физически лежит memory/:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: must
+  term_ru: обязан
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Is CLAUDE.md in place?
+  term_ru: CLAUDE.md на месте?
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Is MEMORY.md in place?
+  term_ru: MEMORY.md на месте?
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Is protocol-open.md in place?
+  term_ru: protocol-open.md на месте?
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Is the task >15 min?
+  term_ru: Задача >15 мин?
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Model?
+  term_ru: Модель?
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: My rules
+  term_ru: Свои правила
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Root CLAUDE.md
+  term_ru: Корневой CLAUDE.md
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Safe pattern:'
+  term_ru: 'Безопасный паттерн:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'The Strategist cannot:'
+  term_ru: 'Стратег НЕ умеет:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Architecture.
+  term_ru: Архитектура.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Critical rule: Push before switch.'
+  term_ru: 'Критичное правило: Push before switch.'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Cross-OS nuances:'
+  term_ru: 'Кросс-ОС нюансы:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Paths:'
+  term_ru: 'Пути:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'MCP paths:'
+  term_ru: 'MCP пути:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Bootstrapping a new device:'
+  term_ru: 'Bootstrap нового устройства:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Where:'
+  term_ru: 'Где:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Answer (revised 23.07, clarified 11.10 — issue #1180): Git Bash is sufficient
+    for basic installation and daily work with hooks.  and peer sessions require WSL2'
+  term_ru: 'Ответ (пересмотрено 23.07, уточнено 11.10 — issue #1180): Git Bash достаточно
+    для базовой установки и повседневной работы с хуками. Для  и peer-сессий нужен
+    WSL2'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'When to use WSL instead:'
+  term_ru: 'Когда всё же взять WSL:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: or
+  term_ru: или
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'If you want WSL:'
+  term_ru: 'Если хочешь WSL:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: not
+  term_ru: не
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Why files in WSL, not on the Windows drive (if you chose WSL)?
+  term_ru: Почему файлы в WSL, а не на Windows-диске (если выбрал WSL)?
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Honest caveat.
+  term_ru: Честная оговорка.
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Rule:'
+  term_ru: 'Правило:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Thoughts and ideas
+  term_ru: Мысли и идеи
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Observations from reading
+  term_ru: Наблюдения из чтения
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Questions to explore
+  term_ru: Вопросы для разбора
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Do not record:'
+  term_ru: 'Не записывай:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Note states:'
+  term_ru: 'Состояния заметки:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: 'Three causes and solutions:'
+  term_ru: 'Три причины и решения:'
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Question outside the knowledge base
+  term_ru: Вопрос вне базы знаний
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Long answer is cut off
+  term_ru: Длинный ответ обрезается
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: Context lost
+  term_ru: Контекст потерян
+- file: docs/LEARNING-PATH.md
+  source: model
+  term_en: If the answer is completely irrelevant
+  term_ru: Если ответ совсем неадекватный
