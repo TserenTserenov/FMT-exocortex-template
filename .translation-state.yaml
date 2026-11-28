@@ -1,5 +1,34 @@
-files_translated: []
-last_run_utc: '2026-11-27T22:46:38Z'
-last_synced_sha: e3bdfb157a5c3a51b5402a34112358c6a8074d2a
+files_translated:
+- docs/PACK-SUBSCRIBE-LIVE-CHECK.md
+last_run_utc: '2026-11-28T06:37:10Z'
+last_synced_sha: f5cd6f0268cf2dd9eb44698db51524b32d37669e
 schema_version: 1
-unapproved_terms: []
+unapproved_terms:
+- file: docs/PACK-SUBSCRIBE-LIVE-CHECK.md
+  source: local-glossary
+  term_en: Skill
+  term_ru: Навык
+- file: docs/PACK-SUBSCRIBE-LIVE-CHECK.md
+  source: local-glossary
+  term_en: Pack
+  term_ru: Пак
+- file: docs/PACK-SUBSCRIBE-LIVE-CHECK.md
+  source: local-glossary
+  term_en: Step
+  term_ru: Шаг
+- file: docs/PACK-SUBSCRIBE-LIVE-CHECK.md
+  source: local-glossary
+  term_en: Verification
+  term_ru: Проверка
+- file: docs/PACK-SUBSCRIBE-LIVE-CHECK.md
+  source: model
+  term_en: Pack of rhetorical techniques
+  term_ru: пак риторических приёмов
+- file: docs/PACK-SUBSCRIBE-LIVE-CHECK.md
+  source: model
+  term_en: catalog
+  term_ru: витрина
+- file: docs/PACK-SUBSCRIBE-LIVE-CHECK.md
+  source: model
+  term_en: not
+  term_ru: не
