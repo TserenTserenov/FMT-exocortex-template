@@ -517,11 +517,11 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "613c1431eed529aec820bd61e59550771fc1849438c30ae185b388376362a7a1"
+      "sha256": "fbb3bd72903eb490ad34c4a6b4994636330a1d5e75c9857b4d5f116a33a01b5a"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
-      "sha256": "d1482b44fb1a8ed982d1f8de202d32562c6f8e470c4b7c77fc0ca3ff871d0c18"
+      "sha256": "50290e5a26b6f94074e8c9f1832e6cfd55ec57589274f5a5e51092b7f2f3b545"
     },
     {
       "path": ".claude/skills/_template/SKILL.md",
@@ -762,6 +762,26 @@
     {
       "path": ".claude/skills/pack-new/SKILL.md",
       "sha256": "cb202460dad8f2e2fd093fb601c042b14cf11da9214faf8c56f2a4fc56284368"
+    },
+    {
+      "path": ".claude/skills/pack-subscribe/SKILL.md",
+      "sha256": "0446d3e9764bda5a39f77dc0b512d0bba615ed5fa765a5a770530dc6f4c1da32"
+    },
+    {
+      "path": ".claude/skills/pack-subscribe/catalog.py",
+      "sha256": "9b1d57e4a2ba1949c88178df579d40ddaa53d24da088834645cbb6b160de6f35"
+    },
+    {
+      "path": ".claude/skills/pack-subscribe/pack-catalog.yaml",
+      "sha256": "2a52c93d39475d9b6bd115830107a5502663a1850e05b4d2557ee7dabfe13b48"
+    },
+    {
+      "path": ".claude/skills/pack-subscribe/templates/subscriber-memo.md",
+      "sha256": "d415e60f25e95957e07bd090def2dd83433b89e0059a4d39515ce91ff38ffd60"
+    },
+    {
+      "path": ".claude/skills/pack-subscribe/templates/subscriptions-extension.md",
+      "sha256": "d1325cd6bde62c1dd3a5c6809551416cee7abe55c6d3d0bba40712e67cc1a67e"
     },
     {
       "path": ".claude/skills/peer-conversation/SKILL.md",
@@ -1005,7 +1025,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "1c945170081f8a9e4dcd4359986c82efa77fb41582f64e4a7c836d5cd3fb2d1b"
+      "sha256": "2447645be8d430ef4aff2748f48b6253d0b08e15ecfa42f94666e0882e7c3679"
     },
     {
       "path": ".gitignore",
@@ -1033,7 +1053,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "adf690a77c3859ebbaba26d97ca277fbf5f456f7b8235b6ee259f19dd6284ed8"
+      "sha256": "ebf62773242987d68fc4d66ad8bdf679c4d4368b9a4faec813fea8cf5be964e0"
     },
     {
       "path": "CLAUDE.md",
@@ -1110,6 +1130,10 @@
     {
       "path": "docs/PACK-CREATION.md",
       "sha256": "63418eae5d6713abfe367d9ca4cf283852b66ce69baaa567c8898b0cebe0e440"
+    },
+    {
+      "path": "docs/PACK-SUBSCRIBE-LIVE-CHECK.md",
+      "sha256": "a39d612caa07bd89fd76a2f0baf2a70c65a1a3e9642fa97196cd2691ae3542ce"
     },
     {
       "path": "docs/PEER-FANOUT-LIVE-CHECK.md",
@@ -1273,7 +1297,7 @@
     },
     {
       "path": "extensions/README.md",
-      "sha256": "be1f3f6adeacb88d263c9e8fb7d515cb6c146eada96fb3811d2cb8e5127b4ce2"
+      "sha256": "cf4466401b7edba68d0d915c91e42bd2727d88adc516deba0e5a79800591c61a"
     },
     {
       "path": "extensions/agent-inbox/README.md",
@@ -3681,7 +3705,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "5e133c3150b942132f2511cef7868988f8d33888453d46f2c5046779a4d6e951"
+      "sha256": "1fb0aa71e5a95f627ad07c2e967244f3f6f26989f937379fb847db5c8fcf7b1f"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
@@ -3993,6 +4017,7 @@
     "scripts/tests/test_mount_readonly_packs.sh",
     "scripts/tests/test_normalize_en_phase_labels.py",
     "scripts/tests/test_notify_optional_gate.sh",
+    "scripts/tests/test_pack_subscribe_catalog.py",
     "scripts/tests/test_pending_lock.py",
     "scripts/tests/test_pending_phases_sweep.sh",
     "scripts/tests/test_release_notice_build.py",

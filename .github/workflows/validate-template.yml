@@ -1143,6 +1143,7 @@ jobs:
             scripts/tests/test_residency_gate_skill_adapter.py \
             scripts/tests/test_release_notice_build.py \
             scripts/tests/test_check_changelog_fields.py \
+            scripts/tests/test_pack_subscribe_catalog.py \
             scripts/tests/test_day_open_week_sync_patch.py \
             scripts/tests/test_week_pool.py \
             scripts/tests/test_skill_agents.py \
