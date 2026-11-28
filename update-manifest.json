@@ -813,7 +813,7 @@
     },
     {
       "path": ".claude/skills/repo-new/SKILL.md",
-      "sha256": "50e531a7b6fa6f8932847ff2afddedfde0045d068279a3f0a0ce33468e3e321d"
+      "sha256": "19c8cf84102b994ae5d50f0451535fe59b565184e5d13f2446943827431a6a23"
     },
     {
       "path": ".claude/skills/repo-new/assets/repository-skeleton/CLAUDE.md",
@@ -1053,7 +1053,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "1faca180f9b8e59a4fc14d1b5384eccc5ac29bfecb1abfa6723a3f31e3c56f40"
+      "sha256": "82b44f13ce932294cd1fd580ac177d61d0d98ba39ee9437e9f39fca9af782c6e"
     },
     {
       "path": "CLAUDE.md",
@@ -1105,7 +1105,7 @@
     },
     {
       "path": "docs/DATA-RESIDENCY.md",
-      "sha256": "381f083068f2b178825cd73e4f78dcf23842feaad7568503744c9f03cec6c31a"
+      "sha256": "2345886ab3f357ac16e02c60c5df009cb2c2bd13ffadd28be352f09c6b3989ee"
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
