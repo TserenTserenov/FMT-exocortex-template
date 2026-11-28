@@ -182,7 +182,10 @@ is_author_context_exception() {
     # personal leakage, and no local bugs/ directory exists here to confirm a
     # rename is even safe (issue #1107 triage); the copyright line of the
     # vendored guide-kit licence, which must name its holder (seen once
-    # extension-less delivered files were scanned, issue #1569).
+    # extension-less delivered files were scanned, issue #1569); two lines of
+    # the shipped pack catalog of /pack-subscribe, which by design names the
+    # public Packs on offer and their authors (the url lines are already
+    # exempt as github.com links).
     # Match the whole line, never the whole file.
     local line="$2"
     line="${line%$'\r'}"  # grep preserves a final CR in Windows line endings.
@@ -207,6 +210,8 @@ is_author_context_exception() {
         'setup/build-runtime.sh:# bug-2026-09-17-tsekh1-recovery-backups-abort: under `set -eu`, a single'|\
         'setup/build-runtime.sh:# bug-2026-09-17-tsekh1-recovery-backups-abort (continuation): leftovers from'|\
         'update.sh:# author_release_regression FPATH PAYLOAD — bug-2026-09-17-tsekh1-release-'|\
+        '.claude/skills/pack-subscribe/pack-catalog.yaml:    owner: TserenTserenov'|\
+        '.claude/skills/pack-subscribe/pack-catalog.yaml:  - name: PACK-MIM'|\
         'guide-kit/LICENSE:Copyright (c) 2026 Tseren Tserenov') return 0 ;;
     esac
     return 1

@@ -1,0 +1,61 @@
+# pack-catalog.yaml — shipped catalog of knowledge bases (Packs) by other authors
+# that /pack-subscribe can connect read-only.
+#
+# Platform file: update.sh overwrites it. Do not edit it in your installation.
+# Your own catalog goes to extensions/pack-catalog.yaml or to the key
+# pack_catalog_url in params.yaml (see .claude/skills/pack-subscribe/SKILL.md).
+#
+# Inclusion rule for this shipped file: only Packs whose repository is PUBLIC
+# (checked with `gh repo view <owner/repo> --json visibility` when added) and
+# that the author offers to everyone. Private and internal Packs are not listed.
+#
+# Fields:
+#   name        clone directory name (letters, digits, . _ -)
+#   owner       GitHub account or organisation of the author
+#   domain      subject area, one phrase
+#   description what is inside, one line
+#   url         https address of the git repository
+#   access      open | by-subscription (by-subscription = read right from the owner)
+#   audience    for whom
+#   offered     optional; internal-only entries are never shown or connected
+#
+# Identifier scope: `name` is unique within the merged catalog (shipped + user
+# entries; a user entry with the same name replaces the shipped one) and equals
+# the clone directory in the workspace root. No separate numbering is introduced.
+# Schema owner: the pack-subscribe skill; catalog.py next to this file is the
+# single parser and validator (`python3 catalog.py validate <file>`).
+schema_version: 1
+updated: 2026-11-21
+
+packs:
+  - name: PACK-rhetoric
+    owner: TserenTserenov
+    domain: "Риторические приёмы"
+    description: "Библиотека из 70+ карточек приёмов (аналогии, кейсы, метафоры, примеры) для постов, руководств и презентаций"
+    url: https://github.com/TserenTserenov/PACK-rhetoric
+    access: open
+    audience: "контент, продвижение"
+
+  - name: PACK-ecosystem
+    owner: MimEcoSys
+    domain: "Экосистема развития интеллекта"
+    description: "Паспорт экосистемы: позиционирование, воронка, сообщество, путь пользователя"
+    url: https://github.com/MimEcoSys/PACK-ecosystem
+    access: open
+    audience: "продвижение, партнёры"
+
+  - name: PACK-MIM
+    owner: MimEcoSys
+    domain: "Мастерская инженеров-менеджеров"
+    description: "Форматы мероприятий, типы программ развития, роли организации"
+    url: https://github.com/MimEcoSys/PACK-MIM
+    access: open
+    audience: "продвижение, программы"
+
+  - name: PACK-personal
+    owner: MimEcoSys
+    domain: "Характеристики и состояния созидателя"
+    description: "Формализованное знание о развитии созидателя; на его понятия ссылаются карточки PACK-rhetoric"
+    url: https://github.com/MimEcoSys/PACK-personal
+    access: open
+    audience: "контент о развитии, вместе с PACK-rhetoric"
