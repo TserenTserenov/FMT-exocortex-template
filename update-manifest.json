@@ -904,6 +904,10 @@
       "sha256": "ac89ad4b2cbc19ee9f9b7d4b2cb649c0fe04ba7a74b4afd7edd58fb17e7299a5"
     },
     {
+      "path": "docs/PEER-FANOUT-LIVE-CHECK.md",
+      "sha256": "d8344f9a009f3287a2ae7cce2e57a66fe9ec8fa0a80715edc54aa2d2bca4b6ce"
+    },
+    {
       "path": "docs/PLATFORM-COMPAT.md",
       "sha256": "104e2fa4d02c1f6b7cddbdfce6320169b8a82729db59102d7f3c91dadfd0a1f3"
     },

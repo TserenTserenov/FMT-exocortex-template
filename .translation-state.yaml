@@ -1,34 +1,38 @@
 files_translated:
-- docs/PACK-SUBSCRIBE-LIVE-CHECK.md
-last_run_utc: '2026-11-28T06:37:10Z'
-last_synced_sha: f5cd6f0268cf2dd9eb44698db51524b32d37669e
+- docs/PEER-FANOUT-LIVE-CHECK.md
+last_run_utc: '2026-11-28T07:05:08Z'
+last_synced_sha: ca0d6af7f6c4e0bb18ac686177a45cde54fb3c9e
 schema_version: 1
 unapproved_terms:
-- file: docs/PACK-SUBSCRIBE-LIVE-CHECK.md
+- file: docs/PEER-FANOUT-LIVE-CHECK.md
   source: local-glossary
   term_en: Skill
   term_ru: Навык
-- file: docs/PACK-SUBSCRIBE-LIVE-CHECK.md
-  source: local-glossary
-  term_en: Pack
-  term_ru: Пак
-- file: docs/PACK-SUBSCRIBE-LIVE-CHECK.md
+- file: docs/PEER-FANOUT-LIVE-CHECK.md
   source: local-glossary
   term_en: Step
   term_ru: Шаг
-- file: docs/PACK-SUBSCRIBE-LIVE-CHECK.md
+- file: docs/PEER-FANOUT-LIVE-CHECK.md
   source: local-glossary
   term_en: Verification
   term_ru: Проверка
-- file: docs/PACK-SUBSCRIBE-LIVE-CHECK.md
+- file: docs/PEER-FANOUT-LIVE-CHECK.md
   source: model
-  term_en: Pack of rhetorical techniques
-  term_ru: пак риторических приёмов
-- file: docs/PACK-SUBSCRIBE-LIVE-CHECK.md
+  term_en: merge request
+  term_ru: запрос на слияние
+- file: docs/PEER-FANOUT-LIVE-CHECK.md
   source: model
-  term_en: catalog
-  term_ru: витрина
-- file: docs/PACK-SUBSCRIBE-LIVE-CHECK.md
+  term_en: feature
+  term_ru: схема
+- file: docs/PEER-FANOUT-LIVE-CHECK.md
+  source: model
+  term_en: distribution script
+  term_ru: программа раздачи
+- file: docs/PEER-FANOUT-LIVE-CHECK.md
+  source: model
+  term_en: summary line
+  term_ru: строка сводки
+- file: docs/PEER-FANOUT-LIVE-CHECK.md
   source: model
   term_en: not
   term_ru: не
