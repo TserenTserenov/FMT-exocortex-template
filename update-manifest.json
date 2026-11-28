@@ -1057,7 +1057,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "21dfd214c23827a1adcda9de490a60a40438f66f50a679a148fd1cad869c15d2"
+      "sha256": "87118674c0a1d66cdd372788928d7bbba54da789a5dedfe40cd4af3e4408def7"
     },
     {
       "path": "CLAUDE.md",
@@ -2089,7 +2089,7 @@
     },
     {
       "path": "roles/strategist/prompts/session-prep.md",
-      "sha256": "7c4856d52adbe61565e4aa8d13e136f26800cac5821c55410c666981cf18d187"
+      "sha256": "f2bebcc80d834f1f07821d0543262d1bf9e02de322c3a4eb645dfe890d6f0191"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-monthly.md",
@@ -3926,6 +3926,7 @@
     "scripts/tests/test_issue_1688_hooks_path_kept.sh",
     "scripts/tests/test_issue_1691_guide_switch.sh",
     "scripts/tests/test_issue_1692_bug_report_commit.sh",
+    "scripts/tests/test_issue_1706_sweep_path.sh",
     "scripts/tests/test_issue_1709_arch_refs.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
