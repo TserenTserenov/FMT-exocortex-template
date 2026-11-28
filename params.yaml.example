@@ -48,6 +48,17 @@ wp_new_add_to_weekplan: true
 # day-open-llm-fill.py всё ещё печатают details независимо от этого параметра.
 dayplan_weekplan_heading_style: details
 
+# Day Open: фоновое обновление снимка квалификации для персонального руководства (issue #1691).
+# Раз в 10 дней (по возрасту снимка) Day Open запускает scripts/update-derived-snapshot.py: он
+# открывает короткую headless-сессию Claude Code (расходует токены) и пишет итог в
+# <репозиторий управления>/logs/personal-guide-update.log.
+#   true  — обновлять (по умолчанию, ключ не задан = true)
+#   false — не обновлять: headless-сессия не открывается, токены не тратятся, в журнале одна строка
+#           «SKIPPED: personal_guide_enabled is false ...»; руководство собирается по последнему
+#           имеющемуся снимку. Работает для любого запуска скрипта (Day Open, расписание, вручную).
+#           Только буквально false, без кавычек: "false", False, no не действуют.
+personal_guide_enabled: true
+
 # Day Close: расчёт мультипликатора IWE (требует WakaTime API key)
 multiplier_enabled: true
 

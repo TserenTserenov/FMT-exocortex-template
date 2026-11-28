@@ -89,7 +89,7 @@ bash .claude/scripts/load-extensions.sh verify before
 **Для `archgate`:**
 - Найти ЭМОГССБ-таблицу из текущей сессии (или запросить)
 - Прочитать изменённые файлы реализации
-- Прочитать DP.ARCH.001 §7 (21 принцип)
+- Прочитать DP.ARCH.001 §15 «Архитектурные принципы (2-й уровень)» (все принципы таблицы)
 - Передать sub-agent'у: файлы + таблица + принципы + чеклист archgate
 - Модель sub-agent'а: Opus
 
@@ -296,7 +296,7 @@ Sub-agent получает промпт с заполненными данным
 | Pack-сущность | SPF pack-template + доменные принципы Pack |
 | Описание метода | SPF process/07 + Pack |
 | Код (DS) | CLAUDE.md репо + Pack-описания сервисов |
-| Архитектурное решение | DP.ARCH.001 §7 (→ используй /archgate вместо /verify) |
+| Архитектурное решение | DP.ARCH.001 §15 «Архитектурные принципы (2-й уровень)» (→ используй /archgate вместо /verify) |
 | План (WeekPlan/DayPlan) | Протоколы Open/Close |
 | Подраздел руководства (SS) | `DS-principles-curriculum/specs/v4-reference/CHECKLIST-subsection-v1.md` (v1.2+) |
 | Раздел руководства (S) | `DS-principles-curriculum/specs/v4-reference/CHECKLIST-section-v1.md` |

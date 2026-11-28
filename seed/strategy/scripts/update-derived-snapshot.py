@@ -9,6 +9,10 @@ parses 3_4_qualification schema, writes to local cache.
 Design: runs in launchd (Sunday 08:00) and optionally from Day Open (--if-stale-days).
 Zero network calls during guide assembly; this script is the separated update channel.
 
+Switch (issue #1691): `personal_guide_enabled: false` in the workspace params.yaml skips the whole
+refresh before any subprocess -- no headless claude session, no tokens -- and logs why.
+Missing key or any other value: the refresh runs as before.
+
 Usage:
   python3 scripts/update-derived-snapshot.py
   python3 scripts/update-derived-snapshot.py --if-stale-days 10
@@ -20,6 +24,7 @@ import json
 import logging
 import os
 import pathlib
+import re
 import subprocess
 import sys
 from typing import Optional
@@ -38,6 +43,16 @@ def _installed_governance_root() -> Optional[pathlib.Path]:
     return script_repo
 
 
+def _configured_iwe_root() -> pathlib.Path:
+    """Workspace root from the environment (IWE_ROOT, then IWE_WORKSPACE), else ~/IWE."""
+    configured_root = os.environ.get("IWE_ROOT") or os.environ.get("IWE_WORKSPACE")
+    return (
+        pathlib.Path(configured_root).expanduser()
+        if configured_root
+        else pathlib.Path.home() / "IWE"
+    )
+
+
 def _resolve_snapshot_path() -> pathlib.Path:
     """Resolve cache location, preferring an installed copy's physical repo."""
     # issue #1132: this cache used to live under inbox/WP-425/ — the platform
@@ -50,17 +65,38 @@ def _resolve_snapshot_path() -> pathlib.Path:
     if installed_root is not None:
         return installed_root / ".cache/derived_snapshot.json"
 
-    configured_root = os.environ.get("IWE_ROOT") or os.environ.get("IWE_WORKSPACE")
-    iwe_root = (
-        pathlib.Path(configured_root).expanduser()
-        if configured_root
-        else pathlib.Path.home() / "IWE"
-    )
     governance_repo = os.environ.get("IWE_GOVERNANCE_REPO", "DS-strategy")
-    return iwe_root / governance_repo / ".cache/derived_snapshot.json"
+    return _configured_iwe_root() / governance_repo / ".cache/derived_snapshot.json"
 
 
 SNAPSHOT_PATH = _resolve_snapshot_path()
+
+# issue #1691: the switch for this updater lives in params.yaml, the user's settings file in the
+# workspace root (the parent of the governance repo; Day Open reads it there as "$IWE/params.yaml").
+# Only the literal `personal_guide_enabled: false` turns the refresh off -- the same convention as
+# `wp_new_add_to_weekplan` (#1503): a missing key, any other value, a missing or unreadable file all
+# keep the previous behaviour (refresh on). The check is here and not in the callers, so one switch
+# closes every entry point: Day Open, a scheduled run, a manual run.
+_PERSONAL_GUIDE_OFF = re.compile(
+    r"^personal_guide_enabled:[ \t]*false[ \t]*(#.*)?$", re.MULTILINE
+)
+
+
+def _params_path() -> pathlib.Path:
+    """params.yaml of this installation: the workspace root, next to the governance repo."""
+    installed_root = _installed_governance_root()
+    if installed_root is not None:
+        return installed_root.parent / "params.yaml"
+    return _configured_iwe_root() / "params.yaml"
+
+
+def _personal_guide_disabled() -> bool:
+    """True only when params.yaml says `personal_guide_enabled: false`."""
+    try:
+        text = _params_path().read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return False
+    return _PERSONAL_GUIDE_OFF.search(text) is not None
 
 
 def _migrate_stray_old_snapshot() -> None:
@@ -262,6 +298,17 @@ def main() -> int:
 
     logging.basicConfig(level=logging.INFO, stream=sys.stderr,
                         format="%(levelname)s %(message)s")
+
+    # issue #1691: first thing, before the migration, the staleness check and any subprocess, so
+    # that `false` means no headless claude session and no tokens on every path (also --dry-run).
+    # The reason is logged as a skip, never as a successful refresh.
+    if _personal_guide_disabled():
+        logging.info(
+            "SKIPPED: personal_guide_enabled is false in %s -- snapshot refresh not run "
+            "(no claude call, no tokens). Set it to true or remove the line to turn it back on.",
+            _params_path(),
+        )
+        return 0
 
     if not args.dry_run:
         _migrate_stray_old_snapshot()

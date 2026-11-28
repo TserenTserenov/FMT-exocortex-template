@@ -537,7 +537,7 @@
     },
     {
       "path": ".claude/skills/archgate/SKILL.md",
-      "sha256": "1d27d9cc07654d6676999fcdc4bf96760ef8f99b9a4d38c75cf601b5efcb178d"
+      "sha256": "8da546cb4df0b5b786f240b8500b85910b012cff24ea98945da5449b0bf8d559"
     },
     {
       "path": ".claude/skills/artifactor/SKILL.md",
@@ -629,7 +629,7 @@
     },
     {
       "path": ".claude/skills/iwe-bug-report/SKILL.md",
-      "sha256": "ae4fb32eef936ed4a5a0acd825344ea767172db6f3867c2d376aab6096d587f5"
+      "sha256": "e1e8c10f38580974c3b3aeb0f64271952f67fb47a5204110c34acf43b8b2f882"
     },
     {
       "path": ".claude/skills/iwe-platform-redteam/SKILL.md",
@@ -933,7 +933,7 @@
     },
     {
       "path": ".claude/skills/verify/SKILL.md",
-      "sha256": "472d3752857754ee20b3a69b9727627dd9097ea93390a68507d18b22627a9dfd"
+      "sha256": "a642a6aa58ae823e95f8f4e2bff24be08f9fe08f42826532eadf535979bbf691"
     },
     {
       "path": ".claude/skills/verify/verify-fpf-subsection.md",
@@ -957,7 +957,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "b0362587102f0889623be79f255adf34d3b219bf7ad4c39100b88a672d75cd56"
+      "sha256": "18b4549b929198bd69b282f40710ef1ecd5ef91a6081d970f23b8524e3d30f26"
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
@@ -1125,7 +1125,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "21f62931837b9fec7c5ae34fa88a3deb0916c6a2f66383f7fd43a4614ab6b29b"
+      "sha256": "445fc00940b2249e65b8442de9b744b34fe0d56ece9c86c56f6b72409b5bb333"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -1305,7 +1305,7 @@
     },
     {
       "path": "extensions/agent-inbox/SPEC.md",
-      "sha256": "97b8964b08a0cdd112b1058a87206f2fd154811d7886b4db263e445f8c01acff"
+      "sha256": "1f87c7a94ab86b1667e44352a6330168e1bd65e8e8f9308e5f648dde59a4a9c7"
     },
     {
       "path": "extensions/agent-inbox/scripts/config/pipeline-security-whitelist.yaml",
@@ -3429,7 +3429,7 @@
     },
     {
       "path": "scripts/update-derived-snapshot.py",
-      "sha256": "f07f4b33b1902a10e5448f4c5eb35ea75bdba1c16c65c8e957b2996df88f3bbd"
+      "sha256": "f38f7587e9fcdc569c38af7a21e89f9ac48543b43258957ce8cabfb85cb133d6"
     },
     {
       "path": "scripts/validate-fmt-scripts.sh",
@@ -3669,7 +3669,7 @@
     },
     {
       "path": "seed/strategy/scripts/update-derived-snapshot.py",
-      "sha256": "98d3bd5cce3c7c1f4ba253efcd2aee191031cb01dfddde2e1babc55db5df7b7c"
+      "sha256": "86ee13dc234b45b627a432da768d745f2c594f6b3aeaa5d2d2f48048d1b97dac"
     },
     {
       "path": "sessions/00-index.md",
@@ -3920,6 +3920,9 @@
     "scripts/tests/test_issue_1659_strategy.sh",
     "scripts/tests/test_issue_1670_secret_scan_bytes.sh",
     "scripts/tests/test_issue_1688_hooks_path_kept.sh",
+    "scripts/tests/test_issue_1691_guide_switch.sh",
+    "scripts/tests/test_issue_1692_bug_report_commit.sh",
+    "scripts/tests/test_issue_1709_arch_refs.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
