@@ -1053,7 +1053,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "82b44f13ce932294cd1fd580ac177d61d0d98ba39ee9437e9f39fca9af782c6e"
+      "sha256": "8192d00acc8d48e4bfc6999936b3238e5b1081ba0597a93ad2da08389a170adf"
     },
     {
       "path": "CLAUDE.md",
@@ -2085,7 +2085,7 @@
     },
     {
       "path": "roles/strategist/prompts/session-prep.md",
-      "sha256": "7c4856d52adbe61565e4aa8d13e136f26800cac5821c55410c666981cf18d187"
+      "sha256": "f2bebcc80d834f1f07821d0543262d1bf9e02de322c3a4eb645dfe890d6f0191"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-monthly.md",
@@ -3920,6 +3920,7 @@
     "scripts/tests/test_issue_1659_strategy.sh",
     "scripts/tests/test_issue_1670_secret_scan_bytes.sh",
     "scripts/tests/test_issue_1688_hooks_path_kept.sh",
+    "scripts/tests/test_issue_1706_sweep_path.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
