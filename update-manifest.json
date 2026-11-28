@@ -517,7 +517,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "082a3900dc7e7daeb3b34688c09f15cfa04757704e38d9629676bca7b558467a"
+      "sha256": "fbb3bd72903eb490ad34c4a6b4994636330a1d5e75c9857b4d5f116a33a01b5a"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -788,6 +788,10 @@
       "sha256": "912783622b22820c5d15798fe44fb4e6e1187586b31792d1a6655e2b587cd8ae"
     },
     {
+      "path": ".claude/skills/peer-fanout/SKILL.md",
+      "sha256": "e16d3409cb45354f97635f7d174fd89737d631fc1d4b308b320d51545c48814f"
+    },
+    {
       "path": ".claude/skills/personal-guide-render/SKILL.md",
       "sha256": "d9260a0d4d0bbd8966c7219d8ba05440635809347345cd96522926247b02fe23"
     },
@@ -809,7 +813,7 @@
     },
     {
       "path": ".claude/skills/repo-new/SKILL.md",
-      "sha256": "50e531a7b6fa6f8932847ff2afddedfde0045d068279a3f0a0ce33468e3e321d"
+      "sha256": "c398a29dba95b9b6fc97a304a16b275fdd70e3778123dc241cdc05870620c04b"
     },
     {
       "path": ".claude/skills/repo-new/assets/repository-skeleton/CLAUDE.md",
@@ -1021,7 +1025,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "d3e12f5f532794e29b2f99c531f223bc4e0e5d1972d7f3b3912afb1b7c1b8a84"
+      "sha256": "2447645be8d430ef4aff2748f48b6253d0b08e15ecfa42f94666e0882e7c3679"
     },
     {
       "path": ".gitignore",
@@ -1049,7 +1053,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "4e5515059eeecb0473aa249442571138cc48055aeb617016c65170da0df441f9"
+      "sha256": "ebf62773242987d68fc4d66ad8bdf679c4d4368b9a4faec813fea8cf5be964e0"
     },
     {
       "path": "CLAUDE.md",
@@ -1101,7 +1105,7 @@
     },
     {
       "path": "docs/DATA-RESIDENCY.md",
-      "sha256": "381f083068f2b178825cd73e4f78dcf23842feaad7568503744c9f03cec6c31a"
+      "sha256": "2345886ab3f357ac16e02c60c5df009cb2c2bd13ffadd28be352f09c6b3989ee"
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
@@ -1130,6 +1134,10 @@
     {
       "path": "docs/PACK-SUBSCRIBE-LIVE-CHECK.md",
       "sha256": "a39d612caa07bd89fd76a2f0baf2a70c65a1a3e9642fa97196cd2691ae3542ce"
+    },
+    {
+      "path": "docs/PEER-FANOUT-LIVE-CHECK.md",
+      "sha256": "646d0132177cd5934e4d88261bdc6c6559e440e9ce2799db179e891b8e9919ff"
     },
     {
       "path": "docs/PLATFORM-COMPAT.md",
@@ -3004,6 +3012,10 @@
       "sha256": "bdbd68e19c8ad197e177ecc4f4817f7f4d0376c5f9e7f1610060c40a7fa54e75"
     },
     {
+      "path": "scripts/peer-fanout.sh",
+      "sha256": "f6860cd9d36f9482c15d5efca2ac1ce78a09cbeeaa46658e635ecf2e67ddd1ca"
+    },
+    {
       "path": "scripts/peer-session-finalize.sh",
       "sha256": "c6c5170a604c103ed730b7a40f15c4a04c729e6b6cfe3fe0e4dcb84a5f083839"
     },
@@ -3193,7 +3205,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "23b9e35851aeb2a0383772a22a3e484c3a2035f4d36e7cd46beb0f21ca4295ca"
+      "sha256": "9005cf60eef847ee2320b6d147ab86ea728a412b5067968e95c34163af39fa68"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3760,6 +3772,7 @@
     "scripts/tests/git-sync-status-smoke.sh",
     "scripts/tests/iwe-paths-scripts-resolution-smoke.sh",
     "scripts/tests/lib/extract-update-download-batch.sh",
+    "scripts/tests/peer-fanout-smoke.sh",
     "scripts/tests/pull-on-touch-ff-only-smoke.sh",
     "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
     "scripts/tests/session-guard-isolate-minimal-smoke.sh",
