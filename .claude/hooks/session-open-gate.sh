@@ -111,7 +111,9 @@ SESSION_ID_SAFE="$SESSION_ID"
 # reused verbatim, not reinvented, to inherit its evasion coverage.
 NORMALIZED_COMMAND=$(printf '%s' "$COMMAND" | tr '\n' ';' | tr -s '[:space:]' ' ')
 GIT_GLOBAL_FLAGS_RE='(-C [^ ]+|-c [^ ]+|--(git-dir|work-tree|namespace|exec-path)(=[^ ]+| [^ ]+)|--(literal-pathspecs|glob-pathspecs|noglob-pathspecs|icase-pathspecs|no-optional-locks|no-lazy-fetch|no-replace-objects|no-pager|paginate|bare)|-P)'
-echo "$NORMALIZED_COMMAND" | grep -qE "(^|[;&|(]) *(([A-Za-z_][A-Za-z0-9_]*=[^ ]+ *)*)(command |builtin |exec )?git( $GIT_GLOBAL_FLAGS_RE)* (commit|push)( |$)" || exit 0
+# The command word is matched without regard to case: on a case-insensitive file system (macOS,
+# Windows) `GIT commit` and `Git commit` run the same git. The sub-command stays case-sensitive.
+echo "$NORMALIZED_COMMAND" | grep -qE "(^|[;&|(]) *(([A-Za-z_][A-Za-z0-9_]*=[^ ]+ *)*)(command |builtin |exec )?[Gg][Ii][Tt]( $GIT_GLOBAL_FLAGS_RE)* (commit|push)( |$)" || exit 0
 
 # The agent name goes into the semaphore globs below: `*` or `[...]` would match
 # other agents' semaphores (a claude-code one with `wp:`) and let the commit

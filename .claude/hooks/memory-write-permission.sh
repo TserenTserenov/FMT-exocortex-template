@@ -16,7 +16,9 @@
 #     approved by Claude Code itself), its parent folder exists, and the REAL path of the
 #     file (symlinks resolved) is still inside the memory folder.
 #   - no component of the real path inside the memory folder is hidden (starts with ".")
-#     or named .git/.claude/.github/.ssh/.gnupg (those keep their own confirmation).
+#     or named .git/.claude/.github/.ssh/.gnupg (those keep their own confirmation);
+#   - the path as written has no ".." segment (a link named .git inside memory followed by
+#     ".." would otherwise look like an ordinary file after normalisation).
 # Anything else: no output and exit 0, so the permission flow stays unchanged.
 # Opt out: IWE_MEMORY_WRITE_AUTO_APPROVE=0.
 #
@@ -92,6 +94,11 @@ def main():
     expected = os.path.realpath(os.path.join(config, "projects", slug, "memory"))
     memory = os.path.realpath(link)
     if memory != expected or not os.path.isdir(memory):
+        return
+    # A ".." segment in the path as written is refused: normalisation would drop it together
+    # with the name before it (memory/.git/../x becomes memory/x) and hide that name from the
+    # checks below, while the OS resolves a link first and applies ".." to its target (N10).
+    if ".." in re.split(r"[\\/]", target):
         return
     # The path as written must go through <workspace>/memory/ before symlinks are resolved.
     if not inside(os.path.normpath(target), os.path.normpath(link)):

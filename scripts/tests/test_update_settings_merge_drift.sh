@@ -56,6 +56,13 @@ if [ ! -f "$PREVIEW" ]; then
     echo 'FAIL: a real addition (non-check mode) did not write the workspace preview' >&2
     exit 1
 fi
+# finding 4 of the rc.2 check of 0.42.2: this workspace has no hook or value of its own, it only
+# lags behind the template, and the warning must not claim "your hooks"
+if ! grep -Fq 'своих хуков и значений в ней нет' <(printf '%s' "$OUT") \
+   || grep -Fq 'ваши хуки' <(printf '%s' "$OUT"); then
+    echo 'FAIL: a workspace with nothing of its own was described as carrying own hooks' >&2
+    exit 1
+fi
 
 # --- Case 2: byte-for-byte identical -> quiet, nothing written ---
 rm -f "$PREVIEW"
@@ -99,6 +106,10 @@ if ! grep -Fq 'платформа обновила hooks/permissions' <(printf '
     echo 'FAIL: an orphaned workspace-only hook did not report a warning' >&2
     exit 1
 fi
+if ! grep -Fq 'ваши хуки, которых нет в шаблоне' <(printf '%s' "$OUT"); then
+    echo 'FAIL: a workspace-only hook was not named as the reason the copy is left alone' >&2
+    exit 1
+fi
 
 # --- Case 5: --check mode on real drift -> warns, writes NOTHING ---
 printf '{"hooks":{"Stop":[{"matcher":"*","hooks":[{"type":"command","command":"a.sh"}]},{"matcher":"*","hooks":[{"type":"command","command":"c.sh"}]}]}}\n' \
@@ -118,4 +129,27 @@ if [ -f "$PREVIEW" ]; then
     exit 1
 fi
 
-echo 'PASS: settings merge drift (quiet on reorder, warns on real add/removal, --check writes nothing)'
+# --- Case 6: no hook of its own, only its own value of a setting the template also sets ---
+printf '{"effortLevel":"high"}\n' > "$SCRIPT_DIR/.claude/settings.json"
+printf '{"effortLevel":"low"}\n' > "$WORKSPACE_DIR/.claude/settings.json"
+rm -f "$PREVIEW"
+OUT=$(report_settings_merge_drift)
+if ! grep -Fq 'ваши значения настроек' <(printf '%s' "$OUT") \
+   || grep -Fq 'ваши хуки' <(printf '%s' "$OUT"); then
+    echo 'FAIL: an own value without own hooks was not described as an own value' >&2
+    exit 1
+fi
+
+# --- Case 7: the only difference is a value the platform itself shipped in older releases ---
+printf '{"permissions":{"defaultMode":"default"}}\n' > "$SCRIPT_DIR/.claude/settings.json"
+printf '{"permissions":{"defaultMode":"acceptEdits"}}\n' > "$WORKSPACE_DIR/.claude/settings.json"
+rm -f "$PREVIEW"
+OUT=$(report_settings_merge_drift)
+if ! grep -Fq 'которое платформа ставила раньше' <(printf '%s' "$OUT") \
+   || grep -Fq 'ваши хуки' <(printf '%s' "$OUT") \
+   || grep -Fq 'ваши значения настроек' <(printf '%s' "$OUT"); then
+    echo 'FAIL: a withdrawn platform value was described as the own hooks or values of the user' >&2
+    exit 1
+fi
+
+echo 'PASS: settings merge drift (quiet on reorder, warns on real add/removal, names what the copy carries, --check writes nothing)'

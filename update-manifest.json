@@ -125,7 +125,7 @@
     },
     {
       "path": ".claude/hooks/memory-write-permission.sh",
-      "sha256": "3ab74ec1d2b79ee8882e12574fa6329896381f9945c626467aba1fc2e31b8757"
+      "sha256": "238376a7fe477dc9340aba5b8b042791cd19b8e2560703ad699dd62697082b18"
     },
     {
       "path": ".claude/hooks/pack-creator-spf-guard.sh",
@@ -145,7 +145,7 @@
     },
     {
       "path": ".claude/hooks/protocol-artifact-validate.sh",
-      "sha256": "441fa6ce6c05387afac650cc7d1095dee7291f798c9487b7c2344b199adb7467"
+      "sha256": "0998d73519091a90e6b5a970fb81c0dd78eadfb126d5d295795066930142413d"
     },
     {
       "path": ".claude/hooks/protocol-completion-reminder.sh",
@@ -189,7 +189,7 @@
     },
     {
       "path": ".claude/hooks/secret-file-read-block.sh",
-      "sha256": "daa0e72ac581bc4ba85634a5123ac19441d66ca580cb6586f43a21c921716811"
+      "sha256": "256ac139423a95eb459b9531cc618c01a4e3a61f3e3d4b482299fff21302e6a9"
     },
     {
       "path": ".claude/hooks/secret-leak-block.sh",
@@ -205,7 +205,7 @@
     },
     {
       "path": ".claude/hooks/session-open-gate.sh",
-      "sha256": "4917d42fdbe0bd2d7c620afc5fb12759ef413efee1b1007f0e7ee7b5beada0a7"
+      "sha256": "ffd72a39c8f3974d53bf7529fc56e636263916b4c95ba34ec94a04d1ccba334a"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -313,11 +313,11 @@
     },
     {
       "path": ".claude/hooks/tests/test-memory-write-permission.sh",
-      "sha256": "1c6aee25c5a0f16c04f6f93ce94f11c7b2b0f1dc9964a49aa38dfdd80d296ce4"
+      "sha256": "f76fab176291ae644326244b122d70b06f0a79a8685b587fa654d8d72ff79fab"
     },
     {
       "path": ".claude/hooks/tests/test-protocol-artifact-validate-mandatory-fail-closed.sh",
-      "sha256": "266d312e3a4ee33d0621cac8db590be55af809eb5280353a73944b04e7670c46"
+      "sha256": "7f890645be5e9b70a5cefa4e26f6e4aa58765b32783088c53dd0a5b1ac147aea"
     },
     {
       "path": ".claude/hooks/tests/test-protocol-stop-gate-quick-close-exempt.sh",
@@ -326,6 +326,10 @@
     {
       "path": ".claude/hooks/tests/test-protocol-stop-gate-task-replacement.sh",
       "sha256": "6e038e043b43c36f020219a2c08f1ec2483f1090eb2d78b5d0eec9b2c578f699"
+    },
+    {
+      "path": ".claude/hooks/tests/test-secret-file-read-block-names-and-env.sh",
+      "sha256": "88bf95fcc7f22ee75bfe9910cff83190c90810dabc0597ecc83ff007bec5f8f6"
     },
     {
       "path": ".claude/hooks/tests/test-secret-leak-block-heredoc-in-dollar-paren.sh",
@@ -337,7 +341,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-session-open-gate.sh",
-      "sha256": "36d17ff94353238dcd0b2a5f264022b81737c82495aebbd8b5672709632535ba"
+      "sha256": "d4cd342dafe034e3ec6a8378c49469765dcc73cf55a771199a113f358cb90bc1"
     },
     {
       "path": ".claude/hooks/tests/test_issue_1184_stop_gate_block_once.sh",
@@ -1053,7 +1057,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "4a4db7bf83e88d68e027790158d73e6b985c7880764718421e1ea2e0154fd7cc"
+      "sha256": "895b28a91ff660a2971b24d13d34f7dd8c681ad95c4d38d5882ad42c787c78e7"
     },
     {
       "path": "CLAUDE.md",
@@ -2717,7 +2721,7 @@
     },
     {
       "path": "scripts/install-hooks.sh",
-      "sha256": "456ddb52697adb2f81ff9e6eacd5602668832ea646283c50fc107c2bbe5622ce"
+      "sha256": "20a27a9c8b893b0c602f3f04b66597a115d2a240097f6bd9eca5e3deb8198ee2"
     },
     {
       "path": "scripts/isolate-push.sh",
@@ -3205,7 +3209,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "9005cf60eef847ee2320b6d147ab86ea728a412b5067968e95c34163af39fa68"
+      "sha256": "815fe9c236f026aa9de466e0c5f136801f4482b7b1f89f4ef6f03c0fc2de88f1"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3285,7 +3289,7 @@
     },
     {
       "path": "scripts/tests/test_install_hooks.py",
-      "sha256": "b5c36f8d133293a6ab30f91bac37aacec290741bd7b8b591090721f68e176586"
+      "sha256": "a224524bc7a0973d0e0d1c37e787ae06b468a46df162c00c081989a952c90b18"
     },
     {
       "path": "scripts/tests/test_issue_1032_strategy_session_offline.sh",
@@ -3417,7 +3421,7 @@
     },
     {
       "path": "scripts/tests/test_update_settings_merge_drift.sh",
-      "sha256": "2dcb6e415044e10273a7cde2a65a362e24434ae4b304ec7ff7db430967c2ed33"
+      "sha256": "793e9d6108a5c8d203ba801a2d69e4a619f3b709b52957118bc8ace656f278f8"
     },
     {
       "path": "scripts/tests/test_upgrade_worktree_cleanup.sh",
@@ -3445,7 +3449,7 @@
     },
     {
       "path": "scripts/validate-staged-artifacts.sh",
-      "sha256": "87914a30cc798eff81d18d0e6b72383b7896af974279a6e6755ac4dbaca95c5e"
+      "sha256": "9054027c9a408004e39d7e4b303215e32d2318ef1d6f3030c9ce02fa90473df2"
     },
     {
       "path": "scripts/verify-context-budget.sh",
@@ -3577,7 +3581,7 @@
     },
     {
       "path": "seed/strategy/scripts/install-hooks.sh",
-      "sha256": "456ddb52697adb2f81ff9e6eacd5602668832ea646283c50fc107c2bbe5622ce"
+      "sha256": "20a27a9c8b893b0c602f3f04b66597a115d2a240097f6bd9eca5e3deb8198ee2"
     },
     {
       "path": "seed/strategy/scripts/isolate-push.sh",
@@ -3677,7 +3681,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "b2d57fa71346b46155c8ccb91fe42c4e9b85479071ea0cdc1c9c7207e458babd"
+      "sha256": "dcd1c458afcd1a7cb747091b73e59f9d6d6c757e23f0f1d0325172502f139351"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3721,7 +3725,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "5695fec50b03e5debc14a2dc4a81a7fbf66afab83d4dadffc1b6d2ba2029b95e"
+      "sha256": "b79b1af0a1d3673f95eb5c406aa940a70a7fc230e32b1a34d3cbc295814a8c07"
     }
   ],
   "excluded_paths": [
@@ -4160,6 +4164,7 @@
     "setup/test-update-modified-skill.sh",
     "setup/test-update-plan-executor.sh",
     "setup/test-update-publish-gate-delivery.sh",
+    "setup/test-update-rate-limit-hint.sh",
     "setup/test-update-rc-channel.sh",
     "setup/test-update-release-channel.sh",
     "setup/test-update-self-overwrite.sh",

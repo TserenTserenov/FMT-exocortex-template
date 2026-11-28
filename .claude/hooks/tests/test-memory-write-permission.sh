@@ -5,7 +5,7 @@
 # Every case also requires an empty stderr, so a crash inside the hook cannot pass as "silent".
 set -uo pipefail
 
-HOOK="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/memory-write-permission.sh"
+HOOK="${HOOK_UNDER_TEST:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/memory-write-permission.sh}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 ERR="$TMP/stderr"
@@ -100,6 +100,10 @@ rmdir "$MEM/.git/hooks" 2>/dev/null; rmdir "$MEM/.git" 2>/dev/null
 mkdir -p "$MEM/plain/hooks"
 ln -s "$MEM/plain" "$MEM/.git"
 expect_silent "link named .git to an ordinary folder" "$(call auto Write "$WS/memory/.git/hooks/pre-commit")"
+# N10 (rc.4 audit): with that link, memory/.git/../x normalises to memory/x and the name .git
+# vanishes from the written path, but the OS resolves the link first, so the real file is memory/x
+expect_silent "dot-dot after a link named .git (exploit path of the rc.4 audit)" "$(call auto Write "$WS/memory/.git/../x.md")"
+expect_silent "dot-dot inside memory is refused too" "$(call auto Write "$WS/memory/sub/../note.md")"
 rm -f "$MEM/.git"; mkdir -p "$MEM/.git/hooks"
 expect_silent "dot-claude inside memory" "$(call auto Write "$WS/memory/.claude/settings.json")"
 expect_silent "dot-github inside memory" "$(call auto Write "$WS/memory/.github/workflows/x.yml")"
@@ -184,6 +188,59 @@ SPMEM="$CONFIG/projects/$(slug_of "$SP")/memory"
 mkdir -p "$SPMEM"
 ln -s "$SPMEM" "$SP/memory"
 expect_allow "workspace path with a space" "$(run_hook "$SP" "$(payload auto Write "$SP/memory/my note.md")")"
+
+# Execute the real hook's Python body with Windows path semantics. No Windows files are read.
+if python3 - "$HOOK" <<'PY_WINDOWS'
+import io
+import json
+import ntpath
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+
+hook = Path(sys.argv[1]).read_text()
+body = hook.split("python3 -I -c '\n", 1)[1].rsplit("\n'\nexit 0", 1)[0]
+namespace = {}
+exec(compile(body.rsplit("\nmain()", 1)[0], sys.argv[1], "exec"), namespace)
+link = r"C:\workspace\memory"
+memory = r"C:\config\projects\test\memory"
+
+def realpath(value):
+    value = ntpath.normpath(value)
+    return memory + value[len(link):] if value == link or value.startswith(link + "\\") else value
+
+paths = SimpleNamespace(
+    isabs=ntpath.isabs, normpath=ntpath.normpath, join=ntpath.join, dirname=ntpath.dirname,
+    realpath=realpath, isdir=lambda _: True,
+)
+namespace["os"] = SimpleNamespace(
+    sep="\\", path=paths, environ={
+        "MEMORY_PROJECT_DIR": r"C:\workspace",
+        "CLAUDE_CODE_PROJECT_DIR_NAME": "test",
+        "CLAUDE_CONFIG_DIR": r"C:\config",
+    },
+)
+for target, allowed in [
+    ("C:/workspace/memory/note.md", True),
+    ("C:/workspace/memory/.git/../note.md", False),
+    (r"C:\workspace\memory\.git\..\note.md", False),
+]:
+    output = io.StringIO()
+    namespace["sys"] = SimpleNamespace(
+        stdin=io.StringIO(json.dumps({
+            "permission_mode": "auto", "tool_name": "Write", "tool_input": {"file_path": target},
+        })),
+        stdout=output,
+    )
+    namespace["main"]()
+    assert bool(output.getvalue()) == allowed, (target, output.getvalue())
+PY_WINDOWS
+then
+  PASS=$((PASS + 1))
+else
+  echo "FAIL Windows path separators"
+  FAIL=$((FAIL + 1))
+fi
 
 echo "memory-write-permission: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
